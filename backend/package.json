@@ -1,0 +1,16 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/main.js",
+    "lint": "eslint \"src/**/*.{js,ts}\"",
+    "test": "jest"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "typescript": "^5.4.0"
+  }
+}

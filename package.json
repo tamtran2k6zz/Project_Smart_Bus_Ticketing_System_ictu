@@ -1,0 +1,23 @@
+{
+  "name": "smart-bus-ticketing",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "prepare": "husky install"
+  },
+  "devDependencies": {
+    "husky": "^8.0.3",
+    "lint-staged": "^15.0.0",
+    "prettier": "^3.0.0"
+  },
+  "lint-staged": {
+    "frontend/**/*.{js,jsx,ts,tsx}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "backend/**/*.{js,ts}": [
+      "prettier --write",
+      "eslint --fix"
+    ]
+  }
+}

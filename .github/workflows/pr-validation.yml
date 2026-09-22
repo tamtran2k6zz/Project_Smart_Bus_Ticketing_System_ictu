@@ -1,0 +1,35 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches: [ develop, main ]
+
+jobs:
+  validate:
+    name: Lint & Unit Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      # Kiểm tra Backend
+      - name: Backend - Install, Lint & Unit Test
+        working-directory: ./backend
+        run: |
+          npm ci
+          npm run lint || true
+          npm run test -- --passWithNoTests
+
+      # Kiểm tra Frontend
+      - name: Frontend - Install, Lint & Unit Test
+        working-directory: ./frontend
+        run: |
+          npm ci
+          npm run lint || true
+          npm run test -- --passWithNoTests

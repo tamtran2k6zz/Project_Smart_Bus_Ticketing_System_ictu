@@ -1,0 +1,69 @@
+name: CI/CD Pipeline - Auto Deploy Staging
+
+on:
+  push:
+    branches: [ develop, main ]
+  pull_request:
+    branches: [ develop ]
+
+jobs:
+  validate:
+    name: Lint & Unit Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      # Kiểm tra Backend
+      - name: Backend - Install, Lint & Unit Test
+        working-directory: ./backend
+        run: |
+          npm ci
+          npm run lint || true
+          npm run test -- --passWithNoTests
+
+      # Kiểm tra Frontend
+      - name: Frontend - Install, Lint & Unit Test
+        working-directory: ./frontend
+        run: |
+          npm ci
+          npm run lint || true
+          npm run test -- --passWithNoTests
+
+  deploy:
+    name: Deploy to Staging Environment
+    needs: validate
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH to Staging Server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.STAGING_SERVER_IP }}
+          username: ${{ secrets.STAGING_SSH_USER }}
+          key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+          script: |
+            cd /home/${{ secrets.STAGING_SSH_USER }}/smart-bus-ticketing
+            git pull origin develop
+            docker compose -f docker-compose.staging.yml down
+            docker compose -f docker-compose.staging.yml up -d --build
+            docker image prune -f
+
+      - name: Notify Slack
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: "🚀 Staging Deployment: Phiên bản mới đã được deploy tự động lên Staging! QA sẵn sàng kiểm thử."
+          fields: repo,message,commit,author,action,eventName,ref,workflow
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
