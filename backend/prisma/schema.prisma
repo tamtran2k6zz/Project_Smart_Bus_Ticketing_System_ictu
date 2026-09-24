@@ -1,0 +1,137 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum RouteStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+}
+
+enum FareType {
+  FLAT_FARE    // Vé toàn tuyến đồng giá
+  STAGE_FARE   // Vé chặng theo khoảng cách / cặp trạm
+}
+
+enum TicketType {
+  SINGLE           // Vé lượt thường
+  MONTHLY_STUDENT  // Vé tháng học sinh, sinh viên
+  MONTHLY_REGULAR  // Vé tháng người lớn/thường
+  PRIORITY         // Vé miễn giảm đối tượng ưu tiên
+}
+
+enum ScheduleStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model Route {
+  id                   String        @id @default(uuid())
+  code                 String        @unique // Mã số tuyến xe buýt (vd: "BUS-01", "T01")
+  name                 String        // Tên tuyến (vd: "Bến xe Thái Nguyên - CNTT&TT")
+  description          String?
+  distanceKm           Float         @default(0.0)
+  estimatedDurationMin Int           @default(0)
+  status               RouteStatus   @default(DRAFT)
+  deletedAt            DateTime?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  // Quan hệ 1-N
+  routeStops           RouteStop[]
+  fares                Fare[]
+  tripSchedules        TripSchedule[]
+
+  @@index([status])
+  @@index([deletedAt])
+  @@map("routes")
+}
+
+model BusStop {
+  id          String      @id @default(uuid())
+  code        String      @unique // Mã trạm (vd: "BS-101")
+  name        String      // Tên trạm dừng
+  address     String      // Địa chỉ trạm
+  latitude    Float       // Vĩ độ
+  longitude   Float       // Kinh độ
+  isActive    Boolean     @default(true)
+  deletedAt   DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Quan hệ
+  routeStops  RouteStop[]
+  fromFares   Fare[]      @relation("FareFromStop")
+  toFares     Fare[]      @relation("FareToStop")
+
+  @@index([latitude, longitude])
+  @@index([deletedAt])
+  @@index([isActive])
+  @@map("bus_stops")
+}
+
+model RouteStop {
+  id                       String    @id @default(uuid())
+  routeId                  String
+  stopId                   String
+  orderIndex               Int       // Thứ tự trạm trên tuyến (1, 2, 3...)
+  distanceFromStartKm      Float     @default(0.0) // Khoảng cách tích lũy từ trạm xuất phát
+  estimatedMinutesFromStart Int      @default(0)   // Thời gian di chuyển tích lũy
+  isTerminal               Boolean   @default(false) // Trạm đầu hoặc trạm cuối
+
+  route                    Route     @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  stop                     BusStop   @relation(fields: [stopId], references: [id], onDelete: Restrict)
+
+  @@unique([routeId, stopId], name: "unique_route_stop")
+  @@unique([routeId, orderIndex], name: "unique_route_order")
+  @@index([routeId])
+  @@index([stopId])
+  @@map("route_stops")
+}
+
+model Fare {
+  id            String       @id @default(uuid())
+  routeId       String
+  fareType      FareType     @default(FLAT_FARE)
+  ticketType    TicketType   @default(SINGLE)
+  amount        Float        // Giá vé VND, phải > 0
+  fromStopId    String?      // Bắt buộc nếu là STAGE_FARE
+  toStopId      String?      // Bắt buộc nếu là STAGE_FARE
+  effectiveFrom DateTime     @default(now())
+  effectiveTo   DateTime?
+  isActive      Boolean      @default(true)
+  deletedAt     DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  route         Route        @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  fromStop      BusStop?     @relation("FareFromStop", fields: [fromStopId], references: [id], onDelete: SetNull)
+  toStop        BusStop?     @relation("FareToStop", fields: [toStopId], references: [id], onDelete: SetNull)
+
+  @@index([routeId])
+  @@index([fareType])
+  @@index([deletedAt])
+  @@map("fares")
+}
+
+model TripSchedule {
+  id            String         @id @default(uuid())
+  routeId       String
+  busNumber     String         // Biển số xe buýt
+  departureTime DateTime
+  status        ScheduleStatus @default(SCHEDULED)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  route         Route          @relation(fields: [routeId], references: [id], onDelete: Cascade)
+
+  @@index([routeId, status])
+  @@map("trip_schedules")
+}
