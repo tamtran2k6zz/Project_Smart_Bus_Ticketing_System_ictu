@@ -1,4 +1,4 @@
-import { BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
+import { BadRequestException, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { AllExceptionsFilter } from './all-exceptions.filter';
 
 describe('AllExceptionsFilter', () => {
@@ -6,7 +6,9 @@ describe('AllExceptionsFilter', () => {
 
   beforeEach(() => {
     filter = new AllExceptionsFilter();
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
   });
+  
 
   const mockResponse = () => {
     const res: any = {};
