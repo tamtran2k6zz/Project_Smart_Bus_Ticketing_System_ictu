@@ -1,6 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { TripStatus } from '@prisma/client';
+import { RouteStatus, TripStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SearchTripsDto } from './dto/search-trips.dto';
 import { TripsService } from './trips.service';
@@ -98,8 +98,8 @@ describe('TripsService', () => {
               routeId: mockRouteId,
               stopId: mockOriginStopId,
               stopOrder: 1,
-              estimatedTimeMinutes: 0,
-              route: { id: mockRouteId, name: 'Tuyến 01', isActive: true },
+              estimatedMinutesFromStart: 0,
+              route: { id: mockRouteId, name: 'Tuyến 01', status: RouteStatus.ACTIVE },
             },
           ]);
         }
@@ -127,8 +127,8 @@ describe('TripsService', () => {
               routeId: mockRouteId,
               stopId: mockOriginStopId,
               stopOrder: 3,
-              estimatedTimeMinutes: 60,
-              route: { id: mockRouteId, name: 'Tuyến 01', isActive: true },
+              estimatedMinutesFromStart: 60,
+              route: { id: mockRouteId, name: 'Tuyến 01', status: RouteStatus.ACTIVE },
             },
           ]);
         }
@@ -138,7 +138,7 @@ describe('TripsService', () => {
             routeId: mockRouteId,
             stopId: mockDestStopId,
             stopOrder: 1,
-            estimatedTimeMinutes: 0,
+            estimatedMinutesFromStart: 0,
           },
         ]);
       });
@@ -163,11 +163,11 @@ describe('TripsService', () => {
               routeId: mockRouteId,
               stopId: mockOriginStopId,
               stopOrder: 1,
-              estimatedTimeMinutes: 15,
+              estimatedMinutesFromStart: 15,
               route: {
                 id: mockRouteId,
                 name: 'Hà Nội - Hải Phòng VIP',
-                isActive: true,
+                status: RouteStatus.ACTIVE,
               },
             },
           ]);
@@ -178,7 +178,7 @@ describe('TripsService', () => {
             routeId: mockRouteId,
             stopId: mockDestStopId,
             stopOrder: 2,
-            estimatedTimeMinutes: 135,
+            estimatedMinutesFromStart: 135,
           },
         ]);
       });
@@ -230,8 +230,8 @@ describe('TripsService', () => {
               routeId: mockRouteId,
               stopId: mockOriginStopId,
               stopOrder: 1,
-              estimatedTimeMinutes: 0,
-              route: { id: mockRouteId, name: 'Hà Nội - Sapa', isActive: true },
+              estimatedMinutesFromStart: 0,
+              route: { id: mockRouteId, name: 'Hà Nội - Sapa', status: RouteStatus.ACTIVE },
             },
           ]);
         }
@@ -241,7 +241,7 @@ describe('TripsService', () => {
             routeId: mockRouteId,
             stopId: mockDestStopId,
             stopOrder: 2,
-            estimatedTimeMinutes: 300,
+            estimatedMinutesFromStart: 300,
           },
         ]);
       });
@@ -296,8 +296,8 @@ describe('TripsService', () => {
               routeId: mockRouteId,
               stopId: mockOriginStopId,
               stopOrder: 1,
-              estimatedTimeMinutes: 0,
-              route: { id: mockRouteId, name: 'Route 1', isActive: true },
+              estimatedMinutesFromStart: 0,
+              route: { id: mockRouteId, name: 'Route 1', status: RouteStatus.ACTIVE },
             },
           ]);
         }
@@ -307,7 +307,7 @@ describe('TripsService', () => {
             routeId: mockRouteId,
             stopId: mockDestStopId,
             stopOrder: 2,
-            estimatedTimeMinutes: 60,
+            estimatedMinutesFromStart: 60,
           },
         ]);
       });

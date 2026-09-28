@@ -8,7 +8,6 @@ describe('AllExceptionsFilter', () => {
     filter = new AllExceptionsFilter();
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
   });
-  
 
   const mockResponse = () => {
     const res: any = {};
