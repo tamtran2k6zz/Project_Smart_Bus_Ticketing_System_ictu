@@ -221,13 +221,18 @@ Dự án đã được tích hợp sẵn 2 file cấu hình [`vercel.json`](file
 
 ## 👥 9. Đội ngũ phát triển (Team 5 - N5 Innovators)
 
-* **Scrum Master / Project Owner:** Trần Đặng Công Tâm
-* **Frontend Lead & Core Auth:** Nguyễn Hoàng Đức
-* **Backend Lead & Route API:** Tao Hoàng Minh Vũ
-* **Backend API & Search Optimization:** Nguyễn Minh Đức
-* **Frontend & Route Lookup UI:** Thiệp
-* **Frontend Route Station Management:** Vinh Hà
-* **Cùng các thành viên Team 5 - ICTU**
+| STT | Họ và tên | Vai trò trong dự án | Phân hệ phụ trách |
+| :---: | :--- | :--- | :--- |
+| 1 | **Trần Đặng Công Tâm** | **Scrum Master kiêm Leader** | Quản lý dự án, điều phối Sprint, Review PR, CI/CD Staging |
+| 2 | **Nguyễn Hoàng Đức** | **Frontend Developer** | Layout Auth, State Management (AuthContext), UI Đăng nhập & Protected Routes |
+| 3 | **Hà Quang Vinh** | **Frontend Developer** | Quản trị tuyến & Sắp xếp trạm dừng xe buýt (Route Station Drag & Drop) |
+| 4 | **Triệu Văn Thiệp** | **Frontend Developer** | Giao diện Trang chủ & Tra cứu thông tin tuyến xe buýt |
+| 5 | **La Công Tuấn** | **Backend Developer** | Thiết kế kiến trúc Backend API, tích hợp dịch vụ & kết nối hệ thống |
+| 6 | **Tào Hoàng Minh Vũ** | **Backend Developer** | Thiết kế cơ sở dữ liệu (Database Schema), Tuyến/Trạm buýt & RESTful API |
+| 7 | **Nguyễn Minh Đức** | **Backend Developer** | Phát triển API tìm kiếm chuyến xe (US01) & Tối ưu hóa Database Index |
+| 8 | **Mạch Thị Ngọc Ánh** | **Quality Assurance (QA)** | Kiểm thử chất lượng phần mềm, lập Test Case, kiểm tra hồi quy |
+| 9 | **Đinh Hữu Phúc** | **Quality Assurance (QA)** | Kiểm thử chức năng (Functional Testing), kiểm tra luồng API & UI |
+| 10 | **Hoàng Quốc Toản** | **Quality Assurance (QA)** | Kiểm thử hiệu năng, bảo mật và nghiệm thu tiêu chuẩn Definition of Done (DoD) |
 
 ---
 
