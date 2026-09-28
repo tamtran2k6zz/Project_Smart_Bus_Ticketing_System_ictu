@@ -128,7 +128,6 @@ Project_Smart_Bus_Ticketing_System_ictu/
 │   ├── .env.example
 │   ├── vercel.json                 # Cấu hình rewrite SPA cho Vercel
 │   └── package.json
-├── docker-compose.staging.yml      # Khởi chạy Docker Staging
 ├── package.json                    # Root package quản lý build monorepo
 ├── vercel.json                     # Root Vercel deployment configuration
 └── README.md
