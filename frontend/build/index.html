@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartBus VN - Hệ Thống Đặt Vé Xe Buýt Thông Minh</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gray-50 font-sans text-gray-800">
+
+    <!-- HEADER -->
+    <header class="bg-blue-600 text-white shadow-md">
+        <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-2 cursor-pointer" onclick="switchView('home')">
+                <span class="text-2xl font-bold">🚌 SmartBus VN</span>
+            </div>
+            <nav class="space-x-6 text-sm font-medium hidden md:block">
+                <button onclick="switchView('home')" class="hover:underline">Trang chủ</button>
+                <button class="hover:underline">Tra cứu vé</button>
+                <button class="hover:underline">Tiện ích GPS</button>
+                <button class="hover:underline">Hỗ trợ</button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT CONTAINER -->
+    <main class="max-w-6xl mx-auto px-4 py-8">
+
+        <!-- ================= VIEW 1: TRANG CHỦ & WIDGET TRA CỨU ================= -->
+        <div id="view-home" class="space-y-12">
+            <div class="relative bg-blue-700 text-white rounded-2xl p-8 md:p-12 shadow-xl overflow-hidden">
+                <div class="relative z-10 max-w-xl">
+                    <h1 class="text-3xl md:text-4xl font-extrabold mb-4">Hệ Thống Đặt Vé Xe Buýt & Xe Khách Thông Minh</h1>
+                    <p class="text-blue-100 mb-6">Đặt vé trực tuyến, chọn vị trí ghế, nhận vé QR code và theo dõi hành trình xe theo thời gian thực.</p>
+                </div>
+
+                <!-- WIDGET TRA CỨU TUYẾN -->
+                <div class="relative z-20 bg-white text-gray-800 rounded-xl p-6 shadow-2xl mt-6">
+                    <form id="search-form" onsubmit="handleSearch(event)" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                        
+                        <!-- Dropdown Điểm đi -->
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Điểm đi</label>
+                            <select id="departure" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm bg-white" required>
+                                <option value="">-- Chọn điểm đi --</option>
+                            </select>
+                        </div>
+
+                        <!-- Dropdown Điểm đến -->
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Điểm đến</label>
+                            <select id="destination" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm bg-white" required>
+                                <option value="">-- Chọn điểm đến --</option>
+                            </select>
+                        </div>
+
+                        <!-- Datepicker Ngày đi -->
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Ngày đi</label>
+                            <input type="date" id="date" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm bg-white" required>
+                        </div>
+
+                        <!-- Nút Tìm kiếm -->
+                        <div>
+                            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold p-3 rounded-lg shadow transition duration-200 text-sm uppercase tracking-wider">
+                                🔍 Tìm chuyến xe
+                            </button>
+                        </div>
+
+                    </form>
+                </div>
+            </div>
+
+            <!-- Features Highlights -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <div class="text-3xl mb-3">🎫</div>
+                    <h3 class="font-bold text-lg mb-2">Vé điện tử QR Code</h3>
+                    <p class="text-gray-600 text-sm">Không cần đổi vé giấy, quét mã QR trực tiếp khi lên xe nhanh chóng.</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <div class="text-3xl mb-3">📍</div>
+                    <h3 class="font-bold text-lg mb-2">Định vị GPS thời gian thực</h3>
+                    <p class="text-gray-600 text-sm">Chủ động theo dõi vị trí xe buýt trên bản đồ, không lo lỡ chuyến.</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <div class="text-3xl mb-3">💳</div>
+                    <h3 class="font-bold text-lg mb-2">Thanh toán đa dạng</h3>
+                    <p class="text-gray-600 text-sm">Hỗ trợ MoMo, VNPay, ZaloPay và thẻ ngân hàng quốc tế an toàn tuyệt đối.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= VIEW 2: TRANG KẾT QUẢ TÌM KIẾM ================= -->
+        <div id="view-search-results" class="space-y-6 hidden">
+            <div class="bg-white p-4 rounded-xl shadow-sm border flex flex-wrap justify-between items-center gap-4">
+                <div>
+                    <span class="text-gray-500 text-sm">Kết quả tìm kiếm cho:</span>
+                    <h2 id="search-title" class="font-bold text-lg text-blue-700">--</h2>
+                </div>
+                <button onclick="switchView('home')" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-sm font-semibold rounded-lg transition">
+                    ← Thay đổi tìm kiếm
+                </button>
+            </div>
+            <div id="results-container" class="space-y-4">
+                <!-- Data injected by JS -->
+            </div>
+        </div>
+
+        <!-- ================= VIEW 3: CHỌN GHẾ & THANH TOÁN ================= -->
+        <div id="view-seat-selection" class="bg-white rounded-xl shadow-sm border p-6 md:p-8 max-w-4xl mx-auto space-y-6 hidden">
+            <div class="flex justify-between items-center border-b pb-4">
+                <div>
+                    <h2 id="seat-trip-title" class="text-xl font-bold">Chọn sơ đồ ghế</h2>
+                    <p id="seat-trip-sub" class="text-gray-500 text-sm">--</p>
+                </div>
+                <button onclick="switchView('search-results')" class="text-sm text-blue-600 hover:underline">← Chọn chuyến khác</button>
+            </div>
+
+            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 text-sm text-yellow-700 flex justify-between items-center">
+                <span>⚠️ Hệ thống tự động giữ chỗ trong vòng <strong>10 phút</strong>.</span>
+                <span id="countdown-timer" class="font-mono font-bold text-red-600">10:00</span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="border rounded-xl p-6 bg-gray-50 flex flex-col items-center">
+                    <span class="text-xs uppercase tracking-wider text-gray-500 mb-4 font-semibold">Tài xế (Phía trước) 💺</span>
+                    <div id="seats-grid" class="grid grid-cols-2 gap-4 w-full max-w-xs">
+                        <!-- Seats injected by JS -->
+                    </div>
+                </div>
+
+                <div class="space-y-4 border-l pl-0 md:pl-8">
+                    <h3 class="font-bold text-lg">Thông tin hành khách</h3>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Họ và tên</label>
+                        <input type="text" id="p-name" placeholder="Nguyễn Văn A" class="w-full p-2.5 border rounded-lg text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Số điện thoại</label>
+                        <input type="text" id="p-phone" placeholder="0912345678" class="w-full p-2.5 border rounded-lg text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Email nhận vé điện tử (QR Code)</label>
+                        <input type="email" id="p-email" placeholder="example@gmail.com" class="w-full p-2.5 border rounded-lg text-sm">
+                    </div>
+
+                    <div class="bg-gray-50 p-4 rounded-lg space-y-2 border">
+                        <div class="flex justify-between text-sm"><span>Ghế đã chọn:</span> <strong id="summary-seats" class="text-blue-600">Chưa chọn</strong></div>
+                        <div class="flex justify-between text-sm"><span>Tổng tiền:</span> <strong id="summary-price" class="text-red-600 font-bold">0đ</strong></div>
+                    </div>
+
+                    <button onclick="handleBookingSuccess()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold p-3 rounded-lg shadow transition text-sm uppercase tracking-wider">
+                        Xác nhận & Thanh toán (MoMo/VNPay)
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= VIEW 4: THÀNH CÔNG & QR CODE ================= -->
+        <div id="view-success" class="bg-white rounded-xl shadow-sm border p-8 max-w-lg mx-auto text-center space-y-6 hidden">
+            <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto">✓</div>
+            <h2 class="text-2xl font-bold text-gray-800">Đặt vé thành công!</h2>
+            <p class="text-gray-600 text-sm">Vé điện tử (Mã QR) đã được gửi đến email của bạn.</p>
+
+            <div class="bg-gray-50 border border-dashed border-gray-300 p-6 rounded-xl space-y-4">
+                <div class="bg-white p-4 inline-block shadow rounded">
+                    <div class="w-32 h-32 bg-gray-900 text-white flex items-center justify-center text-xs font-mono font-bold rounded">
+                        [QR-CODE-BUS-8823]
+                    </div>
+                </div>
+                <div class="text-xs text-gray-500 space-y-1">
+                    <p>Mã vé: <strong>#BUS-2026-8823</strong></p>
+                    <p>Hành khách: <strong id="success-name">--</strong> - Ghế: <strong id="success-seats" class="text-blue-600">--</strong></p>
+                    <p id="success-trip-info">--</p>
+                </div>
+            </div>
+
+            <button onclick="switchView('home')" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold p-3 rounded-lg shadow transition text-sm">
+                Về trang chủ
+            </button>
+        </div>
+
+    </main>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        const STATIONS = [
+            "Bến xe Miền Đông, TP.HCM",
+            "Bến xe Miền Tây, TP.HCM",
+            "Bến xe Phía Nam, Nha Trang",
+            "Bến xe Đà Nẵng",
+            "Bến xe Giáp Bát, Hà Nội",
+            "Bến xe Thái Nguyên",
+            "Bến xe phía Bắc,Lạng Sơn",
+        ];
+
+        const MOCK_TRIPS = [
+            {
+                id: 1,
+                route: "TP.HCM - Nha Trang",
+                departureTime: "08:00",
+                arrivalTime: "16:00",
+                busType: "Giường nằm 44 chỗ",
+                price: 250000,
+                availableSeats: 12,
+                seatsMap: [
+                    { id: "A1", status: "booked" }, { id: "A2", status: "available" }, { id: "A3", status: "available" }, { id: "A4", status: "booked" },
+                    { id: "B1", status: "available" }, { id: "B2", status: "available" }, { id: "B3", status: "booked" }, { id: "B4", status: "available" }
+                ]
+            },
+            {
+                id: 2,
+                route: "TP.HCM - Nha Trang",
+                departureTime: "10:30",
+                arrivalTime: "18:30",
+                busType: "Limousine 34 phòng",
+                price: 380000,
+                availableSeats: 5,
+                seatsMap: [
+                    { id: "V1", status: "booked" }, { id: "V2", status: "booked" }, { id: "V3", status: "available" }, { id: "V4", status: "available" }
+                ]
+            },
+            {
+                id: 3,
+                route: "TP.HCM - Đà Nẵng",
+                departureTime: "07:00",
+                arrivalTime: "22:00",
+                busType: "Giường nằm 40 chỗ",
+                price: 450000,
+                availableSeats: 20,
+                seatsMap: [
+                    { id: "C1", status: "available" }, { id: "C2", status: "available" }, { id: "C3", status: "available" }, { id: "C4", status: "available" }
+                ]
+            }
+        ];
+
+        let selectedTrip = null;
+        let selectedSeats = [];
+
+        // Khởi tạo danh sách trạm vào Dropdown khi load trang
+        window.onload = function() {
+            const depSelect = document.getElementById('departure');
+            const desSelect = document.getElementById('destination');
+            const today = new Date().toISOString().split("T")[0];
+            document.getElementById('date').value = today;
+            document.getElementById('date').min = today;
+
+            STATIONS.forEach(station => {
+                depSelect.innerHTML += `<option value="${station}">${station}</option>`;
+                desSelect.innerHTML += `<option value="${station}">${station}</option>`;
+            });
+        };
+
+        // Chuyển đổi giữa các View
+        function switchView(viewName) {
+            document.getElementById('view-home').classList.add('hidden');
+            document.getElementById('view-search-results').classList.add('hidden');
+            document.getElementById('view-seat-selection').classList.add('hidden');
+            document.getElementById('view-success').classList.add('hidden');
+
+            if (viewName === 'home') document.getElementById('view-home').classList.remove('hidden');
+            if (viewName === 'search-results') document.getElementById('view-search-results').classList.remove('hidden');
+            if (viewName === 'seat-selection') document.getElementById('view-seat-selection').classList.remove('hidden');
+            if (viewName === 'success') document.getElementById('view-success').classList.remove('hidden');
+            window.scrollTo(0, 0);
+        }
+
+        // Xử lý tìm kiếm
+        function handleSearch(e) {
+            e.preventDefault();
+            const dep = document.getElementById('departure').value;
+            const des = document.getElementById('destination').value;
+            const date = document.getElementById('date').value;
+
+            if (dep === des) {
+                alert("Điểm đi và Điểm đến không thể trùng nhau!");
+                return;
+            }
+
+            document.getElementById('search-title').innerText = `${dep} ➔ ${des} (${date})`;
+            
+            const container = document.getElementById('results-container');
+            container.innerHTML = '';
+
+            MOCK_TRIPS.forEach(trip => {
+                container.innerHTML += `
+                    <div class="bg-white rounded-xl shadow-sm border p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                        <div class="space-y-2">
+                            <span class="bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-1 rounded">${trip.busType}</span>
+                            <div class="text-xl font-bold flex items-center space-x-3">
+                                <span>${trip.departureTime}</span>
+                                <span class="text-gray-400 font-normal">─────</span>
+                                <span>${trip.arrivalTime}</span>
+                            </div>
+                            <p class="text-gray-500 text-sm">Tuyến: <strong class="text-gray-700">${trip.route}</strong></p>
+                            <p class="text-green-600 text-xs font-semibold">Còn ${trip.availableSeats} chỗ trống</p>
+                        </div>
+                        <div class="flex flex-col md:items-end w-full md:w-auto border-t md:border-t-0 pt-4 md:pt-0">
+                            <span class="text-gray-500 text-xs">Giá vé từ</span>
+                            <span class="text-2xl font-extrabold text-red-600 mb-3">${trip.price.toLocaleString()}đ</span>
+                            <button onclick="selectTrip(${trip.id})" class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2.5 rounded-lg shadow transition text-sm">
+                                Chọn ghế & Đặt vé
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            switchView('search-results');
+        }
+
+        // Chọn chuyến xe để sang bước chọn ghế
+        function selectTrip(id) {
+            selectedTrip = MOCK_TRIPS.find(t => t.id === id);
+            selectedSeats = [];
+            
+            document.getElementById('seat-trip-title').innerText = `Chọn sơ đồ ghế: ${selectedTrip.busType}`;
+            document.getElementById('seat-trip-sub').innerText = `Tuyến: ${selectedTrip.route} | Khởi hành: ${selectedTrip.departureTime}`;
+            
+            renderSeats();
+            updateSummary();
+            switchView('seat-selection');
+        }
+
+        // Render sơ đồ ghế
+        function renderSeats() {
+            const grid = document.getElementById('seats-grid');
+            grid.innerHTML = '';
+
+            selectedTrip.seatsMap.forEach(seat => {
+                const isBooked = seat.status === 'booked';
+                const isSelected = selectedSeats.includes(seat.id);
+
+                let btnClass = "p-3 rounded-lg font-bold text-sm border transition ";
+                if (isBooked) {
+                    btnClass += "bg-gray-300 text-gray-500 cursor-not-allowed border-gray-300";
+                } else if (isSelected) {
+                    btnClass += "bg-blue-600 text-white border-blue-600 shadow";
+                } else {
+                    btnClass += "bg-white hover:bg-blue-50 text-gray-700 border-gray-300";
+                }
+
+                grid.innerHTML += `
+                    <button onclick="toggleSeat('${seat.id}')" class="${btnClass}" ${isBooked ? 'disabled' : ''}>
+                        ${seat.id} ${isBooked ? '(Đã đặt)' : ''}
+                    </button>
+                `;
+            });
+        }
+
+        // Xử lý click chọn/bỏ chọn ghế
+        function toggleSeat(seatId) {
+            if (selectedSeats.includes(seatId)) {
+                selectedSeats = selectedSeats.filter(s => s !== seatId);
+            } else {
+                selectedSeats.push(seatId);
+            }
+            renderSeats();
+            updateSummary();
+        }
+
+        // Cập nhật tổng tiền và thông tin ghế
+        function updateSummary() {
+            document.getElementById('summary-seats').innerText = selectedSeats.length > 0 ? selectedSeats.join(', ') : 'Chưa chọn';
+            const totalPrice = selectedSeats.length * selectedTrip.price;
+            document.getElementById('summary-price').innerText = totalPrice.toLocaleString() + 'đ';
+        }
+
+        // Hoàn tất đặt vé
+        function handleBookingSuccess() {
+            const name = document.getElementById('p-name').value;
+            const phone = document.getElementById('p-phone').value;
+            const email = document.getElementById('p-email').value;
+
+            if (selectedSeats.length === 0 || !name || !phone) {
+                alert("Vui lòng chọn ít nhất một ghế và điền đầy đủ họ tên, số điện thoại!");
+                return;
+            }
+
+            document.getElementById('success-name').innerText = name;
+            document.getElementById('success-seats').innerText = selectedSeats.join(', ');
+            document.getElementById('success-trip-info').innerText = `Tuyến: ${selectedTrip.route} (${selectedTrip.departureTime})`;
+
+            switchView('success');
+        }
+    </script>
+</body>
+</html>
