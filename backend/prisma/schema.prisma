@@ -1,0 +1,147 @@
+// Prisma Schema for Smart Bus Ticketing System
+// Team: N5 Innovators
+// Feature: Trip Search & DB Index Optimization
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum TripStatus {
+  SCHEDULED
+  RUNNING
+  COMPLETED
+  CANCELLED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+enum TicketStatus {
+  RESERVED
+  BOOKED
+  CANCELLED
+}
+
+model Route {
+  id         String      @id @default(uuid()) @db.Uuid
+  code       String      @unique @db.VarChar(50)
+  name       String      @db.VarChar(255)
+  isActive   Boolean     @default(true) @map("is_active")
+  createdAt  DateTime    @default(now()) @map("created_at")
+  updatedAt  DateTime    @updatedAt @map("updated_at")
+
+  routeStops RouteStop[]
+  trips      Trip[]
+
+  @@map("routes")
+}
+
+model BusStop {
+  id        String      @id @default(uuid()) @db.Uuid
+  name      String      @db.VarChar(255)
+  latitude  Decimal     @db.Decimal(10, 7)
+  longitude Decimal     @db.Decimal(10, 7)
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+
+  routeStops RouteStop[]
+
+  @@map("bus_stops")
+}
+
+model RouteStop {
+  id                   String   @id @default(uuid()) @db.Uuid
+  routeId              String   @map("route_id") @db.Uuid
+  stopId               String   @map("stop_id") @db.Uuid
+  stopOrder            Int      @map("stop_order")
+  estimatedTimeMinutes Int      @default(0) @map("estimated_time_minutes")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  route Route   @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  stop  BusStop @relation(fields: [stopId], references: [id], onDelete: Cascade)
+
+  @@unique([routeId, stopId], name: "uq_route_stop")
+  @@unique([routeId, stopOrder], name: "uq_route_order")
+  // Composite Indexes for high-concurrency stop pair queries
+  @@index([stopId, routeId, stopOrder], name: "idx_route_stops_stop_route_order")
+  @@index([routeId, stopOrder], name: "idx_route_stops_route_order")
+  @@map("route_stops")
+}
+
+model Bus {
+  id          String   @id @default(uuid()) @db.Uuid
+  plateNumber String   @unique @map("plate_number") @db.VarChar(20)
+  busType     String   @map("bus_type") @db.VarChar(50)
+  totalSeats  Int      @map("total_seats")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  trips Trip[]
+
+  @@map("buses")
+}
+
+model Trip {
+  id            String     @id @default(uuid()) @db.Uuid
+  routeId       String     @map("route_id") @db.Uuid
+  busId         String     @map("bus_id") @db.Uuid
+  departureTime DateTime   @map("departure_time") @db.Timestamptz
+  arrivalTime   DateTime   @map("arrival_time") @db.Timestamptz
+  status        TripStatus @default(SCHEDULED) @map("status")
+  basePrice     Decimal    @map("base_price") @db.Decimal(12, 2)
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+
+  route    Route     @relation(fields: [routeId], references: [id], onDelete: Restrict)
+  bus      Bus       @relation(fields: [busId], references: [id], onDelete: Restrict)
+  bookings Booking[]
+  tickets  Ticket[]
+
+  // Composite B-Tree index for trip searching by route and departure range
+  @@index([routeId, departureTime, status], name: "idx_trips_route_departure_status")
+  @@index([status, departureTime], name: "idx_trips_status_departure")
+  @@map("trips")
+}
+
+model Booking {
+  id          String        @id @default(uuid()) @db.Uuid
+  tripId      String        @map("trip_id") @db.Uuid
+  bookingCode String        @unique @map("booking_code") @db.VarChar(50)
+  status      BookingStatus @default(PENDING) @map("status")
+  totalAmount Decimal       @map("total_amount") @db.Decimal(12, 2)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  trip    Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  tickets Ticket[]
+
+  @@index([tripId, status], name: "idx_bookings_trip_status")
+  @@map("bookings")
+}
+
+model Ticket {
+  id         String       @id @default(uuid()) @db.Uuid
+  bookingId  String       @map("booking_id") @db.Uuid
+  tripId     String       @map("trip_id") @db.Uuid
+  seatNumber String       @map("seat_number") @db.VarChar(10)
+  price      Decimal      @map("price") @db.Decimal(12, 2)
+  status     TicketStatus @default(RESERVED) @map("status")
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  trip    Trip    @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  // Composite Index for calculating occupied seats (BOOKED or RESERVED)
+  @@index([tripId, status], name: "idx_tickets_trip_status")
+  @@map("tickets")
+}

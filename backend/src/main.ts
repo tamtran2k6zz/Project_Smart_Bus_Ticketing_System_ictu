@@ -1,19 +1,36 @@
-import express, { Application, Request, Response } from 'express';
-import cors from 'cors';
+import { ValidationPipe } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-const app: Application = express();
-const PORT = process.env.PORT || 5000;
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
 
-app.use(express.json());
-app.use(cors());
+  app.enableCors();
 
-app.get('/', (req: Request, res: Response) => {
-  res.json({ message: 'Smart Bus Ticketing Backend đang chạy thành công!' });
-});
+  // Global exception filter for uniform error responses
+  app.useGlobalFilters(new AllExceptionsFilter());
 
-app.listen(PORT, () => {
-  console.log(`Server đang chạy tại: http://localhost:${PORT}`);
-});
+  // Global interceptor for uniform success responses
+  app.useGlobalInterceptors(new TransformResponseInterceptor());
+
+  // Global validation pipe
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: true },
+    })
+  );
+
+  const port = process.env.PORT || 5000;
+  await app.listen(port);
+  console.log(`Smart Bus Ticketing API is running on http://localhost:${port}`);
+}
+
+bootstrap();
