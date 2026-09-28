@@ -1,3 +1,5 @@
+import { NavLink } from 'react-router-dom';
+
 function Sidebar() {
   return (
     <aside className="sidebar">
@@ -10,11 +12,40 @@ function Sidebar() {
       </div>
 
       <nav className="sidebar-menu">
-        <button className="menu-item">📊 Dashboard</button>
-        <button className="menu-item active">🚌 Tuyến / Trạm</button>
-        <button className="menu-item">🎫 Vé xe</button>
-        <button className="menu-item">👥 Người dùng</button>
-        <button className="menu-item">🚍 Xe buýt</button>
+        <NavLink
+          to="/admin/dashboard"
+          className={({ isActive }) => `menu-item${isActive ? ' active' : ''}`}
+        >
+          📊 Dashboard
+        </NavLink>
+        <NavLink
+          to="/admin/routes"
+          className={({ isActive }) => `menu-item${isActive ? ' active' : ''}`}
+        >
+          🚌 Tuyến / Trạm
+        </NavLink>
+        <NavLink
+          to="/admin/fares"
+          className={({ isActive }) => `menu-item${isActive ? ' active' : ''}`}
+        >
+          🎫 Vé xe
+        </NavLink>
+        <button
+          className="menu-item menu-item-disabled"
+          type="button"
+          disabled
+          title="Chức năng chưa được triển khai"
+        >
+          👥 Người dùng <span>Chưa có</span>
+        </button>
+        <button
+          className="menu-item menu-item-disabled"
+          type="button"
+          disabled
+          title="Chức năng chưa được triển khai"
+        >
+          🚍 Xe buýt <span>Chưa có</span>
+        </button>
       </nav>
     </aside>
   );

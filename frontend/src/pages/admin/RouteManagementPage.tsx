@@ -69,9 +69,7 @@ function RouteManagementPage() {
   };
 
   const handleDelete = async (route: BusRoute) => {
-    const confirmed = window.confirm(
-      `Bạn có chắc muốn xóa tuyến ${route.code} không?`,
-    );
+    const confirmed = window.confirm(`Bạn có chắc muốn xóa tuyến ${route.code} không?`);
 
     if (!confirmed) {
       return;
@@ -107,7 +105,7 @@ function RouteManagementPage() {
 
   return (
     <div className="main-content">
-      <Header />
+      <Header title="Quản trị tuyến & trạm" subtitle="Quản lý các tuyến xe và thứ tự trạm dừng" />
 
       <main className="page-content">
         <div className="page-title-row">

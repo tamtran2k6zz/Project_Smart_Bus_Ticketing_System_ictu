@@ -7,6 +7,8 @@ import { PublicRoute } from '../components/routes/PublicRoute';
 import UnauthorizedPage from '../pages/error/UnauthorizedPage';
 import Sidebar from '../components/admin/Sidebar';
 import RouteManagementPage from '../pages/admin/RouteManagementPage';
+import DashboardPage from '../pages/admin/DashboardPage';
+import FareManagementPage from '../pages/admin/FareManagementPage';
 import PassengerHomePage from '../pages/passenger/PassengerHomePage';
 import { useAuth } from '../context/AuthContext';
 
@@ -54,16 +56,29 @@ export const AppRoutes: React.FC = () => {
       />
 
       {/* Phân hệ Quản trị / Điều hành: Yêu cầu quyền ADMIN hoặc MANAGER */}
-      <Route
-        path="/admin"
-        element={<ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']} />}
-      >
+      <Route path="/admin" element={<ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']} />}>
         <Route index element={<Navigate to="/admin/routes" replace />} />
+        <Route
+          path="dashboard"
+          element={
+            <AdminLayout>
+              <DashboardPage />
+            </AdminLayout>
+          }
+        />
         <Route
           path="routes"
           element={
             <AdminLayout>
               <RouteManagementPage />
+            </AdminLayout>
+          }
+        />
+        <Route
+          path="fares"
+          element={
+            <AdminLayout>
+              <FareManagementPage />
             </AdminLayout>
           }
         />

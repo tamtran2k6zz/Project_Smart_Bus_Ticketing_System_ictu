@@ -1,7 +1,15 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
-function Header() {
+interface HeaderProps {
+  title?: string;
+  subtitle?: string;
+}
+
+function Header({
+  title = 'Quản trị tuyến & trạm',
+  subtitle = 'Quản lý các tuyến xe và thứ tự trạm dừng',
+}: HeaderProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -14,15 +22,15 @@ function Header() {
   const displayRole = user?.roles?.includes('ADMIN')
     ? 'Quản trị viên'
     : user?.roles?.includes('MANAGER')
-    ? 'Quản lý vận hành'
-    : 'Nhân viên';
+      ? 'Quản lý vận hành'
+      : 'Nhân viên';
   const initial = displayName.charAt(0).toUpperCase();
 
   return (
     <header className="header">
       <div>
-        <h1>Quản trị tuyến & trạm</h1>
-        <p>Quản lý các tuyến xe và thứ tự trạm dừng</p>
+        <h1>{title}</h1>
+        <p>{subtitle}</p>
       </div>
 
       <div className="admin-profile" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
