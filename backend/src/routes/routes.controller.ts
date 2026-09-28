@@ -27,7 +27,6 @@ import { Role } from '../common/enums/role.enum';
 @ApiTags('Routes (Quản lý tuyến xe buýt & trạm trên tuyến)')
 @ApiBearerAuth()
 @Controller('api/v1/routes')
-@UseGuards(JwtAuthGuard, RolesGuard)
 export class RoutesController {
   constructor(
     private readonly routesService: RoutesService,
@@ -35,6 +34,7 @@ export class RoutesController {
   ) {}
 
   @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.MANAGER)
   @ApiOperation({ summary: 'Tạo mới tuyến xe buýt (Admin / Manager)' })
   @ApiResponse({ status: 201, description: 'Tạo tuyến thành công.' })
@@ -61,6 +61,7 @@ export class RoutesController {
   }
 
   @Patch(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.MANAGER)
   @ApiOperation({ summary: 'Cập nhật thông tin tuyến xe buýt (Admin / Manager)' })
   update(@Param('id') id: string, @Body() updateRouteDto: UpdateRouteDto) {
@@ -68,6 +69,7 @@ export class RoutesController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.MANAGER)
   @ApiOperation({ summary: 'Xóa tuyến xe buýt (Chặn nếu đang có chuyến xe chạy)' })
   remove(@Param('id') id: string) {
@@ -75,6 +77,7 @@ export class RoutesController {
   }
 
   @Post(':id/stops')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.MANAGER)
   @ApiOperation({ summary: 'Thêm một trạm dừng vào tuyến đường (Admin / Manager)' })
   addStop(@Param('id') id: string, @Body() dto: AddStopToRouteDto) {
@@ -82,6 +85,7 @@ export class RoutesController {
   }
 
   @Delete(':id/stops/:stopId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.MANAGER)
   @ApiOperation({ summary: 'Gỡ trạm dừng khỏi tuyến đường (Chặn nếu tuyến còn <= 2 trạm)' })
   removeStop(@Param('id') id: string, @Param('stopId') stopId: string) {
@@ -89,6 +93,7 @@ export class RoutesController {
   }
 
   @Patch(':id/stops/order')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.MANAGER)
   @ApiOperation({ summary: 'Cập nhật thứ tự trạm dừng (Phục vụ kéo-thả từ Admin UI trong Transaction)' })
   reorderStops(@Param('id') id: string, @Body() dto: ReorderStopsDto) {
@@ -96,6 +101,7 @@ export class RoutesController {
   }
 
   @Post(':id/fares')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.MANAGER)
   @ApiOperation({ summary: 'Cấu hình giá vé mới cho tuyến xe (Admin / Manager)' })
   @ApiResponse({ status: 201, description: 'Thiết lập giá vé thành công.' })
@@ -104,6 +110,7 @@ export class RoutesController {
   }
 
   @Put(':id/fares/:fareId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.MANAGER)
   @ApiOperation({ summary: 'Cập nhật cấu hình giá vé của tuyến xe (Admin / Manager)' })
   updateRouteFare(

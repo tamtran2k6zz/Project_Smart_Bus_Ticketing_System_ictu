@@ -10,7 +10,7 @@ export class AddStopToRouteDto {
   @ApiProperty({ example: 1, description: 'Thứ tự trạm trên tuyến (1, 2, 3...)' })
   @IsNumber()
   @Min(1, { message: 'Thứ tự trạm phải từ 1 trở lên' })
-  orderIndex: number;
+  stopOrder: number;
 
   @ApiPropertyOptional({ example: 0.0, description: 'Khoảng cách tích lũy từ điểm xuất phát (km)' })
   @IsNumber()

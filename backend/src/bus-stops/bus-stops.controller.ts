@@ -21,11 +21,11 @@ import { Role } from '../common/enums/role.enum';
 @ApiTags('Bus Stops (Quản lý trạm dừng)')
 @ApiBearerAuth()
 @Controller('api/v1/bus-stops')
-@UseGuards(JwtAuthGuard, RolesGuard)
 export class BusStopsController {
   constructor(private readonly busStopsService: BusStopsService) {}
 
   @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.MANAGER)
   @ApiOperation({ summary: 'Tạo mới trạm dừng xe buýt (Admin / Manager)' })
   @ApiResponse({ status: 201, description: 'Tạo trạm dừng thành công.' })
@@ -54,6 +54,7 @@ export class BusStopsController {
   }
 
   @Patch(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.MANAGER)
   @ApiOperation({ summary: 'Cập nhật thông tin trạm dừng (Admin / Manager)' })
   update(@Param('id') id: string, @Body() updateBusStopDto: UpdateBusStopDto) {
@@ -61,6 +62,7 @@ export class BusStopsController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.MANAGER)
   @ApiOperation({ summary: 'Xóa mềm trạm dừng (Admin / Manager, chặn nếu đang thuộc tuyến)' })
   remove(@Param('id') id: string) {

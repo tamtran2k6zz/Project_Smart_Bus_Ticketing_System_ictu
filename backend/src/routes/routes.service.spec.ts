@@ -16,7 +16,7 @@ describe('RoutesService', () => {
       create: jest.fn(),
       update: jest.fn(),
     },
-    tripSchedule: {
+    trip: {
       count: jest.fn(),
     },
     busStop: {
@@ -166,7 +166,7 @@ describe('RoutesService', () => {
     it('should soft delete route if no active trips exist', async () => {
       const route = { id: 'route-1', code: 'BUS-01', name: 'Tuyến 1', deletedAt: null };
       mockPrismaService.route.findFirst.mockResolvedValue(route);
-      mockPrismaService.tripSchedule.count.mockResolvedValue(0);
+      mockPrismaService.trip.count.mockResolvedValue(0);
       mockPrismaService.route.update.mockResolvedValue({ ...route, deletedAt: new Date() });
 
       const result = await service.remove('route-1');
@@ -176,7 +176,7 @@ describe('RoutesService', () => {
     it('should throw BadRequestException if active trips exist', async () => {
       const route = { id: 'route-1', code: 'BUS-01', name: 'Tuyến 1', deletedAt: null };
       mockPrismaService.route.findFirst.mockResolvedValue(route);
-      mockPrismaService.tripSchedule.count.mockResolvedValue(3);
+      mockPrismaService.trip.count.mockResolvedValue(3);
 
       await expect(service.remove('route-1')).rejects.toThrow(BadRequestException);
     });
@@ -189,7 +189,7 @@ describe('RoutesService', () => {
       mockPrismaService.busStop.findFirst.mockResolvedValue(null);
 
       await expect(
-        service.addStopToRoute('route-1', { stopId: 'stop-invalid', orderIndex: 1 }),
+        service.addStopToRoute('route-1', { stopId: 'stop-invalid', stopOrder: 1 }),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -200,7 +200,7 @@ describe('RoutesService', () => {
       mockPrismaService.routeStop.findFirst.mockResolvedValueOnce({ id: 'rs-1', routeId: 'route-1', stopId: 'stop-1' });
 
       await expect(
-        service.addStopToRoute('route-1', { stopId: 'stop-1', orderIndex: 1 }),
+        service.addStopToRoute('route-1', { stopId: 'stop-1', stopOrder: 1 }),
       ).rejects.toThrow(ConflictException);
     });
 
@@ -209,11 +209,11 @@ describe('RoutesService', () => {
       mockPrismaService.route.findFirst.mockResolvedValue(route);
       mockPrismaService.busStop.findFirst.mockResolvedValue({ id: 'stop-1', name: 'Trạm 1' });
       mockPrismaService.routeStop.findFirst
-        .mockResolvedValueOnce(null) // no existing stop
-        .mockResolvedValueOnce({ id: 'rs-existing-order', orderIndex: 1 }); // existing order
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: 'rs-existing-order', stopOrder: 1 });
 
       await expect(
-        service.addStopToRoute('route-1', { stopId: 'stop-1', orderIndex: 1 }),
+        service.addStopToRoute('route-1', { stopId: 'stop-1', stopOrder: 1 }),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -228,10 +228,10 @@ describe('RoutesService', () => {
         id: 'rs-new',
         routeId: 'route-1',
         stopId: 'stop-1',
-        orderIndex: 1,
+        stopOrder: 1,
       });
 
-      const result = await service.addStopToRoute('route-1', { stopId: 'stop-1', orderIndex: 1 });
+      const result = await service.addStopToRoute('route-1', { stopId: 'stop-1', stopOrder: 1 });
       expect(result).toEqual(expect.objectContaining({ id: 'rs-new', stopId: 'stop-1' }));
     });
   });
@@ -272,7 +272,7 @@ describe('RoutesService', () => {
       mockPrismaService.route.findFirst.mockResolvedValue(route);
 
       const reorderDto = {
-        stops: [{ stopId: 'stop-1', orderIndex: 1 }],
+        stops: [{ stopId: 'stop-1', stopOrder: 1 }],
       };
 
       await expect(service.reorderStops('route-1', reorderDto)).rejects.toThrow(BadRequestException);
@@ -284,8 +284,8 @@ describe('RoutesService', () => {
 
       const reorderDto = {
         stops: [
-          { stopId: 'stop-1', orderIndex: 1 },
-          { stopId: 'stop-2', orderIndex: 1 },
+          { stopId: 'stop-1', stopOrder: 1 },
+          { stopId: 'stop-2', stopOrder: 1 },
         ],
       };
 
@@ -296,14 +296,14 @@ describe('RoutesService', () => {
       const route = { id: 'route-1', code: 'BUS-01', name: 'Tuyến 1', deletedAt: null };
       mockPrismaService.route.findFirst.mockResolvedValue(route);
       mockPrismaService.routeStop.findMany.mockResolvedValue([
-        { id: 'rs-1', stopId: 'stop-1', orderIndex: 1 },
-        { id: 'rs-2', stopId: 'stop-2', orderIndex: 2 },
+        { id: 'rs-1', stopId: 'stop-1', stopOrder: 1 },
+        { id: 'rs-2', stopId: 'stop-2', stopOrder: 2 },
       ]);
 
       const reorderDto = {
         stops: [
-          { stopId: 'stop-1', orderIndex: 2 },
-          { stopId: 'stop-999', orderIndex: 1 },
+          { stopId: 'stop-1', stopOrder: 2 },
+          { stopId: 'stop-999', stopOrder: 1 },
         ],
       };
 
@@ -320,15 +320,15 @@ describe('RoutesService', () => {
       };
       mockPrismaService.route.findFirst.mockResolvedValue(route);
       mockPrismaService.routeStop.findMany.mockResolvedValue([
-        { id: 'rs-1', stopId: 'stop-1', orderIndex: 1 },
-        { id: 'rs-2', stopId: 'stop-2', orderIndex: 2 },
+        { id: 'rs-1', stopId: 'stop-1', stopOrder: 1 },
+        { id: 'rs-2', stopId: 'stop-2', stopOrder: 2 },
       ]);
       mockPrismaService.routeStop.update.mockResolvedValue({});
 
       const reorderDto = {
         stops: [
-          { stopId: 'stop-1', orderIndex: 2 },
-          { stopId: 'stop-2', orderIndex: 1 },
+          { stopId: 'stop-1', stopOrder: 2 },
+          { stopId: 'stop-2', stopOrder: 1 },
         ],
       };
 

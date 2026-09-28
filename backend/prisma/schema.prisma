@@ -25,10 +25,22 @@ enum TicketType {
   PRIORITY         // Vé miễn giảm đối tượng ưu tiên
 }
 
-enum ScheduleStatus {
+enum TripStatus {
   SCHEDULED
-  IN_PROGRESS
+  RUNNING
   COMPLETED
+  CANCELLED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+enum TicketStatus {
+  RESERVED
+  BOOKED
   CANCELLED
 }
 
@@ -44,10 +56,9 @@ model Route {
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
 
-  // Quan hệ 1-N
   routeStops           RouteStop[]
   fares                Fare[]
-  tripSchedules        TripSchedule[]
+  trips                Trip[]
 
   @@index([status])
   @@index([deletedAt])
@@ -66,7 +77,6 @@ model BusStop {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  // Quan hệ
   routeStops  RouteStop[]
   fromFares   Fare[]      @relation("FareFromStop")
   toFares     Fare[]      @relation("FareToStop")
@@ -81,7 +91,7 @@ model RouteStop {
   id                       String    @id @default(uuid())
   routeId                  String
   stopId                   String
-  orderIndex               Int       // Thứ tự trạm trên tuyến (1, 2, 3...)
+  stopOrder               Int       // Thứ tự trạm trên tuyến (1, 2, 3...)
   distanceFromStartKm      Float     @default(0.0) // Khoảng cách tích lũy từ trạm xuất phát
   estimatedMinutesFromStart Int      @default(0)   // Thời gian di chuyển tích lũy
   isTerminal               Boolean   @default(false) // Trạm đầu hoặc trạm cuối
@@ -90,10 +100,77 @@ model RouteStop {
   stop                     BusStop   @relation(fields: [stopId], references: [id], onDelete: Restrict)
 
   @@unique([routeId, stopId], name: "unique_route_stop")
-  @@unique([routeId, orderIndex], name: "unique_route_order")
+  @@unique([routeId, stopOrder], name: "unique_route_order")
   @@index([routeId])
   @@index([stopId])
   @@map("route_stops")
+}
+
+model Bus {
+  id          String   @id @default(uuid())
+  plateNumber String   @unique
+  busType     String
+  totalSeats  Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  trips       Trip[]
+
+  @@map("buses")
+}
+
+model Trip {
+  id            String     @id @default(uuid())
+  routeId       String
+  busId         String
+  departureTime DateTime
+  arrivalTime   DateTime
+  status        TripStatus @default(SCHEDULED)
+  basePrice     Float      @default(0)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  route         Route      @relation(fields: [routeId], references: [id], onDelete: Restrict)
+  bus           Bus        @relation(fields: [busId], references: [id], onDelete: Restrict)
+  bookings      Booking[]
+  tickets       Ticket[]
+
+  @@index([routeId, departureTime, status])
+  @@index([status, departureTime])
+  @@map("trips")
+}
+
+model Booking {
+  id          String        @id @default(uuid())
+  tripId      String
+  bookingCode String        @unique
+  status      BookingStatus @default(PENDING)
+  totalAmount Float         @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  trip        Trip          @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  tickets     Ticket[]
+
+  @@index([tripId, status])
+  @@map("bookings")
+}
+
+model Ticket {
+  id         String       @id @default(uuid())
+  bookingId  String
+  tripId     String
+  seatNumber String
+  price      Float        @default(0)
+  status     TicketStatus @default(RESERVED)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  booking    Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  trip       Trip         @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId, status])
+  @@map("tickets")
 }
 
 model Fare {
@@ -119,19 +196,4 @@ model Fare {
   @@index([fareType])
   @@index([deletedAt])
   @@map("fares")
-}
-
-model TripSchedule {
-  id            String         @id @default(uuid())
-  routeId       String
-  busNumber     String         // Biển số xe buýt
-  departureTime DateTime
-  status        ScheduleStatus @default(SCHEDULED)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-
-  route         Route          @relation(fields: [routeId], references: [id], onDelete: Cascade)
-
-  @@index([routeId, status])
-  @@map("trip_schedules")
 }

@@ -89,7 +89,7 @@ describe('RoutesController', () => {
   });
 
   it('should call routesService.addStopToRoute', async () => {
-    const dto = { stopId: 'stop-1', orderIndex: 1 };
+    const dto = { stopId: 'stop-1', stopOrder: 1 };
     mockRoutesService.addStopToRoute.mockResolvedValue({ id: 'rs-1' });
     const result = await controller.addStop('route-1', dto);
     expect(result).toEqual({ id: 'rs-1' });
@@ -104,7 +104,7 @@ describe('RoutesController', () => {
   });
 
   it('should call routesService.reorderStops', async () => {
-    const dto = { stops: [{ stopId: 'stop-1', orderIndex: 1 }, { stopId: 'stop-2', orderIndex: 2 }] };
+    const dto = { stops: [{ stopId: 'stop-1', stopOrder: 1 }, { stopId: 'stop-2', stopOrder: 2 }] };
     mockRoutesService.reorderStops.mockResolvedValue({ id: 'route-1' });
     const result = await controller.reorderStops('route-1', dto);
     expect(result).toEqual({ id: 'route-1' });

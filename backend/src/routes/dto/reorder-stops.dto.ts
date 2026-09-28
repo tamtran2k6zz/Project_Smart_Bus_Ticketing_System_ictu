@@ -11,7 +11,7 @@ export class StopOrderItemDto {
   @ApiProperty({ example: 1, description: 'Thứ tự mới của trạm trên tuyến' })
   @IsNumber()
   @Min(1)
-  orderIndex: number;
+  stopOrder: number;
 }
 
 export class ReorderStopsDto {

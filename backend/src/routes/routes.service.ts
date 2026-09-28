@@ -46,7 +46,7 @@ export class RoutesService {
       include: {
         routeStops: {
           include: { stop: true },
-          orderBy: { orderIndex: 'asc' },
+          orderBy: { stopOrder: 'asc' },
         },
         fares: {
           where: { deletedAt: null },
@@ -62,13 +62,13 @@ export class RoutesService {
       include: {
         routeStops: {
           include: { stop: true },
-          orderBy: { orderIndex: 'asc' },
+          orderBy: { stopOrder: 'asc' },
         },
         fares: {
           where: { deletedAt: null },
           include: { fromStop: true, toStop: true },
         },
-        tripSchedules: true,
+        trips: true,
       },
     });
 
@@ -108,7 +108,7 @@ export class RoutesService {
       include: {
         routeStops: {
           include: { stop: true },
-          orderBy: { orderIndex: 'asc' },
+          orderBy: { stopOrder: 'asc' },
         },
       },
     });
@@ -117,10 +117,10 @@ export class RoutesService {
   async remove(id: string) {
     const route = await this.findOne(id);
 
-    const activeTripsCount = await this.prisma.tripSchedule.count({
+    const activeTripsCount = await this.prisma.trip.count({
       where: {
         routeId: id,
-        status: { in: ['SCHEDULED', 'IN_PROGRESS'] },
+        status: { in: ['SCHEDULED', 'RUNNING'] },
       },
     });
 
@@ -154,17 +154,17 @@ export class RoutesService {
     }
 
     const existingOrder = await this.prisma.routeStop.findFirst({
-      where: { routeId, orderIndex: dto.orderIndex },
+      where: { routeId, stopOrder: dto.stopOrder },
     });
     if (existingOrder) {
-      throw new BadRequestException(`Thứ tự trạm (orderIndex = ${dto.orderIndex}) đã tồn tại trong tuyến này!`);
+      throw new BadRequestException(`Thứ tự trạm (stopOrder = ${dto.stopOrder}) đã tồn tại trong tuyến này!`);
     }
 
     return this.prisma.routeStop.create({
       data: {
         routeId,
         stopId: dto.stopId,
-        orderIndex: dto.orderIndex,
+        stopOrder: dto.stopOrder,
         distanceFromStartKm: dto.distanceFromStartKm ?? 0.0,
         estimatedMinutesFromStart: dto.estimatedMinutesFromStart ?? 0,
         isTerminal: dto.isTerminal ?? false,
@@ -206,9 +206,9 @@ export class RoutesService {
       throw new BadRequestException('Một tuyến đường bắt buộc phải có tối thiểu 2 trạm dừng!');
     }
 
-    const orderIndexes = new Set(dto.stops.map((s) => s.orderIndex));
-    if (orderIndexes.size !== dto.stops.length) {
-      throw new BadRequestException('Thứ tự trạm (orderIndex) không được trùng lặp giữa các trạm!');
+    const stopOrders = new Set(dto.stops.map((s) => s.stopOrder));
+    if (stopOrders.size !== dto.stops.length) {
+      throw new BadRequestException('Thứ tự trạm (stopOrder) không được trùng lặp giữa các trạm!');
     }
 
     const currentRouteStops = await this.prisma.routeStop.findMany({
@@ -222,10 +222,9 @@ export class RoutesService {
       throw new BadRequestException('Danh sách trạm khi sắp xếp lại phải khớp chính xác với các trạm hiện có trong tuyến!');
     }
 
-    const sortedStops = [...dto.stops].sort((a, b) => a.orderIndex - b.orderIndex);
+    const sortedStops = [...dto.stops].sort((a, b) => a.stopOrder - b.stopOrder);
 
     return this.prisma.$transaction(async (tx) => {
-      // Step 1: Temporarily set negative orderIndex to prevent unique constraint conflict
       for (const item of sortedStops) {
         await tx.routeStop.update({
           where: {
@@ -235,12 +234,11 @@ export class RoutesService {
             },
           },
           data: {
-            orderIndex: -item.orderIndex,
+            stopOrder: -item.stopOrder,
           },
         });
       }
 
-      // Step 2: Assign final orderIndex and set isTerminal for head & tail stops
       for (let i = 0; i < sortedStops.length; i++) {
         const item = sortedStops[i];
         const isTerminal = i === 0 || i === sortedStops.length - 1;
@@ -252,7 +250,7 @@ export class RoutesService {
             },
           },
           data: {
-            orderIndex: item.orderIndex,
+            stopOrder: item.stopOrder,
             isTerminal,
           },
         });
@@ -263,7 +261,7 @@ export class RoutesService {
         include: {
           routeStops: {
             include: { stop: true },
-            orderBy: { orderIndex: 'asc' },
+            orderBy: { stopOrder: 'asc' },
           },
           fares: {
             where: { deletedAt: null },
