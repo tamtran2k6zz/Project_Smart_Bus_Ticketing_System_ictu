@@ -23,6 +23,9 @@ export const PublicRoute: React.FC<PublicRouteProps> = ({ children }) => {
     if (roles.includes('ADMIN') || roles.includes('MANAGER')) {
       return <Navigate to="/admin/routes" replace />;
     }
+    if (roles.includes('DRIVER')) {
+      return <Navigate to="/driver/portal" replace />;
+    }
     return <Navigate to="/passenger/booking" replace />;
   }
 

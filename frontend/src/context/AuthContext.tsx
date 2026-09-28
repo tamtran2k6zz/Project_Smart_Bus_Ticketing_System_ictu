@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, AuthTokens, LoginCredentials, RoleCode } from '../types/auth';
+import { User, AuthTokens, LoginCredentials, RegisterCredentials, RoleCode } from '../types/auth';
+import { getApiUrl } from '../api/client';
 
 interface AuthContextType {
   user: User | null;
@@ -8,6 +9,7 @@ interface AuthContextType {
   isLoading: boolean;
   error: string | null;
   login: (credentials: LoginCredentials) => Promise<void>;
+  register: (credentials: RegisterCredentials) => Promise<void>;
   logout: () => void;
   hasRole: (role: RoleCode | RoleCode[]) => boolean;
   hasPermission: (permission: string) => boolean;
@@ -25,7 +27,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Khôi phục phiên làm việc khi tải trang
+  // Khôi phục phiên làm việc khi tải lại trang
   useEffect(() => {
     try {
       const storedToken = localStorage.getItem(TOKEN_KEY);
@@ -36,7 +38,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setTokens({
           accessToken: storedToken,
           refreshToken: '',
-          expiresIn: 900,
+          expiresIn: 86400,
           tokenType: 'Bearer',
         });
       }
@@ -53,73 +55,132 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsLoading(true);
     setError(null);
     try {
-      // 1. Thử gọi API thực tế nếu server đang chạy
-      try {
-        const res = await fetch('/api/v1/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            identifier: credentials.identifier,
-            password: credentials.password,
-          }),
-        });
+      // Kết nối trực tiếp vào MySQL API Backend NestJS - KHÔNG MOCK TEST
+      const res = await fetch(getApiUrl('/api/v1/auth/login'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          identifier: credentials.identifier.trim(),
+          password: credentials.password,
+        }),
+      });
 
-        if (res.ok) {
-          const body = await res.json();
-          const authUser: User = body.data.user;
-          const authTokens: AuthTokens = body.data.tokens;
+      const body = await res.json().catch(() => null);
 
-          setUser(authUser);
-          setTokens(authTokens);
-          localStorage.setItem(TOKEN_KEY, authTokens.accessToken);
-          localStorage.setItem(USER_KEY, JSON.stringify(authUser));
-          return;
-        }
-      } catch {
-        // Fallback sang mock bên dưới cho Demo
+      if (!res.ok) {
+        const errorMsg =
+          body?.message ||
+          body?.error ||
+          'Đăng nhập thất bại. Tài khoản hoặc mật khẩu không chính xác trong CSDL MySQL!';
+        throw new Error(errorMsg);
       }
 
-      // 2. Chế độ Mock thông minh phục vụ Demo Sprint
-      const idf = credentials.identifier.toLowerCase();
-      let role: RoleCode = 'PASSENGER';
-      let fullName = 'Hành khách Demo';
+      // Xử lý dữ liệu trả về từ MySQL
+      const apiUser = body?.data?.user || body?.user;
+      const apiTokens = body?.data?.tokens || body?.tokens;
 
-      if (idf.includes('admin')) {
-        role = 'ADMIN';
-        fullName = 'Nguyễn Hoàng Đức (Admin)';
-      } else if (idf.includes('manager') || idf.includes('quanly')) {
-        role = 'MANAGER';
-        fullName = 'Quản lý Điều hành';
-      } else if (idf.includes('driver') || idf.includes('0987')) {
-        role = 'DRIVER';
-        fullName = 'Tài xế / Phụ xe';
+      if (!apiUser || !apiTokens?.accessToken) {
+        throw new Error('Dữ liệu phản hồi từ máy chủ không đúng định dạng!');
       }
 
-      const mockUser: User = {
-        id: 'usr-' + Math.random().toString(36).substring(2, 9),
-        email: idf.includes('@') ? idf : `${idf}@smartbus.ictu.vn`,
-        phone: idf.includes('@') ? '0912345678' : idf,
-        fullName,
+      const role = (apiUser.role || 'PASSENGER') as RoleCode;
+      const mappedUser: User = {
+        id: apiUser.id,
+        email: apiUser.email,
+        phone: apiUser.phoneNumber || '',
+        fullName: apiUser.fullName,
         avatarUrl: null,
-        status: 'ACTIVE',
+        status: (apiUser.status || 'ACTIVE') as any,
         roles: [role],
-        permissions: ['route:manage', 'ticket:read'],
+        permissions:
+          role === 'ADMIN'
+            ? ['*']
+            : role === 'MANAGER'
+            ? ['route:manage', 'trip:manage', 'user:manage']
+            : ['ticket:book', 'route:view'],
         createdAt: new Date().toISOString(),
       };
 
-      const mockTokens: AuthTokens = {
-        accessToken: 'mock_jwt_access_token_' + Date.now(),
-        refreshToken: 'mock_jwt_refresh_token',
-        expiresIn: 900,
+      const authTokens: AuthTokens = {
+        accessToken: apiTokens.accessToken,
+        refreshToken: apiTokens.refreshToken || '',
+        expiresIn: apiTokens.expiresIn || 86400,
         tokenType: 'Bearer',
       };
 
-      setUser(mockUser);
-      setTokens(mockTokens);
-      localStorage.setItem(TOKEN_KEY, mockTokens.accessToken);
-      localStorage.setItem(USER_KEY, JSON.stringify(mockUser));
+      setUser(mappedUser);
+      setTokens(authTokens);
+      localStorage.setItem(TOKEN_KEY, authTokens.accessToken);
+      localStorage.setItem(USER_KEY, JSON.stringify(mappedUser));
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Đăng nhập thất bại. Vui lòng thử lại!';
+      const msg = err instanceof Error ? err.message : 'Lỗi kết nối cơ sở dữ liệu MySQL!';
+      setError(msg);
+      throw new Error(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const register = async (credentials: RegisterCredentials): Promise<void> => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      // Kết nối trực tiếp vào MySQL API Backend - KHÔNG MOCK DATA
+      const res = await fetch(getApiUrl('/api/v1/auth/register'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          full_name: credentials.fullName.trim(),
+          email: credentials.email.trim(),
+          phone_number: credentials.phone.trim(),
+          password: credentials.password,
+          role: 'PASSENGER',
+        }),
+      });
+
+      const body = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        const errorMsg =
+          body?.message ||
+          body?.error ||
+          'Đăng ký tài khoản thất bại. Vui lòng kiểm tra lại thông tin!';
+        throw new Error(errorMsg);
+      }
+
+      const apiUser = body?.data?.user || body?.user;
+      const apiTokens = body?.data?.tokens || body?.tokens;
+
+      if (!apiUser || !apiTokens?.accessToken) {
+        throw new Error('Dữ liệu phản hồi từ máy chủ không đúng định dạng!');
+      }
+
+      const role = (apiUser.role || 'PASSENGER') as RoleCode;
+      const mappedUser: User = {
+        id: String(apiUser.id),
+        email: apiUser.email,
+        phone: apiUser.phoneNumber || credentials.phone || '',
+        fullName: apiUser.fullName,
+        avatarUrl: null,
+        status: (apiUser.status || 'ACTIVE') as any,
+        roles: [role],
+        permissions: ['ticket:book', 'route:view'],
+        createdAt: new Date().toISOString(),
+      };
+
+      const authTokens: AuthTokens = {
+        accessToken: apiTokens.accessToken,
+        refreshToken: apiTokens.refreshToken || '',
+        expiresIn: apiTokens.expiresIn || 86400,
+        tokenType: 'Bearer',
+      };
+
+      setUser(mappedUser);
+      setTokens(authTokens);
+      localStorage.setItem(TOKEN_KEY, authTokens.accessToken);
+      localStorage.setItem(USER_KEY, JSON.stringify(mappedUser));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Lỗi kết nối CSDL MySQL khi đăng ký!';
       setError(msg);
       throw new Error(msg);
     } finally {
@@ -156,6 +217,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     isLoading,
     error,
     login,
+    register,
     logout,
     hasRole,
     hasPermission,

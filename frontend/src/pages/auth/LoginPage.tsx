@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import './LoginPage.css';
 
@@ -46,6 +46,8 @@ export const LoginPage: React.FC = () => {
         const roles = parsed.roles || [];
         if (roles.includes('ADMIN') || roles.includes('MANAGER')) {
           navigate('/admin/routes', { replace: true });
+        } else if (roles.includes('DRIVER')) {
+          navigate('/driver/portal', { replace: true });
         } else {
           navigate('/passenger/booking', { replace: true });
         }
@@ -63,19 +65,19 @@ export const LoginPage: React.FC = () => {
     switch (role) {
       case 'ADMIN':
         setIdentifier('admin@smartbus.ictu.vn');
-        setPassword('Admin@2026');
+        setPassword('Admin@12345');
         break;
       case 'MANAGER':
         setIdentifier('manager@smartbus.ictu.vn');
-        setPassword('Manager@2026');
+        setPassword('Manager@123');
         break;
       case 'DRIVER':
         setIdentifier('0987654321');
-        setPassword('Driver@2026');
+        setPassword('Driver@123');
         break;
       case 'PASSENGER':
-        setIdentifier('0912345678');
-        setPassword('Passenger@2026');
+        setIdentifier('khachhang@gmail.com');
+        setPassword('User@123');
         break;
     }
   };
@@ -179,6 +181,51 @@ export const LoginPage: React.FC = () => {
         <button type="submit" className="btn-submit" disabled={isLoading}>
           {isLoading ? 'Đang xác thực...' : 'Đăng nhập →'}
         </button>
+
+        <div style={{
+          marginTop: '20px',
+          textAlign: 'center',
+          fontSize: '13.5px',
+          color: 'rgba(255, 255, 255, 0.7)',
+        }}>
+          Chưa có tài khoản?{' '}
+          <Link
+            to="/register"
+            style={{
+              color: '#38bdf8',
+              fontWeight: 600,
+              textDecoration: 'none',
+              marginLeft: '4px',
+            }}
+          >
+            Đăng ký tài khoản mới ➔
+          </Link>
+        </div>
+
+        <div style={{ marginTop: '20px', textAlign: 'center' }}>
+          <a
+            href="/landing.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              fontSize: '12.5px',
+              color: '#38bdf8',
+              textDecoration: 'none',
+              fontWeight: 500,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 14px',
+              borderRadius: '9999px',
+              border: '1px solid rgba(56, 189, 248, 0.25)',
+              background: 'rgba(56, 189, 248, 0.06)',
+              backdropFilter: 'blur(8px)',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            🌌 Mở Cinematic Space-Travel Landing Page (Liquid-Glass UI) ↗
+          </a>
+        </div>
       </form>
     </div>
   );

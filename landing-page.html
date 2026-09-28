@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmartBus — Cinematic Space-Travel Landing Page</title>
+
+  <!-- Pinned CDN Scripts -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+  <script src="https://unpkg.com/framer-motion@11.11.17/dist/framer-motion.js"></script>
+  <script>
+    // Safeguard FramerMotion global
+    window.Motion = window.Motion || window.FramerMotion || (window.MotionPlugin && window.MotionPlugin.Motion);
+  </script>
+
+  <!-- Google Fonts: Playfair Display & Be Vietnam Pro (Full Vietnamese Support) + Instrument Serif & Barlow -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,300;0,400;0,500;1,400&family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Instrument+Serif:ital@0;1&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet">
+
+  <!-- Tailwind Configuration -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            heading: ['"Playfair Display"', '"Instrument Serif"', 'Georgia', 'serif'],
+            body: ['"Be Vietnam Pro"', '"Barlow"', 'sans-serif'],
+          },
+          borderRadius: {
+            DEFAULT: "9999px",
+          },
+        },
+      },
+    };
+  </script>
+
+  <!-- Liquid-Glass & Core CSS -->
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: #000000;
+      color: #ffffff;
+      overflow-x: hidden;
+      margin: 0;
+      padding: 0;
+      font-family: 'Be Vietnam Pro', 'Barlow', sans-serif;
+    }
+
+    /* Subtle liquid-glass utility */
+    .liquid-glass {
+      background: rgba(255, 255, 255, 0.025);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: none;
+      box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.12);
+      position: relative;
+      overflow: hidden;
+    }
+    .liquid-glass::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      padding: 1.4px;
+      background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.45) 0%,
+        rgba(255, 255, 255, 0.15) 20%,
+        rgba(255, 255, 255, 0) 40%,
+        rgba(255, 255, 255, 0) 60%,
+        rgba(255, 255, 255, 0.15) 80%,
+        rgba(255, 255, 255, 0.45) 100%
+      );
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+    }
+
+    /* Strong liquid-glass utility */
+    .liquid-glass-strong {
+      background: rgba(14, 14, 22, 0.75);
+      backdrop-filter: blur(45px);
+      -webkit-backdrop-filter: blur(45px);
+      border: none;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), inset 0 1px 1px rgba(255, 255, 255, 0.2);
+      position: relative;
+      overflow: hidden;
+    }
+    .liquid-glass-strong::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      padding: 1.4px;
+      background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.6) 0%,
+        rgba(255, 255, 255, 0.2) 20%,
+        rgba(255, 255, 255, 0) 45%,
+        rgba(255, 255, 255, 0.1) 75%,
+        rgba(255, 255, 255, 0.5) 100%
+      );
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    .hero-bg {
+      background: radial-gradient(circle at 50% 25%, rgba(20, 60, 140, 0.4) 0%, rgba(8, 12, 24, 0.95) 60%, #000000 100%);
+    }
+
+    .capabilities-bg {
+      background: radial-gradient(circle at 50% 35%, rgba(55, 48, 107, 0.4) 0%, rgba(8, 8, 15, 0.95) 65%, #000000 100%);
+    }
+  </style>
+</head>
+<body>
+  <!-- Film grain noise overlay -->
+  <svg style="position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0.035; z-index: 99999;">
+    <filter id="noiseFilter">
+      <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch" />
+    </filter>
+    <rect width="100%" height="100%" filter="url(#noiseFilter)" />
+  </svg>
+
+  <div id="root"></div>
+
+  <!-- Components & App Script -->
+  <script type="text/babel">
+    const { useEffect, useRef, useState, useCallback } = React;
+    
+    // Robust Framer Motion fallback ensures no black screen even if CDN has delay
+    const motionObj = window.Motion && window.Motion.motion ? window.Motion.motion : null;
+    const motion = motionObj || {
+      div: (props) => <div {...props} />,
+      p: (props) => <p {...props} />,
+      span: (props) => <span {...props} />,
+      section: (props) => <section {...props} />,
+      header: (props) => <header {...props} />,
+      button: (props) => <button {...props} />,
+    };
+
+    // Suppress benign Framer Motion dev key warnings
+    const origError = console.error;
+    console.error = (...args) => {
+      if (args[0] && typeof args[0] === 'string' && args[0].includes('Each child in a list should have a unique "key" prop')) return;
+      origError.apply(console, args);
+    };
+
+    // ==========================================
+    // 1. FADING VIDEO COMPONENT (Safe Crossfade + AutoPlay)
+    // ==========================================
+    function FadingVideo({ src, className, style }) {
+      const videoRef = useRef(null);
+      const rafIdRef = useRef(null);
+      const fadingOutRef = useRef(false);
+
+      const fadeTo = useCallback((target, duration = 600) => {
+        if (rafIdRef.current) {
+          cancelAnimationFrame(rafIdRef.current);
+        }
+        const video = videoRef.current;
+        if (!video) return;
+
+        const startOpacity = parseFloat(video.style.opacity !== '' ? video.style.opacity : 1);
+        const startTime = performance.now();
+
+        function step(now) {
+          const elapsed = now - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          const current = startOpacity + (target - startOpacity) * progress;
+          if (videoRef.current) {
+            videoRef.current.style.opacity = current;
+          }
+          if (progress < 1) {
+            rafIdRef.current = requestAnimationFrame(step);
+          } else {
+            rafIdRef.current = null;
+          }
+        }
+
+        rafIdRef.current = requestAnimationFrame(step);
+      }, []);
+
+      useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+
+        // Default to visible so user never sees plain black void
+        video.style.opacity = '0.9';
+
+        const tryPlay = () => {
+          const playPromise = video.play();
+          if (playPromise !== undefined) {
+            playPromise.then(() => {
+              fadeTo(1, 500);
+            }).catch(() => {
+              // Browser autoplay policy might hold until user interaction
+              video.style.opacity = '1';
+            });
+          }
+        };
+
+        const handleLoadedData = () => {
+          tryPlay();
+        };
+
+        const handleCanPlay = () => {
+          tryPlay();
+        };
+
+        const handleTimeUpdate = () => {
+          if (
+            !fadingOutRef.current &&
+            video.duration &&
+            video.duration - video.currentTime <= 0.6 &&
+            video.duration - video.currentTime > 0
+          ) {
+            fadingOutRef.current = true;
+            fadeTo(0, 600);
+          }
+        };
+
+        const handleEnded = () => {
+          video.style.opacity = '0';
+          setTimeout(() => {
+            if (!videoRef.current) return;
+            videoRef.current.currentTime = 0;
+            videoRef.current.play().then(() => {
+              fadingOutRef.current = false;
+              fadeTo(1, 600);
+            }).catch(() => {
+              video.style.opacity = '1';
+            });
+          }, 80);
+        };
+
+        video.addEventListener('loadeddata', handleLoadedData);
+        video.addEventListener('canplay', handleCanPlay);
+        video.addEventListener('timeupdate', handleTimeUpdate);
+        video.addEventListener('ended', handleEnded);
+
+        if (video.readyState >= 2) {
+          tryPlay();
+        }
+
+        // Global click resume in case browser blocked audio/video playback
+        const handleUserClick = () => {
+          if (video.paused) {
+            video.play().catch(() => {});
+          }
+        };
+        window.addEventListener('click', handleUserClick, { once: true });
+
+        return () => {
+          if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+          video.removeEventListener('loadeddata', handleLoadedData);
+          video.removeEventListener('canplay', handleCanPlay);
+          video.removeEventListener('timeupdate', handleTimeUpdate);
+          video.removeEventListener('ended', handleEnded);
+          window.removeEventListener('click', handleUserClick);
+        };
+      }, [fadeTo, src]);
+
+      return (
+        <video
+          ref={videoRef}
+          src={src}
+          autoPlay
+          muted
+          playsInline
+          loop={false}
+          preload="auto"
+          className={className}
+          style={{ opacity: 0.9, ...style }}
+        />
+      );
+    }
+
+    // ==========================================
+    // 2. BLUR TEXT COMPONENT (Word-by-word animation)
+    // ==========================================
+    function BlurText({ text, className }) {
+      const containerRef = useRef(null);
+      const [inView, setInView] = useState(true);
+
+      useEffect(() => {
+        const observer = new IntersectionObserver(
+          ([entry]) => {
+            if (entry.isIntersecting) {
+              setInView(true);
+            }
+          },
+          { threshold: 0.1 }
+        );
+
+        if (containerRef.current) {
+          observer.observe(containerRef.current);
+        }
+
+        return () => observer.disconnect();
+      }, []);
+
+      const words = text.split(' ');
+
+      return (
+        <p
+          ref={containerRef}
+          className={className}
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            justifyContent: 'center',
+            rowGap: '0.1em',
+          }}
+        >
+          {words.map((word, i) => (
+            <motion.span
+              key={i}
+              initial={{ filter: 'blur(8px)', opacity: 0.2, y: 30 }}
+              animate={
+                inView
+                  ? {
+                      filter: ['blur(8px)', 'blur(2px)', 'blur(0px)'],
+                      opacity: [0.2, 0.7, 1],
+                      y: [30, -3, 0],
+                    }
+                  : { filter: 'blur(0px)', opacity: 1, y: 0 }
+              }
+              transition={{
+                duration: 0.6,
+                times: [0, 0.5, 1],
+                ease: 'easeOut',
+                delay: (i * 80) / 1000,
+              }}
+              style={{ display: 'inline-block', marginRight: '0.28em' }}
+            >
+              {word}
+            </motion.span>
+          ))}
+        </p>
+      );
+    }
+
+    // ==========================================
+    // 3. ICONS
+    // ==========================================
+    const ArrowUpRight = ({ className = "h-5 w-5" }) => (
+      <svg
+        className={className}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M7 17L17 7" />
+        <path d="M7 7h10v10" />
+      </svg>
+    );
+
+    const PlayIcon = ({ className = "h-4 w-4" }) => (
+      <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+        <polygon points="6 4 20 12 6 20 6 4" />
+      </svg>
+    );
+
+    const ClockIcon = () => (
+      <svg
+        className="w-7 h-7 text-white stroke-current"
+        viewBox="0 0 24 24"
+        fill="none"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <circle cx="12" cy="12" r="10" />
+        <polyline points="12 6 12 12 16 14" />
+      </svg>
+    );
+
+    const GlobeIcon = () => (
+      <svg
+        className="w-7 h-7 text-white stroke-current"
+        viewBox="0 0 24 24"
+        fill="none"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <circle cx="12" cy="12" r="10" />
+        <line x1="2" y1="12" x2="22" y2="12" />
+        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+      </svg>
+    );
+
+    // ==========================================
+    // 4. NAVBAR COMPONENT
+    // ==========================================
+    function Navbar() {
+      const links = ['Trang chủ', 'Tuyến xe', 'Lộ trình', 'Vé điện tử', 'Điều hành'];
+      return (
+        <header className="fixed top-4 inset-x-0 px-6 lg:px-16 z-50 flex items-center justify-between pointer-events-none">
+          {/* Logo Left */}
+          <a
+            href="/admin/routes"
+            className="w-12 h-12 rounded-full liquid-glass flex items-center justify-center font-heading italic text-2xl text-white pointer-events-auto cursor-pointer hover:scale-105 transition-transform duration-200"
+            title="SmartBus Admin"
+          >
+            🚌
+          </a>
+
+          {/* Nav Center Pill */}
+          <nav className="hidden md:flex liquid-glass rounded-full px-2 py-1.5 items-center gap-1 pointer-events-auto">
+            {links.map((link) => (
+              <a
+                key={link}
+                href="#hero"
+                className="px-3 py-2 text-sm font-medium text-white/90 font-body hover:text-white transition-colors duration-150"
+              >
+                {link}
+              </a>
+            ))}
+            <a
+              href="/login"
+              className="bg-white text-black rounded-full px-4 py-2 text-sm font-semibold whitespace-nowrap flex items-center gap-1.5 hover:opacity-90 transition-opacity duration-150 ml-1 shadow-sm"
+            >
+              <span>Vào SmartBus App</span>
+              <ArrowUpRight className="w-4 h-4 text-black" />
+            </a>
+          </nav>
+
+          {/* Right Mobile Link */}
+          <div className="pointer-events-auto md:hidden">
+            <a
+              href="/login"
+              className="liquid-glass rounded-full px-4 py-2 text-xs font-semibold text-white flex items-center gap-1"
+            >
+              <span>Đăng nhập</span>
+              <ArrowUpRight className="w-3.5 h-3.5 text-white" />
+            </a>
+          </div>
+        </header>
+      );
+    }
+
+    // ==========================================
+    // 5. HERO SECTION
+    // ==========================================
+    function HeroSection() {
+      return (
+        <section id="hero" className="relative w-full h-screen min-h-screen overflow-hidden hero-bg flex flex-col justify-between">
+          {/* Background Video */}
+          <FadingVideo
+            src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260418_080021_d598092b-c4c2-4e53-8e46-94cf9064cd50.mp4"
+            className="absolute left-1/2 top-0 -translate-x-1/2 object-cover object-top z-0 pointer-events-none"
+            style={{ width: "120%", height: "120%" }}
+          />
+
+          {/* Hero Content */}
+          <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center pt-28 px-4 max-w-4xl mx-auto">
+            {/* Badge */}
+            <motion.div
+              initial={{ filter: 'blur(8px)', opacity: 0, y: 20 }}
+              animate={{ filter: 'blur(0px)', opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.2, ease: 'easeOut' }}
+              className="liquid-glass rounded-full pl-1 pr-3.5 py-1 inline-flex items-center gap-2.5 mb-6"
+            >
+              <span className="bg-white text-black px-3 py-1 rounded-full text-xs font-semibold">
+                SmartBus 2026
+              </span>
+              <span className="text-sm text-white/90 font-body font-normal">
+                Hệ thống xe buýt số hóa thông minh thế hệ mới
+              </span>
+            </motion.div>
+
+            {/* Headline */}
+            <BlurText
+              text="Di chuyển thông minh Chạm là lên xe"
+              className="text-5xl md:text-7xl lg:text-[5.5rem] font-heading italic text-white leading-[1.05] max-w-3xl justify-center tracking-[-2px]"
+            />
+
+            {/* Subheading */}
+            <motion.p
+              initial={{ filter: 'blur(8px)', opacity: 0, y: 20 }}
+              animate={{ filter: 'blur(0px)', opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.5, ease: 'easeOut' }}
+              className="mt-6 text-sm md:text-base text-white/80 max-w-2xl font-body font-light leading-relaxed text-center"
+            >
+              Trải nghiệm di chuyển công cộng hiện đại với vé điện tử QR siêu tốc, theo dõi lộ trình thời gian thực, đặt chỗ trực quan và liên thông CSDL MySQL an toàn tuyệt đối.
+            </motion.p>
+
+            {/* CTAs */}
+            <motion.div
+              initial={{ filter: 'blur(8px)', opacity: 0, y: 20 }}
+              animate={{ filter: 'blur(0px)', opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.8, ease: 'easeOut' }}
+              className="flex items-center gap-4 md:gap-6 mt-8 flex-wrap justify-center"
+            >
+              <a
+                href="/login"
+                className="liquid-glass-strong rounded-full px-6 py-3 text-sm font-medium text-white flex items-center gap-2 hover:scale-[1.02] transition-transform duration-200 cursor-pointer shadow-lg"
+              >
+                <span>Bắt đầu trải nghiệm ngay</span>
+                <ArrowUpRight className="h-5 w-5" />
+              </a>
+
+              <a
+                href="#capabilities"
+                className="text-white/80 hover:text-white text-sm font-medium font-body flex items-center gap-2 transition-colors duration-150 cursor-pointer"
+              >
+                <span>Khám phá tính năng</span>
+                <PlayIcon className="h-4 w-4" />
+              </a>
+            </motion.div>
+
+            {/* Stats row */}
+            <motion.div
+              initial={{ filter: 'blur(8px)', opacity: 0, y: 20 }}
+              animate={{ filter: 'blur(0px)', opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 1.0, ease: 'easeOut' }}
+              className="flex items-stretch gap-4 mt-10 flex-wrap justify-center"
+            >
+              {/* Card 1 */}
+              <div className="liquid-glass p-5 w-[210px] rounded-[1.25rem] text-left flex flex-col justify-between">
+                <ClockIcon />
+                <div className="mt-4">
+                  <div className="font-heading italic text-white text-3xl md:text-4xl tracking-[-1px] leading-none">
+                    &lt; 1 Giây
+                  </div>
+                  <div className="text-xs text-white/70 font-body font-light mt-2">
+                    Tốc độ quét mã QR soát vé
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 2 */}
+              <div className="liquid-glass p-5 w-[210px] rounded-[1.25rem] text-left flex flex-col justify-between">
+                <GlobeIcon />
+                <div className="mt-4">
+                  <div className="font-heading italic text-white text-3xl md:text-4xl tracking-[-1px] leading-none">
+                    100% Real
+                  </div>
+                  <div className="text-xs text-white/70 font-body font-light mt-2">
+                    Dữ liệu thời gian thực từ MySQL
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Partners row at bottom */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 1.2, ease: 'easeOut' }}
+            className="relative z-10 flex flex-col items-center gap-3 pb-8"
+          >
+            <div className="liquid-glass rounded-full px-4 py-1 text-xs font-medium text-white/80 font-body">
+              Công nghệ số hóa giao thông công cộng tiên tiến — Team 5 ICTU
+            </div>
+          </motion.div>
+        </section>
+      );
+    }
+
+    // ==========================================
+    // 6. CAPABILITIES SECTION
+    // ==========================================
+    function CapabilitiesSection() {
+      const cards = [
+        {
+          title: "Vé điện tử QR",
+          body: "Giữ chỗ 10 phút, mã QR bảo mật mã hóa một lần, tích hợp thanh toán tự động và tra cứu lịch sử mua vé.",
+          iconPath: "M5 21q-.825 0-1.412-.587T3 19V5q0-.825.588-1.412T5 3h14q.825 0 1.413.588T21 5v14q0 .825-.587 1.413T19 21H5Zm1-4h12l-3.75-5-3 4L9 13l-3 4Z",
+          tags: ["Mã QR độc quyền", "Giữ chỗ 10 phút", "Thanh toán ví/thẻ", "Bảo mật cao"]
+        },
+        {
+          title: "Quản lý Tuyến & Trạm",
+          body: "Sắp xếp thứ tự trạm dừng trực quan bằng thao tác kéo thả dnd-kit mượt mà, định tuyến chính xác trên bản đồ.",
+          iconPath: "M4 6.47 5.76 10H20v8H4V6.47M22 4h-4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.89-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4Z",
+          tags: ["Kéo thả trạm", "Định tuyến tự động", "Phần luồng xe", "Tối ưu lộ trình"]
+        },
+        {
+          title: "Điều hành & Phân quyền",
+          body: "Hệ thống RBAC 4 cấp độ: Admin quản trị, Quản lý điều độ, Tài xế soát vé & báo sự cố, Hành khách đặt vé & phản ánh.",
+          iconPath: "M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1Zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7Z",
+          tags: ["Phân quyền RBAC", "Báo cáo sự cố", "Duyệt vé HSSV", "Đánh giá chất lượng"]
+        }
+      ];
+
+      return (
+        <section id="capabilities" className="relative min-h-screen overflow-hidden capabilities-bg text-white flex flex-col justify-between">
+          {/* Background Video */}
+          <FadingVideo
+            src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260418_094631_d30ab262-45ee-4b7d-99f3-5d5848c8ef13.mp4"
+            className="absolute inset-0 w-full h-full object-cover z-0 pointer-events-none"
+            style={{ width: "100%", height: "100%" }}
+          />
+
+          {/* Content */}
+          <div className="relative z-10 px-6 md:px-16 lg:px-20 pt-28 pb-16 flex flex-col min-h-screen justify-between">
+            {/* Header */}
+            <div className="mb-auto">
+              <div className="text-sm font-body text-white/70 mb-4 tracking-wider uppercase">
+                // Tính năng đột phá
+              </div>
+              <h2 className="font-heading italic text-white text-5xl md:text-7xl lg:text-[5.5rem] leading-[1.0] tracking-[-2px]">
+                Nền tảng vận hành<br />thế hệ mới
+              </h2>
+            </div>
+
+            {/* Three Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12 mb-8">
+              {cards.map((card, idx) => (
+                <div
+                  key={idx}
+                  className="liquid-glass rounded-[1.5rem] p-6 min-h-[340px] flex flex-col justify-between hover:bg-white/[0.04] transition-all duration-300"
+                >
+                  {/* Top row */}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="w-12 h-12 rounded-[0.85rem] liquid-glass flex items-center justify-center flex-shrink-0 text-cyan-400">
+                      <svg className="h-6 w-6 fill-current" viewBox="0 0 24 24">
+                        <path d={card.iconPath} />
+                      </svg>
+                    </div>
+
+                    <div className="flex flex-wrap justify-end gap-1.5 max-w-[70%]">
+                      {card.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="liquid-glass rounded-full px-3 py-1 text-[11px] text-white/90 font-body whitespace-nowrap"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Spacer */}
+                  <div className="flex-1" />
+
+                  {/* Bottom info */}
+                  <div className="mt-6">
+                    <h3 className="font-heading italic text-white text-3xl md:text-4xl tracking-[-1px] leading-tight">
+                      {card.title}
+                    </h3>
+                    <p className="mt-3 text-sm text-white/80 font-body font-light leading-relaxed">
+                      {card.body}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Footer Row */}
+            <div className="flex justify-between items-center pt-8 border-t border-white/10 text-xs text-white/50 flex-wrap gap-4">
+              <span>© 2026 SmartBus Ticketing System. Team 5 ICTU.</span>
+              <a href="/login" className="text-cyan-400 hover:underline font-medium text-sm flex items-center gap-1">
+                Đăng nhập vào Hệ thống Quản trị & Điều hành →
+              </a>
+            </div>
+          </div>
+        </section>
+      );
+    }
+
+    // ==========================================
+    // 7. ROOT APP COMPONENT
+    // ==========================================
+    function App() {
+      return (
+        <div className="relative w-full bg-black selection:bg-cyan-400 selection:text-black">
+          <Navbar />
+          <HeroSection />
+          <CapabilitiesSection />
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>

@@ -52,9 +52,9 @@ export class BusStopsService {
         ...(search
           ? {
               OR: [
-                { name: { contains: search, mode: 'insensitive' } },
-                { code: { contains: search, mode: 'insensitive' } },
-                { address: { contains: search, mode: 'insensitive' } },
+                { name: { contains: search } },
+                { code: { contains: search } },
+                { address: { contains: search } },
               ],
             }
           : {}),
