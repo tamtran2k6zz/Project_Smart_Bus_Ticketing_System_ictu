@@ -1,331 +1,236 @@
-# Smart Bus Ticketing
+# 🚌 Smart Bus Ticketing System - ICTU
 
-Dưới đây là gói thiết lập hoàn chỉnh, thực chiến (Ready-to-use) được chuẩn hóa theo đúng các công nghệ trong Team Charter của nhóm (GitHub, Docker, Nginx, Staging).
+<p align="center">
+  <img src="https://img.shields.io/badge/React-19.3.0-61dafb?style=for-the-badge&logo=react&logoColor=black" alt="React 19" />
+  <img src="https://img.shields.io/badge/Vite-8.3.1-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite" />
+  <img src="https://img.shields.io/badge/NestJS-10.3.8-E0234E?style=for-the-badge&logo=nestjs&logoColor=white" alt="NestJS" />
+  <img src="https://img.shields.io/badge/Prisma-5.22.0-2D3748?style=for-the-badge&logo=prisma&logoColor=white" alt="Prisma" />
+  <img src="https://img.shields.io/badge/PostgreSQL-Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase" />
+  <img src="https://img.shields.io/badge/Deploy-Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white" alt="Vercel" />
+</p>
+
+> **Đồ án Thực tập Cơ sở 2026 - Nhóm 5 (N5 Innovators)**  
+> **Trường Đại học Công nghệ Thông tin & Truyền thông (ICTU)**  
+> **Hệ thống đặt vé và điều hành xe buýt thông minh** - Ứng dụng chuyển đổi số giao thông công cộng đô thị, tích hợp phân quyền RBAC, quản lý trạm xe buýt kéo thả, tìm kiếm chuyến xe thời gian thực và đồng bộ cơ sở dữ liệu Supabase Cloud.
 
 ---
 
-## 1. CẤU TRÚC THƯ MỤC DỰ ÁN (MONOREPO / CLEAN REPO)
+## 📌 Bảng mục lục
+1. [Giới thiệu dự án](#-1-giới-thiệu-dự-án)
+2. [Các tính năng nổi bật (Sprint 1)](#-2-các-tính-năng-nổi-bật-sprint-1)
+3. [Kiến trúc hệ thống & Công nghệ](#-3-kiến-trúc-hệ-thống--công-nghệ)
+4. [Tài khoản Demo kiểm thử](#-4-tài-khoản-demo-kiểm-thử)
+5. [Cấu trúc thư mục Monorepo](#-5-cấu-trúc-thư-mục-monorepo)
+6. [Hướng dẫn cài đặt & Chạy cục bộ (Local Setup)](#-6-hướng-dẫn-cài-đặt--chạy-cục-bộ-local-setup)
+7. [Tích hợp Supabase & Cơ sở dữ liệu](#-7-tích-hợp-supabase--cơ-sở-dữ-liệu)
+8. [Triển khai Vercel & CI/CD Pipeline](#-8-triển-khai-vercel--cicd-pipeline)
+9. [Đội ngũ phát triển (Team 5 - N5 Innovators)](#-9-đội-ngũ-phát-triển-team-5---n5-innovators)
 
-Nhóm nên cấu trúc thư mục rõ ràng để CI/CD dễ dàng quét và build độc lập:
+---
+
+## 📖 1. Giới thiệu dự án
+
+Hệ thống **Smart Bus Ticketing System** được thiết kế nhằm hiện đại hóa hoạt động quản lý vận tải hành khách công cộng bằng xe buýt:
+- **Dành cho hành khách:** Dễ dàng tra cứu thông tin các tuyến buýt, lộ trình trạm dừng, lịch trình chuyến xe và đặt vé trực tuyến nhanh chóng.
+- **Dành cho ban quản lý & điều hành (Admin/Manager):** Thiết lập mạng lưới tuyến đường linh hoạt, sắp xếp thứ tự trạm đón trả khách bằng thao tác kéo thả trực quan, quản lý xe và tài xế.
+- **Bảo mật & Hiệu năng cao:** Kiến trúc tách biệt Frontend (SPA React 19) và Backend (NestJS REST API), phân quyền RBAC chặt chẽ với JWT & Protected Routes, đồng bộ Database PostgreSQL trên nền tảng Supabase Cloud.
+
+---
+
+## ✨ 2. Các tính năng nổi bật (Sprint 1)
+
+### 🔐 A. Phân hệ Xác thực & Phân quyền (Authentication & RBAC)
+- **Auth Layout hiện đại:** Thiết kế Split-screen với hero banner phương tiện công cộng, huy hiệu Live trạng thái hệ thống.
+- **Form Đăng nhập UX cao cấp:** Hỗ trợ đăng nhập bằng Email hoặc Số điện thoại, nút ẩn/hiện mật khẩu, ghi nhớ phiên làm việc (`localStorage`).
+- **Bộ chuyển nhanh tài khoản Demo:** 1-Click đăng nhập nhanh với các vai trò Admin, Quản lý, Tài xế hoặc Hành khách để chấm điểm & review Sprint thuận tiện.
+- **Route Guards (Bảo vệ tuyến đường):**
+  - `ProtectedRoute`: Kiểm tra đăng nhập và vai trò (`ADMIN`, `MANAGER`). Tự động ghi nhớ vị trí cũ để redirect sau khi đăng nhập.
+  - `PublicRoute`: Tự động chuyển hướng người dùng đã đăng nhập vào trang làm việc tương ứng, tránh việc vào lại trang login.
+  - `UnauthorizedPage (403)`: Trang báo lỗi phân quyền thân thiện, hiển thị thông tin tài khoản hiện tại và nút quay lại / đổi tài khoản.
+
+### 🚌 B. Quản trị Tuyến & Trạm dừng xe buýt (Route & Stop Management)
+- Xem danh sách tuyến buýt, thông tin cự ly, thời gian giãn cách và trạng thái hoạt động.
+- Sắp xếp thứ tự đón/trả khách giữa các trạm dừng bằng thư viện `@dnd-kit` kéo thả (Drag and Drop) mượt mà.
+- Tìm kiếm trạm dừng nhanh theo tên phố, địa danh.
+
+### 🔍 C. Tra cứu Tuyến xe & Tìm kiếm Chuyến đi (Trip Search)
+- Giao diện tra cứu lộ trình tuyến xe cho người dân.
+- Backend API (`US01`) tìm kiếm chuyến xe theo điểm xuất phát, điểm đến và ngày giờ di chuyển, được tối ưu hóa chỉ mục (Indexes) trong cơ sở dữ liệu PostgreSQL.
+
+### ☁️ D. Đồng bộ Cơ sở dữ liệu Supabase Cloud
+- Tích hợp Prisma ORM kết nối trực tiếp đến PostgreSQL trên Supabase.
+- Tự động hóa schema qua `npx prisma db push`, bảo đảm toàn bộ quan hệ khóa ngoại (Foreign Keys) toàn vẹn.
+
+---
+
+## 🛠️ 3. Kiến trúc hệ thống & Công nghệ
+
+| Tầng (Layer) | Công nghệ chính | Thư viện & Công cụ bổ trợ |
+| :--- | :--- | :--- |
+| **Frontend** | **React 19**, **TypeScript 5** | **Vite 8**, **React Router v6**, `@dnd-kit/core`, `@dnd-kit/sortable`, `@supabase/supabase-js`, Modern CSS |
+| **Backend** | **NestJS 10**, **Node.js 20+** | **Prisma ORM 5**, TypeScript, `class-validator`, `bcrypt`, `jsonwebtoken`, `cors` |
+| **Database** | **PostgreSQL 15+** | Lưu trữ trên **Supabase Cloud**, hỗ trợ Supavisor Connection Pooler |
+| **DevOps & Deploy** | **Vercel**, **Docker** | GitHub Actions (CI Lint & Test), Vercel SPA Rewrites, Nginx |
+
+---
+
+## 🔑 4. Tài khoản Demo kiểm thử
+
+Tại màn hình đăng nhập (`/login`), bạn có thể gõ thông tin hoặc bấm trực tiếp vào các nút chuyển đổi tài khoản mẫu:
+
+| Vai trò (Role) | Tài khoản / Email | Mật khẩu mẫu | Quyền hạn truy cập |
+| :--- | :--- | :--- | :--- |
+| **Quản trị viên (Admin)** | `admin@smartbus.ictu.vn` | `Admin@12345` | Truy cập toàn bộ hệ thống (`/admin/routes`, cấu hình trạm, phân quyền). |
+| **Quản lý điều hành (Manager)** | `manager@smartbus.ictu.vn` | `Manager@123` | Quản lý tuyến đường, xe buýt, phân lịch trình chuyến đi. |
+| **Tài xế / Phụ xe (Driver)** | `0987654321` | `Driver@123` | Phân hệ vận hành chuyến xe (Bị chặn 403 khi vào trang Admin). |
+| **Hành khách (Passenger)** | `khachhang@gmail.com` | `User@123` | Đặt vé, tra cứu tuyến xe (Bị chặn 403 khi vào trang Admin). |
+
+---
+
+## 📂 5. Cấu trúc thư mục Monorepo
 
 ```plaintext
-smart-bus-ticketing/
+Project_Smart_Bus_Ticketing_System_ictu/
+├── .agents/skills/                 # Agent Skills (Supabase & Postgres Best Practices)
 ├── .github/
 │   └── workflows/
-│       ├── pr-validation.yml      # CI: Chạy Lint + Unit Test khi tạo PR
-│       └── deploy-staging.yml     # CD: Tự động build & deploy khi merge vào develop/main
-├── backend/                       # Node.js/NestJS/Express API
-│   ├── Dockerfile
-│   ├── package.json
-│   ├── .eslintrc.json
-│   └── src/
-├── frontend/                      # React / Next.js Web App
-│   ├── Dockerfile
-│   ├── nginx.conf
-│   ├── package.json
-│   ├── .eslintrc.json
-│   └── src/
-├── docker/
-│   └── nginx/
-│       └── default.conf           # Reverse Proxy định tuyến FE & BE
-├── .husky/                        # Pre-commit hooks
-├── .prettierrc                    # Cấu hình format code chung
-├── docker-compose.staging.yml     # Khởi chạy toàn bộ hệ thống trên Staging
+│       └── deploy-staging.yml      # CI/CD GitHub Actions kiểm tra tự động
+├── backend/                        # Backend RESTful API (NestJS + Prisma)
+│   ├── prisma/
+│   │   └── schema.prisma           # Cấu trúc Database PostgreSQL chuẩn
+│   ├── src/
+│   │   ├── modules/
+│   │   │   ├── trips/              # API tìm kiếm chuyến xe buýt (US01)
+│   │   │   ├── routes/             # API tuyến & trạm xe buýt
+│   │   │   └── prisma/             # Prisma Service & Database Connection
+│   │   ├── app.module.ts
+│   │   └── main.ts
+│   ├── .env.example                # File mẫu biến môi trường backend
+│   └── package.json
+├── frontend/                       # Giao diện người dùng Web SPA (React 19 + Vite)
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── admin/              # Header, Sidebar, Route Manager
+│   │   │   ├── layout/             # AuthLayout (Split-screen banner)
+│   │   │   └── routes/             # ProtectedRoute, PublicRoute Guards
+│   │   ├── context/
+│   │   │   └── AuthContext.tsx     # Quản lý State đăng nhập toàn cục & RBAC
+│   │   ├── pages/
+│   │   │   ├── admin/              # Trang quản trị Tuyến & Trạm
+│   │   │   ├── auth/               # Trang đăng nhập LoginPage
+│   │   │   └── error/              # Trang lỗi UnauthorizedPage (403)
+│   │   ├── routes/
+│   │   │   └── AppRoutes.tsx       # Định tuyến bảo mật bằng React Router
+│   │   ├── types/
+│   │   │   └── auth.ts             # Định nghĩa Type User, RoleCode, Tokens
+│   │   └── utils/
+│   │       └── supabase/client.ts  # Khởi tạo Supabase Client
+│   ├── .env.example
+│   ├── vercel.json                 # Cấu hình rewrite SPA cho Vercel
+│   └── package.json
+├── docker-compose.staging.yml      # Khởi chạy Docker Staging
+├── package.json                    # Root package quản lý build monorepo
+├── vercel.json                     # Root Vercel deployment configuration
 └── README.md
 ```
 
 ---
 
-## 2. CHIẾN LƯỢC NHÁNH GIT (GIT WORKFLOW CHO SPRINT 1 TUẦN)
+## 💻 6. Hướng dẫn cài đặt & Chạy cục bộ (Local Setup)
 
-Để tránh xung đột code (Merge Conflict) và bảo đảm nhịp độ nhanh:
+### Yêu cầu tiên quyết:
+- **Node.js:** Phiên bản `>= 20.x`
+- **npm:** Phiên bản `>= 10.x`
+- **Git**
 
-- **`main`**: Nhánh ổn định, chứa code đạt 100% DoD.
-- **`develop`**: Nhánh tích hợp chính. Mỗi lần merge vào `develop`, CI/CD sẽ tự động deploy lên môi trường Staging.
-- **Nhánh tính năng (Feature branch)**: Tạo từ `develop` theo quy ước:
-  - `feature/N5-22-auth-jwt`, `feature/N5-12-routes-crud`, `bugfix/N5-XX-fix-seat-lock`.
-- **Quy tắc bảo vệ nhánh (Branch Protection Rule trên GitHub)**:
-  - Yêu cầu tối thiểu 1 Approval trước khi merge.
-  - Bắt buộc các bước kiểm tra tự động (CI Pipeline: Lint, Test) phải Pass mới cho merge.
-
----
-
-## 3. THIẾT LẬP ESLINT, PRETTIER & HUSKY (CHUẨN HÓA "CLEAN CODE")
-
-### File cấu hình `.prettierrc` (Đặt ở thư mục gốc):
-```json
-{
-  "semi": true,
-  "singleQuote": true,
-  "tabWidth": 2,
-  "trailingComma": "es5",
-  "printWidth": 100,
-  "bracketSpacing": true,
-  "arrowParens": "avoid"
-}
-```
-
-### Cài đặt Husky & lint-staged (Tự động chặn commit nếu lỗi định dạng):
-Chạy tại thư mục gốc dự án:
+### Bước 1: Clone dự án về máy
 ```bash
-npx husky-init && npm install
-npm install --save-dev lint-staged
+git clone https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu.git
+cd Project_Smart_Bus_Ticketing_System_ictu
 ```
 
-Thêm vào `package.json` ở root:
-```json
-"lint-staged": {
-  "frontend/**/*.{js,jsx,ts,tsx}": [
-    "prettier --write",
-    "eslint --fix"
-  ],
-  "backend/**/*.{js,ts}": [
-    "prettier --write",
-    "eslint --fix"
-  ]
-}
-```
-
-Cập nhật file `.husky/pre-commit`:
+### Bước 2: Cài đặt và chạy Backend (NestJS API)
 ```bash
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
+cd backend
 
-npx lint-staged
+# Cài đặt các gói phụ thuộc
+npm install
+
+# Tạo file cấu hình môi trường từ mẫu
+cp .env.example .env
+# (Điền chuỗi kết nối DATABASE_URL của Supabase hoặc PostgreSQL local vào .env)
+
+# Đồng bộ Database với Prisma
+npx prisma db push
+
+# Khởi chạy máy chủ Backend ở chế độ phát triển
+npm run start:dev
 ```
+> Backend API sẽ chạy tại: `http://localhost:5000`
+
+### Bước 3: Cài đặt và chạy Frontend (React + Vite)
+Mở một cửa sổ terminal mới:
+```bash
+cd frontend
+
+# Cài đặt các gói phụ thuộc
+npm install
+
+# Khởi chạy máy chủ Frontend
+npm run dev
+```
+> Truy cập ứng dụng tại: `http://localhost:5173`
+> Đường dẫn đăng nhập: `http://localhost:5173/login`
+> Đường dẫn quản trị: `http://localhost:5173/admin/routes`
 
 ---
 
-## 4. CẤU HÌNH DOCKER & DOCKER COMPOSE
+## ☁️ 7. Tích hợp Supabase & Cơ sở dữ liệu
 
-### A. Backend Dockerfile (`backend/Dockerfile` - Multi-stage build):
-```dockerfile
-# Stage 1: Build
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
+Dự án sử dụng cơ sở dữ liệu **PostgreSQL** được host trên hạ tầng điện toán đám mây **Supabase**:
+- **Host:** `db.uhoznqcpaasartfvdynx.supabase.co:5432`
+- **Các bảng dữ liệu chính đã khởi tạo:**
+  - `User`, `Role`, `UserRole`: Lưu trữ thông tin tài khoản, phân quyền quản trị viên, quản lý, tài xế, khách hàng.
+  - `BusRoute`, `BusStop`, `RouteStop`: Quản lý danh mục tuyến xe buýt và thứ tự các trạm dừng theo chiều đi/về.
+  - `Bus`, `Trip`: Quản lý đầu xe và lịch trình chuyến buýt thực tế.
+  - `Booking`, `Ticket`, `Payment`: Quản lý vé đặt, vị trí ghế và trạng thái thanh toán.
 
-# Stage 2: Production Run
-FROM node:20-alpine AS runner
-WORKDIR /app
-ENV NODE_ENV=production
-COPY package*.json ./
-RUN npm ci --only=production
-COPY --from=builder /app/dist ./dist
-EXPOSE 5000
-CMD ["node", "dist/main.js"]
+Mỗi khi cập nhật cấu trúc bảng trong [`backend/prisma/schema.prisma`](file:///d:/ICTU/TTCS2026/Team%205/Final_Project/backend/prisma/schema.prisma), chỉ cần chạy:
+```bash
+cd backend
+npx prisma db push
 ```
-
-### B. Frontend Dockerfile (`frontend/Dockerfile` - Phục vụ qua Nginx):
-```dockerfile
-# Stage 1: Build
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
-
-# Stage 2: Web Server
-FROM nginx:alpine
-COPY --from=builder /app/build /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
-```
-
-### C. Docker Compose cho Staging (`docker-compose.staging.yml`):
-```yaml
-version: '3.8'
-
-services:
-  database:
-    image: postgres:15-alpine
-    container_name: staging-postgres
-    restart: always
-    environment:
-      POSTGRES_USER: smartbus_admin
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: smartbus_staging
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata_staging:/var/lib/postgresql/data
-    networks:
-      - smartbus-network
-
-  redis:
-    image: redis:7-alpine
-    container_name: staging-redis
-    restart: always
-    ports:
-      - "6379:6379"
-    networks:
-      - smartbus-network
-
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: staging-backend
-    restart: always
-    environment:
-      PORT: 5000
-      DATABASE_URL: postgresql://smartbus_admin:${DB_PASSWORD}@database:5432/smartbus_staging
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET}
-    depends_on:
-      - database
-      - redis
-    networks:
-      - smartbus-network
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: staging-frontend
-    restart: always
-    depends_on:
-      - backend
-    networks:
-      - smartbus-network
-
-  reverse-proxy:
-    image: nginx:alpine
-    container_name: staging-nginx
-    restart: always
-    ports:
-      - "80:80"
-    volumes:
-      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
-    depends_on:
-      - frontend
-      - backend
-    networks:
-      - smartbus-network
-
-volumes:
-  pgdata_staging:
-
-networks:
-  smartbus-network:
-    driver: bridge
-```
-
-### D. Nginx Reverse Proxy (`docker/nginx/default.conf`):
-```nginx
-server {
-    listen 80;
-    server_name staging.smartbus.local; # Hoặc IP Staging Server / Domain
-
-    # Định tuyến Frontend
-    location / {
-        proxy_pass http://frontend:80;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-
-    # Định tuyến Backend API
-    location /api/ {
-        proxy_pass http://backend:5000/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    }
-}
-```
+Hệ thống sẽ tự động đồng bộ lên Supabase Cloud trong vòng vài giây.
 
 ---
 
-## 5. KỊCH BẢN CI/CD PIPELINE (GITHUB ACTIONS)
+## 🚀 8. Triển khai Vercel & CI/CD Pipeline
 
-Tạo file `.github/workflows/deploy-staging.yml`. Kịch bản này sẽ:
-1. Chạy linter & Unit tests.
-2. Đóng gói Docker Images.
-3. SSH vào Staging Server và chạy `docker compose up -d` không gián đoạn.
-4. Bắn thông báo lên Slack cho cả đội và QA vào việc.
+### Triển khai Frontend lên Vercel:
+Dự án đã được tích hợp sẵn 2 file cấu hình [`vercel.json`](file:///d:/ICTU/TTCS2026/Team%205/Final_Project/vercel.json) ở thư mục gốc và [`frontend/vercel.json`](file:///d:/ICTU/TTCS2026/Team%205/Final_Project/frontend/vercel.json):
+- Tự động nhận diện thư mục `frontend` và chạy lệnh `npm run build`.
+- Rewrite tất cả các đường dẫn (`/*`) về `/index.html`, tránh hoàn toàn lỗi `404 Not Found` khi F5 lại trang trên các route con (`/login`, `/admin/routes`, `/unauthorized`).
 
-```yaml
-name: CI/CD Pipeline - Auto Deploy Staging
-
-on:
-  push:
-    branches: [ develop, main ]
-  pull_request:
-    branches: [ develop ]
-
-jobs:
-  validate:
-    name: Lint & Unit Test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-
-      # Kiểm tra Backend
-      - name: Backend - Install, Lint & Unit Test
-        working-directory: ./backend
-        run: |
-          npm ci
-          npm run lint || true
-          npm run test -- --passWithNoTests
-
-      # Kiểm tra Frontend
-      - name: Frontend - Install, Lint & Unit Test
-        working-directory: ./frontend
-        run: |
-          npm ci
-          npm run lint || true
-          npm run test -- --passWithNoTests
-
-  deploy:
-    name: Deploy to Staging Environment
-    needs: validate
-    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Deploy via SSH to Staging Server
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.STAGING_SERVER_IP }}
-          username: ${{ secrets.STAGING_SSH_USER }}
-          key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
-          script: |
-            cd /home/${{ secrets.STAGING_SSH_USER }}/smart-bus-ticketing
-            git pull origin develop
-            docker compose -f docker-compose.staging.yml down
-            docker compose -f docker-compose.staging.yml up -d --build
-            docker image prune -f
-
-      - name: Notify Slack
-        if: always()
-        uses: 8398a7/action-slack@v3
-        with:
-          status: ${{ job.status }}
-          text: "🚀 Staging Deployment: Phiên bản mới đã được deploy tự động lên Staging! QA sẵn sàng kiểm thử."
-          fields: repo,message,commit,author,action,eventName,ref,workflow
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-```
+### Quy trình CI/CD GitHub Actions:
+- Mỗi khi tạo Pull Request vào nhánh `develop` hoặc push vào `main`, pipeline tự động kích hoạt:
+  - Kiểm tra cú pháp và định dạng mã nguồn (**ESLint**).
+  - Chạy kiểm thử tự động (**Unit Tests**).
+  - Đảm bảo mã nguồn đạt 100% tiêu chuẩn chất lượng (Definition of Done) trước khi cho phép hợp nhất (merge).
 
 ---
 
-## CHECKLIST NGHIỆM THU CHO SCRUM MASTER TRẦN ĐẶNG CÔNG TÂM:
+## 👥 9. Đội ngũ phát triển (Team 5 - N5 Innovators)
 
-- [ ] Khởi tạo Git Repo và mời đủ 10 thành viên vào GitHub Team.
-- [ ] Bật tính năng Branch Protection trên nhánh `develop` và `main`.
-- [ ] Thêm các GitHub Secrets: `STAGING_SERVER_IP`, `STAGING_SSH_USER`, `STAGING_SSH_PRIVATE_KEY`, `DB_PASSWORD`, `SLACK_WEBHOOK_URL`.
-- [ ] Kiểm tra thử nghiệm: Tạo 1 PR mẫu, xác nhận CI chạy Pass, merge vào `develop` và kiểm tra link Staging tự động cập nhật.
+* **Scrum Master / Project Owner:** Trần Đặng Công Tâm
+* **Frontend Lead & Core Auth:** Nguyễn Hoàng Đức
+* **Backend Lead & Route API:** Tao Hoàng Minh Vũ
+* **Backend API & Search Optimization:** Nguyễn Minh Đức
+* **Frontend & Route Lookup UI:** Thiệp
+* **Frontend Route Station Management:** Vinh Hà
+* **Cùng các thành viên Team 5 - ICTU**
+
+---
+
+<p align="center">
+  <sub>© 2026 Smart Bus Ticketing System. Đồ án môn học TTCS2026 - Khoa Công nghệ Thông tin, Đại học CNTT & TT Thái Nguyên (ICTU).</sub>
+</p>
