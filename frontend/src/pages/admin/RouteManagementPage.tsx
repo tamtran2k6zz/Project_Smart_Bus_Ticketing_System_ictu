@@ -1,89 +1,45 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Header from '../../components/admin/Header';
 import RouteTable from '../../components/admin/RouteTable';
 import RouteModal from '../../components/admin/RouteModal';
 import type { BusRoute } from '../../types/route';
-
-const mockRoutes: BusRoute[] = [
-  {
-    id: '1',
-    code: 'R01',
-    name: 'Bến xe Mỹ Đình - Long Biên',
-    status: 'ACTIVE',
-    stations: [
-      {
-        id: 's1',
-        name: 'Bến xe Mỹ Đình',
-        address: 'Phạm Hùng, Nam Từ Liêm',
-        order: 1,
-      },
-      {
-        id: 's2',
-        name: 'Cầu Giấy',
-        address: 'Cầu Giấy, Hà Nội',
-        order: 2,
-      },
-      {
-        id: 's3',
-        name: 'Long Biên',
-        address: 'Long Biên, Hà Nội',
-        order: 3,
-      },
-    ],
-  },
-  {
-    id: '2',
-    code: 'R02',
-    name: 'Hà Đông - Nội Bài',
-    status: 'ACTIVE',
-    stations: [
-      {
-        id: 's4',
-        name: 'Hà Đông',
-        address: 'Hà Đông, Hà Nội',
-        order: 1,
-      },
-      {
-        id: 's5',
-        name: 'Thanh Xuân',
-        address: 'Thanh Xuân, Hà Nội',
-        order: 2,
-      },
-    ],
-  },
-  {
-    id: '3',
-    code: 'R03',
-    name: 'Cầu Giấy - Gia Lâm',
-    status: 'INACTIVE',
-    stations: [
-      {
-        id: 's6',
-        name: 'Cầu Giấy',
-        address: 'Cầu Giấy, Hà Nội',
-        order: 1,
-      },
-    ],
-  },
-];
+import { deleteRoute, getRoutes, saveRoute } from '../../services/routes';
 
 function RouteManagementPage() {
-  const [routes, setRoutes] =
-    useState<BusRoute[]>(mockRoutes);
-
+  const [routes, setRoutes] = useState<BusRoute[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [pageError, setPageError] = useState('');
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
+  const [selectedRoute, setSelectedRoute] = useState<BusRoute | null>(null);
 
-  const [statusFilter, setStatusFilter] =
-    useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
+  useEffect(() => {
+    let cancelled = false;
 
-  const [modalOpen, setModalOpen] =
-    useState(false);
+    getRoutes()
+      .then(data => {
+        if (!cancelled) {
+          setRoutes(data);
+          setPageError('');
+        }
+      })
+      .catch(error => {
+        if (!cancelled) {
+          setPageError(error instanceof Error ? error.message : 'Không thể tải danh sách tuyến.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
 
-  const [modalMode, setModalMode] =
-    useState<'add' | 'edit'>('add');
-
-  const [selectedRoute, setSelectedRoute] =
-    useState<BusRoute | null>(null);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filteredRoutes = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -114,7 +70,7 @@ function RouteManagementPage() {
     setModalOpen(true);
   };
 
-  const handleDelete = (route: BusRoute) => {
+  const handleDelete = async (route: BusRoute) => {
     const confirmed = window.confirm(
       `Bạn có chắc muốn xóa tuyến ${route.code} không?`,
     );
@@ -123,11 +79,13 @@ function RouteManagementPage() {
       return;
     }
 
-    setRoutes((current) =>
-      current.filter(
-        (item) => item.id !== route.id,
-      ),
-    );
+    try {
+      await deleteRoute(route.id);
+      setRoutes(current => current.filter(item => item.id !== route.id));
+      setPageError('');
+    } catch (error) {
+      setPageError(error instanceof Error ? error.message : 'Không thể xóa tuyến.');
+    }
   };
 
   const handleViewStations = (route: BusRoute) => {
@@ -136,21 +94,15 @@ function RouteManagementPage() {
     setModalOpen(true);
   };
 
-  const handleSave = (route: BusRoute) => {
-    setRoutes((current) => {
-      const exists = current.some(
-        (item) => item.id === route.id,
-      );
-
-      if (exists) {
-        return current.map((item) =>
-          item.id === route.id ? route : item,
-        );
-      }
-
-      return [...current, route];
+  const handleSave = async (route: BusRoute) => {
+    const savedRoute = await saveRoute(route);
+    setRoutes(current => {
+      const exists = current.some(item => item.id === savedRoute.id);
+      return exists
+        ? current.map(item => (item.id === savedRoute.id ? savedRoute : item))
+        : [...current, savedRoute];
     });
-
+    setPageError('');
     setModalOpen(false);
     setSelectedRoute(null);
   };
@@ -215,12 +167,17 @@ function RouteManagementPage() {
         </div>
 
         <div className="content-card">
-          <RouteTable
-            routes={filteredRoutes}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            onViewStations={handleViewStations}
-          />
+          {pageError && <div className="form-error">{pageError}</div>}
+          {loading ? (
+            <p role="status">Đang tải danh sách tuyến...</p>
+          ) : (
+            <RouteTable
+              routes={filteredRoutes}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              onViewStations={handleViewStations}
+            />
+          )}
         </div>
       </main>
 

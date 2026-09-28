@@ -11,7 +11,7 @@ interface RouteModalProps {
   mode: 'add' | 'edit';
   route: BusRoute | null;
   onClose: () => void;
-  onSave: (route: BusRoute) => void;
+  onSave: (route: BusRoute) => void | Promise<void>;
 }
 
 function RouteModal({
@@ -24,6 +24,7 @@ function RouteModal({
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
   const [status, setStatus] =
     useState<RouteStatus>('ACTIVE');
 
@@ -87,7 +88,7 @@ function RouteModal({
     setError('');
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!code.trim()) {
       setError('Vui lòng nhập mã tuyến.');
       return;
@@ -116,7 +117,14 @@ function RouteModal({
       })),
     };
 
-    onSave(newRoute);
+    setSaving(true);
+    try {
+      await onSave(newRoute);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Không thể lưu tuyến.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -282,6 +290,7 @@ function RouteModal({
             type="button"
             className="cancel-button"
             onClick={onClose}
+            disabled={saving}
           >
             Hủy
           </button>
@@ -290,8 +299,9 @@ function RouteModal({
             type="button"
             className="primary-button"
             onClick={handleSubmit}
+            disabled={saving}
           >
-            {mode === 'add'
+            {saving ? 'Đang lưu...' : mode === 'add'
               ? 'Tạo tuyến'
               : 'Lưu thay đổi'}
           </button>

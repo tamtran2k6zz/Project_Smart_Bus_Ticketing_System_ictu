@@ -7,6 +7,8 @@ import { PublicRoute } from '../components/routes/PublicRoute';
 import UnauthorizedPage from '../pages/error/UnauthorizedPage';
 import Sidebar from '../components/admin/Sidebar';
 import RouteManagementPage from '../pages/admin/RouteManagementPage';
+import PassengerHomePage from '../pages/passenger/PassengerHomePage';
+import { useAuth } from '../context/AuthContext';
 
 const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
@@ -15,6 +17,25 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       {children}
     </div>
   );
+};
+
+const HomeRedirect: React.FC = () => {
+  const { isAuthenticated, isLoading, user } = useAuth();
+
+  if (isLoading) {
+    return <div>Đang kiểm tra phiên làm việc...</div>;
+  }
+
+  if (!isAuthenticated || !user) {
+    return <Navigate to="/login" replace />;
+  }
+  if (user.roles.includes('ADMIN') || user.roles.includes('MANAGER')) {
+    return <Navigate to="/admin/routes" replace />;
+  }
+  if (user.roles.includes('PASSENGER')) {
+    return <Navigate to="/passenger/booking" replace />;
+  }
+  return <Navigate to="/unauthorized" replace />;
 };
 
 export const AppRoutes: React.FC = () => {
@@ -50,9 +71,17 @@ export const AppRoutes: React.FC = () => {
 
       {/* Trang báo lỗi 403 Forbidden khi thiếu quyền */}
       <Route path="/unauthorized" element={<UnauthorizedPage />} />
+      <Route
+        path="/passenger/booking"
+        element={
+          <ProtectedRoute allowedRoles={['PASSENGER']}>
+            <PassengerHomePage />
+          </ProtectedRoute>
+        }
+      />
 
       {/* Điều hướng mặc định */}
-      <Route path="/" element={<Navigate to="/admin/routes" replace />} />
+      <Route path="/" element={<HomeRedirect />} />
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );

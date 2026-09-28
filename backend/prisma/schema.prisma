@@ -3,7 +3,7 @@
 // Feature: Trip Search & DB Index Optimization
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -31,7 +31,7 @@ enum TicketStatus {
 }
 
 model Route {
-  id         String      @id @default(uuid()) @db.Uuid
+  id         String      @id @default(uuid()) @db.Char(36)
   code       String      @unique @db.VarChar(50)
   name       String      @db.VarChar(255)
   isActive   Boolean     @default(true) @map("is_active")
@@ -45,8 +45,9 @@ model Route {
 }
 
 model BusStop {
-  id        String      @id @default(uuid()) @db.Uuid
+  id        String      @id @default(uuid()) @db.Char(36)
   name      String      @db.VarChar(255)
+  address   String      @default("") @db.VarChar(255)
   latitude  Decimal     @db.Decimal(10, 7)
   longitude Decimal     @db.Decimal(10, 7)
   createdAt DateTime    @default(now()) @map("created_at")
@@ -58,9 +59,9 @@ model BusStop {
 }
 
 model RouteStop {
-  id                   String   @id @default(uuid()) @db.Uuid
-  routeId              String   @map("route_id") @db.Uuid
-  stopId               String   @map("stop_id") @db.Uuid
+  id                   String   @id @default(uuid()) @db.Char(36)
+  routeId              String   @map("route_id") @db.Char(36)
+  stopId               String   @map("stop_id") @db.Char(36)
   stopOrder            Int      @map("stop_order")
   estimatedTimeMinutes Int      @default(0) @map("estimated_time_minutes")
   createdAt            DateTime @default(now()) @map("created_at")
@@ -78,7 +79,7 @@ model RouteStop {
 }
 
 model Bus {
-  id          String   @id @default(uuid()) @db.Uuid
+  id          String   @id @default(uuid()) @db.Char(36)
   plateNumber String   @unique @map("plate_number") @db.VarChar(20)
   busType     String   @map("bus_type") @db.VarChar(50)
   totalSeats  Int      @map("total_seats")
@@ -91,11 +92,11 @@ model Bus {
 }
 
 model Trip {
-  id            String     @id @default(uuid()) @db.Uuid
-  routeId       String     @map("route_id") @db.Uuid
-  busId         String     @map("bus_id") @db.Uuid
-  departureTime DateTime   @map("departure_time") @db.Timestamptz
-  arrivalTime   DateTime   @map("arrival_time") @db.Timestamptz
+  id            String     @id @default(uuid()) @db.Char(36)
+  routeId       String     @map("route_id") @db.Char(36)
+  busId         String     @map("bus_id") @db.Char(36)
+  departureTime DateTime   @map("departure_time") @db.DateTime(3)
+  arrivalTime   DateTime   @map("arrival_time") @db.DateTime(3)
   status        TripStatus @default(SCHEDULED) @map("status")
   basePrice     Decimal    @map("base_price") @db.Decimal(12, 2)
   createdAt     DateTime   @default(now()) @map("created_at")
@@ -113,8 +114,8 @@ model Trip {
 }
 
 model Booking {
-  id          String        @id @default(uuid()) @db.Uuid
-  tripId      String        @map("trip_id") @db.Uuid
+  id          String        @id @default(uuid()) @db.Char(36)
+  tripId      String        @map("trip_id") @db.Char(36)
   bookingCode String        @unique @map("booking_code") @db.VarChar(50)
   status      BookingStatus @default(PENDING) @map("status")
   totalAmount Decimal       @map("total_amount") @db.Decimal(12, 2)
@@ -129,9 +130,9 @@ model Booking {
 }
 
 model Ticket {
-  id         String       @id @default(uuid()) @db.Uuid
-  bookingId  String       @map("booking_id") @db.Uuid
-  tripId     String       @map("trip_id") @db.Uuid
+  id         String       @id @default(uuid()) @db.Char(36)
+  bookingId  String       @map("booking_id") @db.Char(36)
+  tripId     String       @map("trip_id") @db.Char(36)
   seatNumber String       @map("seat_number") @db.VarChar(10)
   price      Decimal      @map("price") @db.Decimal(12, 2)
   status     TicketStatus @default(RESERVED) @map("status")

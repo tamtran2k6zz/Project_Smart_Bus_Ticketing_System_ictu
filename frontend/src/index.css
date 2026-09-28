@@ -545,3 +545,311 @@ button {
   color: #dc2626;
   font-size: 13px;
 }
+
+.passenger-home {
+  min-height: 100vh;
+  background: #f5f7fb;
+}
+
+.passenger-home-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px max(24px, calc((100vw - 1100px) / 2));
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.passenger-brand,
+.passenger-account {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.passenger-brand {
+  color: #172554;
+  text-decoration: none;
+}
+
+.passenger-brand span {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 12px;
+  background: #dbeafe;
+  font-size: 20px;
+}
+
+.passenger-brand strong {
+  color: #172554;
+  font-size: 18px;
+}
+
+.passenger-account {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.passenger-account button {
+  padding: 9px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #334155;
+}
+
+.passenger-account button:hover {
+  background: #f8fafc;
+}
+
+.passenger-page {
+  width: min(100% - 40px, 1000px);
+  margin: 0 auto;
+  padding: 56px 0 80px;
+}
+
+.passenger-intro {
+  margin-bottom: 30px;
+}
+
+.passenger-eyebrow {
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.passenger-intro h1 {
+  max-width: 720px;
+  margin: 12px 0 10px;
+  color: #172554;
+  font-size: clamp(28px, 4vw, 40px);
+  line-height: 1.15;
+}
+
+.passenger-intro p {
+  margin: 0;
+  color: #64748b;
+  line-height: 1.7;
+}
+
+.trip-search-panel,
+.trip-results {
+  padding: 24px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+}
+
+.trip-search-panel h2,
+.trip-results-heading h2 {
+  margin: 0;
+  color: #172554;
+  font-size: 20px;
+}
+
+.trip-search-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.trip-search-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.trip-search-form select,
+.trip-search-form input {
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #172033;
+}
+
+.trip-search-form select:focus,
+.trip-search-form input:focus {
+  border-color: #2563eb;
+  outline: 3px solid rgba(37, 99, 235, 0.12);
+}
+
+.trip-search-button {
+  align-self: end;
+  min-height: 44px;
+  border: 0;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.trip-search-button:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.trip-search-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.trip-hint,
+.trip-error {
+  margin: 14px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.trip-hint {
+  color: #64748b;
+}
+
+.trip-error {
+  padding: 12px 14px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.trip-results {
+  margin-top: 24px;
+}
+
+.trip-results-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.trip-results-heading span,
+.trip-result-route span,
+.trip-result-times span,
+.trip-result-price span {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.trip-result-list {
+  display: grid;
+  gap: 12px;
+}
+
+.trip-result-card {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1fr;
+  align-items: center;
+  gap: 20px;
+  padding: 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.trip-result-route,
+.trip-result-times,
+.trip-result-price {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.trip-result-route strong,
+.trip-result-times strong,
+.trip-result-price strong {
+  color: #172554;
+}
+
+.trip-result-times {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.trip-result-price {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.trip-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 34px 16px 20px;
+  text-align: center;
+}
+
+.trip-empty-state > span {
+  font-size: 28px;
+}
+
+.trip-empty-state p {
+  margin: 12px 0 6px;
+  color: #334155;
+  font-weight: 650;
+}
+
+.trip-empty-state small {
+  color: #64748b;
+}
+
+@media (max-width: 680px) {
+  .passenger-home-header {
+    padding: 14px 16px;
+  }
+
+  .passenger-brand strong {
+    font-size: 15px;
+  }
+
+  .passenger-account {
+    gap: 8px;
+  }
+
+  .passenger-account span {
+    max-width: 110px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .passenger-page {
+    width: min(100% - 28px, 1000px);
+    padding-top: 36px;
+  }
+
+  .trip-search-panel,
+  .trip-results {
+    padding: 18px;
+  }
+
+  .trip-search-form {
+    grid-template-columns: 1fr;
+  }
+
+  .trip-results-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .trip-result-card {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .trip-result-price {
+    align-items: flex-start;
+    text-align: left;
+  }
+}

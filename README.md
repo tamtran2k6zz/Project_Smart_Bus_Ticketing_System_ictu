@@ -34,6 +34,32 @@ smart-bus-ticketing/
 └── README.md
 ```
 
+## Chạy thử API tìm chuyến
+
+Trong thư mục `backend`, cấu hình `DATABASE_URL` trong `.env` rồi chạy seed dữ liệu demo (có thể chạy lại an toàn):
+
+```bash
+npm run prisma:generate
+npm run prisma:seed
+npm run start:prod
+```
+
+Seed tạo một tuyến demo, hai trạm và một chuyến vào ngày kế tiếp. Gửi request tìm chuyến với ID hai trạm demo và ngày chuyến:
+
+```text
+GET http://localhost:5000/api/v1/trips/search?origin_stop_id=22222222-2222-4222-8222-222222222222&destination_stop_id=33333333-3333-4333-8333-333333333333&departure_date=YYYY-MM-DD
+```
+
+Thay `YYYY-MM-DD` bằng ngày kế tiếp theo UTC.
+
+## Tài khoản đăng ký và đăng nhập
+
+- Đăng ký dùng Supabase Auth: email và mật khẩu được lưu trong Auth; họ tên và số điện thoại được lưu trong metadata của tài khoản.
+- Nếu bật xác nhận email trong Supabase, người dùng cần xác minh email trước khi đăng nhập bằng email và mật khẩu đã đăng ký.
+- Thêm URL chuyển hướng `{origin}/login` vào Supabase Auth > URL Configuration > Redirect URLs. Khi chạy local, `origin` là địa chỉ frontend, ví dụ `http://localhost:5174`.
+- Tài khoản mẫu trên trang đăng nhập chỉ dùng cho demo, không phải tài khoản đã đăng ký.
+- Mật khẩu không được lưu trong trình duyệt. Tùy chọn “Ghi nhớ đăng nhập” chỉ quyết định phiên được lưu trong local storage hay session storage.
+
 ---
 
 ## 2. CHIẾN LƯỢC NHÁNH GIT (GIT WORKFLOW CHO SPRINT 1 TUẦN)
@@ -143,17 +169,18 @@ version: '3.8'
 
 services:
   database:
-    image: postgres:15-alpine
-    container_name: staging-postgres
+    image: mysql:8.0
+    container_name: staging-mysql
     restart: always
     environment:
-      POSTGRES_USER: smartbus_admin
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: smartbus_staging
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_USER: smartbus_admin
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: smartbus_staging
     ports:
-      - "5432:5432"
+      - "3306:3306"
     volumes:
-      - pgdata_staging:/var/lib/postgresql/data
+      - mysql_data_staging:/var/lib/mysql
     networks:
       - smartbus-network
 
@@ -174,7 +201,7 @@ services:
     restart: always
     environment:
       PORT: 5000
-      DATABASE_URL: postgresql://smartbus_admin:${DB_PASSWORD}@database:5432/smartbus_staging
+      DATABASE_URL: mysql://smartbus_admin:${DB_PASSWORD}@database:3306/smartbus_staging
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET}
     depends_on:
@@ -209,7 +236,7 @@ services:
       - smartbus-network
 
 volumes:
-  pgdata_staging:
+  mysql_data_staging:
 
 networks:
   smartbus-network:
@@ -327,5 +354,5 @@ jobs:
 
 - [ ] Khởi tạo Git Repo và mời đủ 10 thành viên vào GitHub Team.
 - [ ] Bật tính năng Branch Protection trên nhánh `develop` và `main`.
-- [ ] Thêm các GitHub Secrets: `STAGING_SERVER_IP`, `STAGING_SSH_USER`, `STAGING_SSH_PRIVATE_KEY`, `DB_PASSWORD`, `SLACK_WEBHOOK_URL`.
+- [ ] Thêm các GitHub Secrets: `STAGING_SERVER_IP`, `STAGING_SSH_USER`, `STAGING_SSH_PRIVATE_KEY`, `DB_PASSWORD`, `DB_ROOT_PASSWORD`, `SLACK_WEBHOOK_URL`.
 - [ ] Kiểm tra thử nghiệm: Tạo 1 PR mẫu, xác nhận CI chạy Pass, merge vào `develop` và kiểm tra link Staging tự động cập nhật.

@@ -2,17 +2,18 @@ version: '3.8'
 
 services:
   database:
-    image: postgres:15-alpine
-    container_name: staging-postgres
+    image: mysql:8.0
+    container_name: staging-mysql
     restart: always
     environment:
-      POSTGRES_USER: smartbus_admin
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: smartbus_staging
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_USER: smartbus_admin
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: smartbus_staging
     ports:
-      - "5432:5432"
+      - "3306:3306"
     volumes:
-      - pgdata_staging:/var/lib/postgresql/data
+      - mysql_data_staging:/var/lib/mysql
     networks:
       - smartbus-network
 
@@ -33,7 +34,7 @@ services:
     restart: always
     environment:
       PORT: 5000
-      DATABASE_URL: postgresql://smartbus_admin:${DB_PASSWORD}@database:5432/smartbus_staging
+      DATABASE_URL: mysql://smartbus_admin:${DB_PASSWORD}@database:3306/smartbus_staging
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET}
     depends_on:
@@ -68,7 +69,7 @@ services:
       - smartbus-network
 
 volumes:
-  pgdata_staging:
+  mysql_data_staging:
 
 networks:
   smartbus-network:
