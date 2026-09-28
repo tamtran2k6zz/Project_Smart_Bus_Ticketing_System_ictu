@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { TicketStatus, TripStatus } from '@prisma/client';
+import { RouteStatus, TicketStatus, TripStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SearchTripsDto } from './dto/search-trips.dto';
 import { SearchTripsResponseDto, TripSearchResultDto } from './dto/trip-search-response.dto';
@@ -43,18 +43,18 @@ export class TripsService {
       this.prisma.routeStop.findMany({
         where: {
           stopId: origin_stop_id,
-          route: { isActive: true },
+          route: { status: RouteStatus.ACTIVE },
         },
         include: {
           route: {
-            select: { id: true, name: true, isActive: true },
+            select: { id: true, name: true, status: true },
           },
         },
       }),
       this.prisma.routeStop.findMany({
         where: {
           stopId: destination_stop_id,
-          route: { isActive: true },
+          route: { status: RouteStatus.ACTIVE },
         },
       }),
     ]);
@@ -76,8 +76,8 @@ export class TripsService {
         validRoutes.push({
           routeId: rsOrigin.routeId,
           routeName: rsOrigin.route.name,
-          originOffsetMinutes: rsOrigin.estimatedTimeMinutes,
-          destOffsetMinutes: rsDest.estimatedTimeMinutes,
+          originOffsetMinutes: rsOrigin.estimatedMinutesFromStart,
+          destOffsetMinutes: rsDest.estimatedMinutesFromStart,
         });
       }
     }
