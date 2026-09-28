@@ -1,12 +1,14 @@
-import Sidebar from './components/admin/Sidebar';
-import RouteManagementPage from './pages/admin/RouteManagementPage';
+import { BrowserRouter } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
+import AppRoutes from './routes/AppRoutes';
 
 function App() {
   return (
-    <div className="admin-layout">
-      <Sidebar />
-      <RouteManagementPage />
-    </div>
+    <BrowserRouter>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
 

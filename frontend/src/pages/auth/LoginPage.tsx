@@ -1,0 +1,187 @@
+import React, { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import './LoginPage.css';
+
+export const LoginPage: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { login, isLoading, error, clearError } = useAuth();
+
+  const [identifier, setIdentifier] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [rememberMe, setRememberMe] = useState<boolean>(true);
+  const [formError, setFormError] = useState<string | null>(null);
+  const locationState = location.state as { from?: { pathname?: string } } | null;
+  const from = locationState?.from?.pathname;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    clearError();
+    setFormError(null);
+
+    if (!identifier.trim()) {
+      setFormError('Vui lòng nhập Email hoặc Số điện thoại.');
+      return;
+    }
+
+    if (!password) {
+      setFormError('Vui lòng nhập mật khẩu.');
+      return;
+    }
+
+    try {
+      await login({ identifier: identifier.trim(), password, rememberMe });
+
+      if (from) {
+        navigate(from, { replace: true });
+        return;
+      }
+
+      // Điều hướng theo vai trò người dùng
+      const storedUser = localStorage.getItem('smartbus_user');
+      if (storedUser) {
+        const parsed = JSON.parse(storedUser);
+        const roles = parsed.roles || [];
+        if (roles.includes('ADMIN') || roles.includes('MANAGER')) {
+          navigate('/admin/routes', { replace: true });
+        } else {
+          navigate('/passenger/booking', { replace: true });
+        }
+      } else {
+        navigate('/admin/routes', { replace: true });
+      }
+    } catch {
+      // Error handled in AuthContext
+    }
+  };
+
+  const setDemoAccount = (role: 'PASSENGER' | 'DRIVER' | 'MANAGER' | 'ADMIN') => {
+    clearError();
+    setFormError(null);
+    switch (role) {
+      case 'ADMIN':
+        setIdentifier('admin@smartbus.ictu.vn');
+        setPassword('Admin@2026');
+        break;
+      case 'MANAGER':
+        setIdentifier('manager@smartbus.ictu.vn');
+        setPassword('Manager@2026');
+        break;
+      case 'DRIVER':
+        setIdentifier('0987654321');
+        setPassword('Driver@2026');
+        break;
+      case 'PASSENGER':
+        setIdentifier('0912345678');
+        setPassword('Passenger@2026');
+        break;
+    }
+  };
+
+  return (
+    <div className="login-card">
+      <div className="login-header">
+        <h2 className="login-title">Chào mừng trở lại! 👋</h2>
+        <p className="login-subtitle">
+          Đăng nhập vào hệ thống điều hành xe buýt thông minh SmartBus ICTU
+        </p>
+      </div>
+
+      <div className="demo-role-box">
+        <div className="demo-role-label">⚡ Chọn tài khoản mẫu (Sprint 1 Review):</div>
+        <div className="demo-role-buttons">
+          <button type="button" className="demo-btn" onClick={() => setDemoAccount('ADMIN')}>
+            Admin
+          </button>
+          <button type="button" className="demo-btn" onClick={() => setDemoAccount('MANAGER')}>
+            Quản lý
+          </button>
+          <button type="button" className="demo-btn" onClick={() => setDemoAccount('DRIVER')}>
+            Tài xế
+          </button>
+          <button type="button" className="demo-btn" onClick={() => setDemoAccount('PASSENGER')}>
+            Hành khách
+          </button>
+        </div>
+      </div>
+
+      {(formError || error) && (
+        <div className="login-error-alert">
+          ⚠️ {formError || error}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} noValidate>
+        <div className="form-group">
+          <label className="form-label" htmlFor="identifier">
+            Email hoặc Số điện thoại
+          </label>
+          <div className="input-wrapper">
+            <input
+              id="identifier"
+              type="text"
+              className="form-input"
+              placeholder="VD: admin@smartbus.ictu.vn hoặc 0981234567"
+              value={identifier}
+              onChange={(e) => {
+                setIdentifier(e.target.value);
+                if (formError) setFormError(null);
+              }}
+              disabled={isLoading}
+            />
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label" htmlFor="password">
+            Mật khẩu
+          </label>
+          <div className="input-wrapper">
+            <input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              className="form-input"
+              placeholder="Nhập mật khẩu"
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (formError) setFormError(null);
+              }}
+              disabled={isLoading}
+            />
+            <button
+              type="button"
+              className="input-icon-right"
+              onClick={() => setShowPassword(!showPassword)}
+            >
+              {showPassword ? '🙈' : '👁️'}
+            </button>
+          </div>
+        </div>
+
+        <div className="form-options">
+          <label className="remember-label">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              disabled={isLoading}
+            />
+            <span>Ghi nhớ đăng nhập</span>
+          </label>
+          <a href="#forgot" className="forgot-link" onClick={(e) => e.preventDefault()}>
+            Quên mật khẩu?
+          </a>
+        </div>
+
+        <button type="submit" className="btn-submit" disabled={isLoading}>
+          {isLoading ? 'Đang xác thực...' : 'Đăng nhập →'}
+        </button>
+      </form>
+    </div>
+  );
+};
+
+export default LoginPage;
