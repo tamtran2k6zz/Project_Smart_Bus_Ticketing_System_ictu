@@ -144,12 +144,6 @@ function RouteManagementPage() {
           </select>
         </div>
 
-        {pageError && (
-          <div className="page-error" role="alert">
-            {pageError}
-          </div>
-        )}
-
         <div className="content-card">
           {pageError && <div className="form-error">{pageError}</div>}
           {loading ? (
@@ -171,7 +165,6 @@ function RouteManagementPage() {
         route={selectedRoute}
         onClose={() => setModalOpen(false)}
         onSave={handleSave}
-        saving={saving}
       />
     </div>
   );

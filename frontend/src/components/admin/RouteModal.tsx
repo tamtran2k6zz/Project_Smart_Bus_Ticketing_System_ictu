@@ -10,7 +10,7 @@ interface RouteModalProps {
   onSave: (route: BusRoute) => void | Promise<void>;
 }
 
-function RouteModal({ open, mode, route, onClose, onSave, saving }: RouteModalProps) {
+function RouteModal({ open, mode, route, onClose, onSave }: RouteModalProps) {
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');

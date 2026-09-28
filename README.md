@@ -4,6 +4,31 @@ Dưới đây là gói thiết lập hoàn chỉnh, thực chiến (Ready-to-use
 
 ---
 
+## Chạy Backend cục bộ
+
+Tạo cấu hình backend từ file mẫu rồi nhập thông tin MySQL vào `backend/.env`:
+
+```powershell
+Copy-Item backend\.env.example backend\.env
+```
+
+Từ thư mục gốc repository, cài dependencies, tạo Prisma Client, áp dụng migration
+và chạy NestJS ở chế độ phát triển:
+
+```powershell
+npm --prefix backend install
+npm --prefix backend run prisma:generate
+Push-Location backend
+npx prisma migrate deploy
+Pop-Location
+npm --prefix backend run start:dev
+```
+
+`src/main.ts` là TypeScript, vì vậy chạy qua Nest CLI thay vì gọi trực tiếp bằng
+`node`. File `backend/.env` chứa thông tin kết nối riêng và không được commit.
+
+---
+
 ## 1. CẤU TRÚC THƯ MỤC DỰ ÁN (MONOREPO / CLEAN REPO)
 
 Nhóm nên cấu trúc thư mục rõ ràng để CI/CD dễ dàng quét và build độc lập:
