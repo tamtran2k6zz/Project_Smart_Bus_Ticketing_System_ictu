@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
    "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
-    "build": "tsc",
+    "build": "npm --prefix frontend install && npm --prefix frontend run build",
     "start": "node dist/main.ts",
     "lint": "eslint \"src/**/*.{js,ts}\"",
     "test": "jest"
