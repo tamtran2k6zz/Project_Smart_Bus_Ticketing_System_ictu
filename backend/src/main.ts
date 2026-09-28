@@ -1,12 +1,10 @@
+import 'dotenv/config';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
-import { ValidationPipe, Logger } from '@nestjs/common';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
-import * as dotenv from 'dotenv';
-
-dotenv.config();
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -15,14 +13,13 @@ async function bootstrap() {
   app.enableCors();
   app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalInterceptors(new TransformResponseInterceptor());
-
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       transform: true,
       forbidNonWhitelisted: true,
       transformOptions: { enableImplicitConversion: true },
-    })
+    }),
   );
 
   const config = new DocumentBuilder()
@@ -31,13 +28,13 @@ async function bootstrap() {
     .setVersion('1.0.0')
     .addBearerAuth()
     .build();
-
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
   const port = process.env.PORT || 5000;
   await app.listen(port);
-  logger.log(`🚀 Smart Bus Backend is running on: http://localhost:${port}`);
-  logger.log(`📖 Swagger API Docs: http://localhost:${port}/api/docs`);
+  logger.log(`Smart Bus Backend is running on: http://localhost:${port}`);
+  logger.log(`Swagger API Docs: http://localhost:${port}/api/docs`);
 }
-bootstrap();
+
+void bootstrap();
