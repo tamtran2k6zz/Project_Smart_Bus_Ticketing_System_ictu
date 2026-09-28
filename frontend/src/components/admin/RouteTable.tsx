@@ -7,12 +7,7 @@ interface RouteTableProps {
   onViewStations: (route: BusRoute) => void;
 }
 
-function RouteTable({
-  routes,
-  onEdit,
-  onDelete,
-  onViewStations,
-}: RouteTableProps) {
+function RouteTable({ routes, onEdit, onDelete, onViewStations }: RouteTableProps) {
   return (
     <div className="table-wrapper">
       <table className="route-table">
@@ -27,52 +22,49 @@ function RouteTable({
         </thead>
 
         <tbody>
-          {routes.map((route) => (
-            <tr key={route.id}>
-              <td>
-                <strong>{route.code}</strong>
-              </td>
-
-              <td>{route.name}</td>
-
-              <td>{route.stations.length} trạm</td>
-
-              <td>
-                <span
-                  className={`status-badge ${
-                    route.status === 'ACTIVE' ? 'active' : 'inactive'
-                  }`}
-                >
-                  {route.status === 'ACTIVE' ? 'Hoạt động' : 'Tạm dừng'}
-                </span>
-              </td>
-
-              <td>
-                <div className="table-actions">
-                  <button
-                    className="action-button view"
-                    onClick={() => onViewStations(route)}
-                  >
-                    Trạm
-                  </button>
-
-                  <button
-                    className="action-button edit"
-                    onClick={() => onEdit(route)}
-                  >
-                    Sửa
-                  </button>
-
-                  <button
-                    className="action-button delete"
-                    onClick={() => onDelete(route)}
-                  >
-                    Xóa
-                  </button>
-                </div>
+          {routes.length === 0 ? (
+            <tr>
+              <td colSpan={5} className="table-message">
+                Chưa có tuyến nào. Chọn “Thêm tuyến” để tạo tuyến mới.
               </td>
             </tr>
-          ))}
+          ) : (
+            routes.map(route => (
+              <tr key={route.id}>
+                <td>
+                  <strong>{route.code}</strong>
+                </td>
+
+                <td>{route.name}</td>
+
+                <td>{route.stations.length} trạm</td>
+
+                <td>
+                  <span
+                    className={`status-badge ${route.status === 'ACTIVE' ? 'active' : 'inactive'}`}
+                  >
+                    {route.status === 'ACTIVE' ? 'Hoạt động' : 'Tạm dừng'}
+                  </span>
+                </td>
+
+                <td>
+                  <div className="table-actions">
+                    <button className="action-button view" onClick={() => onViewStations(route)}>
+                      Trạm
+                    </button>
+
+                    <button className="action-button edit" onClick={() => onEdit(route)}>
+                      Sửa
+                    </button>
+
+                    <button className="action-button delete" onClick={() => onDelete(route)}>
+                      Xóa
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))
+          )}
         </tbody>
       </table>
     </div>

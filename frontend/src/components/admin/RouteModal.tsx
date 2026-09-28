@@ -1,10 +1,6 @@
 import { useEffect, useState } from 'react';
 import StationList from './StationList';
-import type {
-  BusRoute,
-  RouteStatus,
-  Station,
-} from '../../types/route';
+import type { BusRoute, RouteStatus, Station } from '../../types/route';
 
 interface RouteModalProps {
   open: boolean;
@@ -14,13 +10,7 @@ interface RouteModalProps {
   onSave: (route: BusRoute) => void | Promise<void>;
 }
 
-function RouteModal({
-  open,
-  mode,
-  route,
-  onClose,
-  onSave,
-}: RouteModalProps) {
+function RouteModal({ open, mode, route, onClose, onSave, saving }: RouteModalProps) {
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
@@ -78,10 +68,7 @@ function RouteModal({
       order: stations.length + 1,
     };
 
-    setStations((current) => [
-      ...current,
-      newStation,
-    ]);
+    setStations(current => [...current, newStation]);
 
     setStationName('');
     setStationAddress('');
@@ -128,57 +115,31 @@ function RouteModal({
   };
 
   return (
-    <div
-      className="modal-overlay"
-      onMouseDown={onClose}
-    >
-      <div
-        className="route-modal"
-        onMouseDown={(event) =>
-          event.stopPropagation()
-        }
-      >
+    <div className="modal-overlay" onMouseDown={onClose}>
+      <div className="route-modal" onMouseDown={event => event.stopPropagation()}>
         <div className="modal-header">
           <div>
-            <h2>
-              {mode === 'add'
-                ? 'Thêm tuyến'
-                : 'Sửa tuyến'}
-            </h2>
+            <h2>{mode === 'add' ? 'Thêm tuyến' : 'Sửa tuyến'}</h2>
 
-            <p>
-              {mode === 'add'
-                ? 'Tạo tuyến xe buýt mới'
-                : 'Cập nhật thông tin tuyến'}
-            </p>
+            <p>{mode === 'add' ? 'Tạo tuyến xe buýt mới' : 'Cập nhật thông tin tuyến'}</p>
           </div>
 
-          <button
-            type="button"
-            className="modal-close"
-            onClick={onClose}
-          >
+          <button type="button" className="modal-close" onClick={onClose}>
             ×
           </button>
         </div>
 
         <div className="modal-body">
-          {error && (
-            <div className="form-error">
-              {error}
-            </div>
-          )}
+          {error && <div className="form-error">{error}</div>}
 
           <div className="form-grid">
             <div className="form-group">
-              <label htmlFor="route-code">
-                Mã tuyến
-              </label>
+              <label htmlFor="route-code">Mã tuyến</label>
 
               <input
                 id="route-code"
                 value={code}
-                onChange={(event) => {
+                onChange={event => {
                   setCode(event.target.value);
                   setError('');
                 }}
@@ -187,39 +148,27 @@ function RouteModal({
             </div>
 
             <div className="form-group">
-              <label htmlFor="route-status">
-                Trạng thái
-              </label>
+              <label htmlFor="route-status">Trạng thái</label>
 
               <select
                 id="route-status"
                 value={status}
-                onChange={(event) =>
-                  setStatus(
-                    event.target.value as RouteStatus,
-                  )
-                }
+                onChange={event => setStatus(event.target.value as RouteStatus)}
               >
-                <option value="ACTIVE">
-                  Hoạt động
-                </option>
+                <option value="ACTIVE">Hoạt động</option>
 
-                <option value="INACTIVE">
-                  Tạm dừng
-                </option>
+                <option value="INACTIVE">Tạm dừng</option>
               </select>
             </div>
           </div>
 
           <div className="form-group">
-            <label htmlFor="route-name">
-              Tên tuyến
-            </label>
+            <label htmlFor="route-name">Tên tuyến</label>
 
             <input
               id="route-name"
               value={name}
-              onChange={(event) => {
+              onChange={event => {
                 setName(event.target.value);
                 setError('');
               }}
@@ -232,20 +181,16 @@ function RouteModal({
               <div>
                 <h3>Trạm dừng</h3>
 
-                <p>
-                  Kéo thả để thay đổi thứ tự trạm
-                </p>
+                <p>Kéo thả để thay đổi thứ tự trạm</p>
               </div>
 
-              <span className="station-count">
-                {stations.length} trạm
-              </span>
+              <span className="station-count">{stations.length} trạm</span>
             </div>
 
             <div className="add-station-form">
               <input
                 value={stationName}
-                onChange={(event) => {
+                onChange={event => {
                   setStationName(event.target.value);
                   setError('');
                 }}
@@ -254,10 +199,8 @@ function RouteModal({
 
               <input
                 value={stationAddress}
-                onChange={(event) => {
-                  setStationAddress(
-                    event.target.value,
-                  );
+                onChange={event => {
+                  setStationAddress(event.target.value);
                   setError('');
                 }}
                 placeholder="Địa chỉ"
@@ -267,20 +210,16 @@ function RouteModal({
                 type="button"
                 className="secondary-button"
                 onClick={handleAddStation}
+                aria-label="Thêm trạm vào tuyến"
               >
                 + Thêm trạm
               </button>
             </div>
 
             {stations.length > 0 ? (
-              <StationList
-                stations={stations}
-                onChange={setStations}
-              />
+              <StationList stations={stations} onChange={setStations} />
             ) : (
-              <div className="empty-stations">
-                Chưa có trạm dừng
-              </div>
+              <div className="empty-stations">Chưa có trạm dừng</div>
             )}
           </div>
         </div>

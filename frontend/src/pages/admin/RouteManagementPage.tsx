@@ -44,15 +44,13 @@ function RouteManagementPage() {
   const filteredRoutes = useMemo(() => {
     const keyword = search.trim().toLowerCase();
 
-    return routes.filter((route) => {
+    return routes.filter(route => {
       const matchesSearch =
         !keyword ||
         route.code.toLowerCase().includes(keyword) ||
         route.name.toLowerCase().includes(keyword);
 
-      const matchesStatus =
-        statusFilter === 'ALL' ||
-        route.status === statusFilter;
+      const matchesStatus = statusFilter === 'ALL' || route.status === statusFilter;
 
       return matchesSearch && matchesStatus;
     });
@@ -116,15 +114,10 @@ function RouteManagementPage() {
           <div>
             <h2>Danh sách tuyến</h2>
 
-            <p>
-              Quản lý tuyến xe buýt trong hệ thống
-            </p>
+            <p>Quản lý tuyến xe buýt trong hệ thống</p>
           </div>
 
-          <button
-            className="primary-button"
-            onClick={handleAdd}
-          >
+          <button className="primary-button" onClick={handleAdd}>
             + Thêm tuyến
           </button>
         </div>
@@ -134,37 +127,28 @@ function RouteManagementPage() {
             className="search-input"
             type="text"
             value={search}
-            onChange={(event) =>
-              setSearch(event.target.value)
-            }
+            onChange={event => setSearch(event.target.value)}
             placeholder="Tìm kiếm theo mã hoặc tên tuyến..."
           />
 
           <select
             className="filter-select"
             value={statusFilter}
-            onChange={(event) =>
-              setStatusFilter(
-                event.target.value as
-                  | 'ALL'
-                  | 'ACTIVE'
-                  | 'INACTIVE',
-              )
-            }
+            onChange={event => setStatusFilter(event.target.value as 'ALL' | 'ACTIVE' | 'INACTIVE')}
           >
-            <option value="ALL">
-              Tất cả trạng thái
-            </option>
+            <option value="ALL">Tất cả trạng thái</option>
 
-            <option value="ACTIVE">
-              Hoạt động
-            </option>
+            <option value="ACTIVE">Hoạt động</option>
 
-            <option value="INACTIVE">
-              Tạm dừng
-            </option>
+            <option value="INACTIVE">Tạm dừng</option>
           </select>
         </div>
+
+        {pageError && (
+          <div className="page-error" role="alert">
+            {pageError}
+          </div>
+        )}
 
         <div className="content-card">
           {pageError && <div className="form-error">{pageError}</div>}
@@ -187,6 +171,7 @@ function RouteManagementPage() {
         route={selectedRoute}
         onClose={() => setModalOpen(false)}
         onSave={handleSave}
+        saving={saving}
       />
     </div>
   );
