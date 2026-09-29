@@ -39,10 +39,11 @@ export const DriverPortalPage: React.FC = () => {
     try {
       const res = await fetch(getApiUrl('/api/v1/operations/incidents'));
       const json = await res.json();
-      setIncidents(Array.isArray(json) ? json : json.data || []);
+      setIncidents(Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : []);
       setDbStatus('connected');
     } catch {
       setDbStatus('error');
+      setIncidents([]);
     }
   }, []);
 
@@ -52,22 +53,23 @@ export const DriverPortalPage: React.FC = () => {
     try {
       const res = await fetch(getApiUrl('/api/v1/routes'));
       const json = await res.json();
-      const rawList = Array.isArray(json) ? json : json.data || [];
+      const rawList = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
       const mapped: BusRoute[] = rawList.map((r: any) => ({
         id: r.id,
         code: r.code,
         name: r.name,
         status: r.status,
-        stations: (r.routeStops || []).map((rs: any) => ({
-          id: rs.stop?.id || rs.stopId,
-          name: rs.stop?.name || 'Trạm đón trả',
-          address: rs.stop?.address || '',
+        stations: (Array.isArray(r.stops) ? r.stops : Array.isArray(r.routeStops) ? r.routeStops : []).map((rs: any) => ({
+          id: rs.stop?.id || rs.stopId || rs.id || `st-${rs.stopOrder}`,
+          name: rs.stop?.name || rs.name || 'Trạm đón trả',
+          address: rs.stop?.address || rs.address || '',
           order: rs.stopOrder,
         })),
       }));
       setRoutes(mapped);
     } catch {
       setDbStatus('error');
+      setRoutes([]);
     } finally {
       setIsLoadingRoutes(false);
     }
@@ -374,7 +376,7 @@ export const DriverPortalPage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {verifiedList.map((item, idx) => (
+                      {(Array.isArray(verifiedList) ? verifiedList : []).map((item, idx) => (
                         <tr key={idx}>
                           <td style={{ color: '#38bdf8', fontWeight: 600 }}>{item.code}</td>
                           <td>{item.passenger}</td>
@@ -486,7 +488,7 @@ export const DriverPortalPage: React.FC = () => {
 
             <h3 style={{ fontSize: '18px', margin: '0 0 14px' }}>Các sự cố vừa báo cáo gần đây:</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {incidents.map((inc) => (
+              {(Array.isArray(incidents) ? incidents : []).map((inc) => (
                 <div
                   key={inc.id}
                   className="liquid-glass"
@@ -527,7 +529,7 @@ export const DriverPortalPage: React.FC = () => {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {routes.map((r) => (
+                {(Array.isArray(routes) ? routes : []).map((r) => (
                   <div key={r.id} className="liquid-glass" style={{ padding: '20px', borderRadius: '16px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                       <div>
@@ -538,11 +540,11 @@ export const DriverPortalPage: React.FC = () => {
                     </div>
 
                     <div style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '8px' }}>
-                      Lộ trình qua {r.stations.length} trạm dừng:
+                      Lộ trình qua {Array.isArray(r.stations) ? r.stations.length : 0} trạm dừng:
                     </div>
 
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                      {r.stations.map((st, i) => (
+                      {(Array.isArray(r.stations) ? r.stations : []).map((st, i) => (
                         <span
                           key={st.id}
                           style={{

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { getApiUrl } from '../../api/client';
 
 export const OperationsView: React.FC = () => {
   const [incidents, setIncidents] = useState<any[]>([]);
@@ -20,15 +21,17 @@ export const OperationsView: React.FC = () => {
     setLoading(true);
     try {
       const [incRes, fbRes] = await Promise.all([
-        fetch('/api/v1/operations/incidents'),
-        fetch('/api/v1/operations/feedbacks'),
+        fetch(getApiUrl('/api/v1/operations/incidents')),
+        fetch(getApiUrl('/api/v1/operations/feedbacks')),
       ]);
       const incJson = await incRes.json();
       const fbJson = await fbRes.json();
-      setIncidents(Array.isArray(incJson) ? incJson : incJson.data || []);
-      setFeedbacks(Array.isArray(fbJson) ? fbJson : fbJson.data || []);
+      setIncidents(Array.isArray(incJson?.data) ? incJson.data : Array.isArray(incJson) ? incJson : []);
+      setFeedbacks(Array.isArray(fbJson?.data) ? fbJson.data : Array.isArray(fbJson) ? fbJson : []);
     } catch (err) {
       console.error(err);
+      setIncidents([]);
+      setFeedbacks([]);
     } finally {
       setLoading(false);
     }
@@ -48,11 +51,11 @@ export const OperationsView: React.FC = () => {
 
     try {
       const token = localStorage.getItem('smartbus_access_token');
-      const dashRes = await fetch('/api/v1/operations/dashboard/summary');
+      const dashRes = await fetch(getApiUrl('/api/v1/operations/dashboard/summary'));
       const dashJson = await dashRes.json();
       const firstTripId = dashJson.tripOccupancy?.[0]?.id || 'trip-1';
 
-      const res = await fetch('/api/v1/operations/incidents', {
+      const res = await fetch(getApiUrl('/api/v1/operations/incidents'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -91,11 +94,11 @@ export const OperationsView: React.FC = () => {
       const userStr = localStorage.getItem('smartbus_user');
       const currentUser = userStr ? JSON.parse(userStr) : null;
 
-      const dashRes = await fetch('/api/v1/operations/dashboard/summary');
+      const dashRes = await fetch(getApiUrl('/api/v1/operations/dashboard/summary'));
       const dashJson = await dashRes.json();
       const firstTripId = dashJson.tripOccupancy?.[0]?.id || 'trip-1';
 
-      const res = await fetch('/api/v1/operations/feedbacks', {
+      const res = await fetch(getApiUrl('/api/v1/operations/feedbacks'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -219,7 +222,7 @@ export const OperationsView: React.FC = () => {
           Danh sách sự cố vừa ghi nhận:
         </h4>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {incidents.map((inc) => (
+          {(Array.isArray(incidents) ? incidents : []).map((inc) => (
             <div
               key={inc.id}
               className="liquid-glass"
@@ -322,7 +325,7 @@ export const OperationsView: React.FC = () => {
           Ý kiến phản hồi từ khách hàng:
         </h4>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {feedbacks.map((fb) => (
+          {(Array.isArray(feedbacks) ? feedbacks : []).map((fb) => (
             <div
               key={fb.id}
               className="liquid-glass"

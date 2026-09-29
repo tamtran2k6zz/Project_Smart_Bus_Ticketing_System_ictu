@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { getApiUrl } from '../../api/client';
 
 interface UserData {
   id: string;
@@ -22,13 +23,14 @@ export const UserManagementView: React.FC = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('smartbus_access_token');
-      const res = await fetch('/api/v1/users', {
+      const res = await fetch(getApiUrl('/api/v1/users'), {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       const json = await res.json();
-      setUsers(Array.isArray(json) ? json : json.data || []);
+      setUsers(Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : []);
     } catch (err) {
       console.error(err);
+      setUsers([]);
     } finally {
       setLoading(false);
     }
@@ -41,7 +43,7 @@ export const UserManagementView: React.FC = () => {
   const handleApproveDiscount = async (userId: string, newStatus: 'APPROVED' | 'REJECTED') => {
     try {
       const token = localStorage.getItem('smartbus_access_token');
-      const res = await fetch(`/api/v1/users/${userId}/discount-approval`, {
+      const res = await fetch(getApiUrl(`/api/v1/users/${userId}/discount-approval`), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -122,7 +124,7 @@ export const UserManagementView: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {users.map((u) => {
+              {(Array.isArray(users) ? users : []).map((u) => {
                 const isStudentOrElderly = u.discountType !== 'NONE';
                 const roleBadgeStyle =
                   u.role === 'ADMIN'

@@ -7,6 +7,7 @@ import stopsRoutes from './routes/stops.routes';
 import tripsRoutes from './routes/trips.routes';
 import operationsRoutes from './routes/operations.routes';
 import ticketingRoutes from './routes/ticketing.routes';
+import usersRoutes from './routes/users.routes';
 import pool, { query } from './config/database';
 
 dotenv.config();
@@ -64,6 +65,8 @@ app.use('/api/operations', operationsRoutes);
 app.use('/api/v1/operations', operationsRoutes);
 app.use('/api/ticketing', ticketingRoutes);
 app.use('/api/v1/ticketing', ticketingRoutes);
+app.use('/api/users', usersRoutes);
+app.use('/api/v1/users', usersRoutes);
 
 // 404 Route Handler
 app.use((req: Request, res: Response) => {

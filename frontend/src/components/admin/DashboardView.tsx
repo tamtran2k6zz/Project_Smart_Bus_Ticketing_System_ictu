@@ -25,6 +25,8 @@ interface SummaryData {
   }>;
 }
 
+import { getApiUrl } from '../../api/client';
+
 export const DashboardView: React.FC = () => {
   const [data, setData] = useState<SummaryData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -32,7 +34,7 @@ export const DashboardView: React.FC = () => {
   const fetchSummary = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/v1/operations/dashboard/summary');
+      const res = await fetch(getApiUrl('/api/v1/operations/dashboard/summary'));
       const json = await res.json();
       setData(json.data || json);
     } catch (e) {
@@ -55,11 +57,11 @@ export const DashboardView: React.FC = () => {
   }
 
   const overview = data?.overview;
-  const occupancy = data?.tripOccupancy || [];
+  const occupancy = Array.isArray(data?.tripOccupancy) ? data.tripOccupancy : [];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-      {/* 4 Thẻ chỉ số chính - Liquid Glass & Instrument Serif Italic */}
+      {/* 4 Thẻ chỉ số chính - Liquid Glass & Open Sans Italic */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px' }}>
         {/* Doanh thu */}
         <div className="liquid-glass" style={{ padding: '24px' }}>
@@ -178,7 +180,7 @@ export const DashboardView: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {occupancy.map((t) => (
+              {(Array.isArray(occupancy) ? occupancy : []).map((t) => (
                 <tr key={t.id}>
                   <td style={{ fontWeight: 600, color: '#38bdf8' }}>{t.routeCode}</td>
                   <td>{t.routeName}</td>

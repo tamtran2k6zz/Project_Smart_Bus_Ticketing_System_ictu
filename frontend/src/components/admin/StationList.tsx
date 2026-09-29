@@ -141,11 +141,11 @@ function StationList({
       onDragEnd={handleDragEnd}
     >
       <SortableContext
-        items={stations.map((station) => station.id)}
+        items={(Array.isArray(stations) ? stations : []).map((station) => station.id)}
         strategy={verticalListSortingStrategy}
       >
         <div className="station-list">
-          {stations.map((station) => (
+          {(Array.isArray(stations) ? stations : []).map((station) => (
             <SortableStation
               key={station.id}
               station={station}

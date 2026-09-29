@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getApiUrl } from '../../api/client';
 
 interface SeatInfo {
   id: string;
@@ -35,9 +36,15 @@ export const TicketBookingView: React.FC = () => {
   useEffect(() => {
     const fetchTrips = async () => {
       try {
-        const dashRes = await fetch('/api/v1/operations/dashboard/summary');
+        const dashRes = await fetch(getApiUrl('/api/v1/operations/dashboard/summary'));
         const dashJson = await dashRes.json();
-        const tripList = (dashJson.tripOccupancy || []).map((t: any) => ({
+        const rawOccupancy = Array.isArray(dashJson?.tripOccupancy)
+          ? dashJson.tripOccupancy
+          : Array.isArray(dashJson?.data?.tripOccupancy)
+          ? dashJson.data.tripOccupancy
+          : [];
+
+        const tripList = rawOccupancy.map((t: any) => ({
           id: t.id,
           code: t.routeCode,
           routeName: t.routeName,
@@ -64,9 +71,14 @@ export const TicketBookingView: React.FC = () => {
     const fetchSeats = async () => {
       setIsLoading(true);
       try {
-        const res = await fetch(`/api/v1/ticketing/trips/${selectedTripId}/seats`);
+        const res = await fetch(getApiUrl(`/api/v1/ticketing/trips/${selectedTripId}/seats`));
         const json = await res.json();
-        setSeats(json.data?.seats || json.seats || []);
+        const rawSeats = Array.isArray(json?.data?.seats)
+          ? json.data.seats
+          : Array.isArray(json?.seats)
+          ? json.seats
+          : [];
+        setSeats(rawSeats);
         setSelectedSeat('');
       } catch (err) {
         console.error(err);
@@ -92,7 +104,7 @@ export const TicketBookingView: React.FC = () => {
       const userStr = localStorage.getItem('smartbus_user');
       const currentUser = userStr ? JSON.parse(userStr) : null;
 
-      const res = await fetch('/api/v1/ticketing/bookings', {
+      const res = await fetch(getApiUrl('/api/v1/ticketing/bookings'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -116,9 +128,14 @@ export const TicketBookingView: React.FC = () => {
       setStatusMessage('🎉 Đặt vé và giữ chỗ 10 phút thành công! Mã QR đã được lưu trong MySQL.');
 
       // Tải lại sơ đồ ghế
-      const seatsRes = await fetch(`/api/v1/ticketing/trips/${selectedTripId}/seats`);
+      const seatsRes = await fetch(getApiUrl(`/api/v1/ticketing/trips/${selectedTripId}/seats`));
       const seatsJson = await seatsRes.json();
-      setSeats(seatsJson.data?.seats || seatsJson.seats || []);
+      const rawSeats = Array.isArray(seatsJson?.data?.seats)
+        ? seatsJson.data.seats
+        : Array.isArray(seatsJson?.seats)
+        ? seatsJson.seats
+        : [];
+      setSeats(rawSeats);
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -134,7 +151,7 @@ export const TicketBookingView: React.FC = () => {
     }
 
     try {
-      const res = await fetch('/api/v1/ticketing/verify', {
+      const res = await fetch(getApiUrl('/api/v1/ticketing/verify'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: verifyCode.trim() }),
@@ -173,7 +190,7 @@ export const TicketBookingView: React.FC = () => {
               onChange={(e) => setSelectedTripId(e.target.value)}
               style={{ width: '100%', borderRadius: '12px', height: '46px' }}
             >
-              {trips.map((t) => (
+              {(Array.isArray(trips) ? trips : []).map((t) => (
                 <option key={t.id} value={t.id}>
                   [{t.code}] {t.routeName} - Xe: {t.plateNumber} ({new Date(t.departureTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })})
                 </option>
@@ -229,7 +246,7 @@ export const TicketBookingView: React.FC = () => {
               border: '1px solid rgba(255, 255, 255, 0.06)',
             }}
           >
-            {seats.map((s) => {
+            {(Array.isArray(seats) ? seats : []).map((s) => {
               const isSelected = selectedSeat === s.seatNumber;
               return (
                 <button

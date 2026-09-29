@@ -37,6 +37,8 @@ interface StopItem {
   name: string;
 }
 
+import { DEFAULT_STOPS } from '../../constants/defaultData';
+
 export const SearchResultsPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -47,7 +49,7 @@ export const SearchResultsPage: React.FC = () => {
     searchParams.get('departure_date') || new Date().toISOString().split('T')[0];
 
   const [trips, setTrips] = useState<TripResult[]>([]);
-  const [stops, setStops] = useState<StopItem[]>([]);
+  const [stops, setStops] = useState<StopItem[]>(DEFAULT_STOPS);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [bookingSuccessTripId, setBookingSuccessTripId] = useState<number | null>(null);
@@ -59,13 +61,26 @@ export const SearchResultsPage: React.FC = () => {
 
   // Fetch stops for the dropdown
   useEffect(() => {
+    let isMounted = true;
     apiClient
       .get('/stops')
       .then((res) => {
-        const data = res.data?.data || res.data || [];
-        setStops(data);
+        if (!isMounted) return;
+        const raw = res?.data;
+        const data = Array.isArray(raw?.data) ? raw.data : Array.isArray(raw) ? raw : [];
+        if (data.length > 0) {
+          setStops(data);
+        }
       })
-      .catch((err) => console.error('Lỗi nạp trạm:', err));
+      .catch((err) => {
+        console.error('Lỗi nạp trạm:', err);
+        if (isMounted) {
+          setStops(DEFAULT_STOPS);
+        }
+      });
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // Fetch trips matching query
@@ -88,7 +103,8 @@ export const SearchResultsPage: React.FC = () => {
         },
       });
 
-      const list = res.data?.data || [];
+      const raw = res?.data;
+      const list = Array.isArray(raw?.data) ? raw.data : Array.isArray(raw) ? raw : [];
       setTrips(list);
     } catch (err: any) {
       console.error('Lỗi tra cứu chuyến xe:', err);
@@ -96,6 +112,7 @@ export const SearchResultsPage: React.FC = () => {
         err.response?.data?.message ||
         'Không thể nạp dữ liệu chuyến xe từ MySQL. Vui lòng kiểm tra lại kết nối!';
       setErrorMsg(msg);
+      setTrips([]);
     } finally {
       setIsLoading(false);
     }
@@ -190,7 +207,7 @@ export const SearchResultsPage: React.FC = () => {
                   fontSize: '13px',
                 }}
               >
-                {stops.map((s) => (
+                {(Array.isArray(stops) ? stops : []).map((s) => (
                   <option key={s.id} value={s.id}>
                     [{s.code}] {s.name}
                   </option>
@@ -215,7 +232,7 @@ export const SearchResultsPage: React.FC = () => {
                   fontSize: '13px',
                 }}
               >
-                {stops.map((s) => (
+                {(Array.isArray(stops) ? stops : []).map((s) => (
                   <option key={s.id} value={s.id}>
                     [{s.code}] {s.name}
                   </option>
@@ -347,7 +364,7 @@ export const SearchResultsPage: React.FC = () => {
               Tìm thấy <strong style={{ color: '#38bdf8' }}>{trips.length}</strong> chuyến xe phù hợp:
             </div>
 
-            {trips.map((trip) => (
+            {(Array.isArray(trips) ? trips : []).map((trip) => (
               <div
                 key={trip.tripId}
                 style={{

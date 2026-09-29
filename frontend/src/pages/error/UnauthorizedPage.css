@@ -55,7 +55,7 @@
 }
 
 .unauthorized-code {
-  font-family: 'Playfair Display', 'Instrument Serif', Georgia, serif;
+  font-family: 'Open Sans', sans-serif;
   font-style: italic;
   font-size: 4rem;
   font-weight: 400;
@@ -66,7 +66,7 @@
 }
 
 .unauthorized-title {
-  font-family: 'Playfair Display', 'Instrument Serif', Georgia, serif;
+  font-family: 'Open Sans', sans-serif;
   font-style: italic;
   font-size: 28px;
   font-weight: 400;

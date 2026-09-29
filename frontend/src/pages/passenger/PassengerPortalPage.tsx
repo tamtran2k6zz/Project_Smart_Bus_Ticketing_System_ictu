@@ -60,7 +60,13 @@ export const PassengerPortalPage: React.FC = () => {
     try {
       const dashRes = await fetch(getApiUrl('/api/v1/operations/dashboard/summary'));
       const dashJson = await dashRes.json();
-      const tripList = (dashJson.tripOccupancy || []).map((t: any) => ({
+      const rawOccupancy = Array.isArray(dashJson?.tripOccupancy)
+        ? dashJson.tripOccupancy
+        : Array.isArray(dashJson?.data?.tripOccupancy)
+        ? dashJson.data.tripOccupancy
+        : [];
+
+      const tripList = rawOccupancy.map((t: any) => ({
         id: t.id,
         code: t.routeCode,
         routeName: t.routeName,
@@ -75,6 +81,7 @@ export const PassengerPortalPage: React.FC = () => {
       }
     } catch (e) {
       console.error(e);
+      setTrips([]);
     }
   }, []);
 
@@ -85,10 +92,16 @@ export const PassengerPortalPage: React.FC = () => {
       try {
         const res = await fetch(getApiUrl(`/api/v1/ticketing/trips/${selectedTripId}/seats`));
         const json = await res.json();
-        setSeats(json.data?.seats || json.seats || []);
+        const rawSeats = Array.isArray(json?.data?.seats)
+          ? json.data.seats
+          : Array.isArray(json?.seats)
+          ? json.seats
+          : [];
+        setSeats(rawSeats);
         setSelectedSeat('');
       } catch (e) {
         console.error(e);
+        setSeats([]);
       }
     };
     fetchSeats();
@@ -103,24 +116,26 @@ export const PassengerPortalPage: React.FC = () => {
       ]);
       const fbJson = await fbRes.json();
       const rJson = await rRes.json();
-      setFeedbacks(Array.isArray(fbJson) ? fbJson : fbJson.data || []);
+      setFeedbacks(Array.isArray(fbJson?.data) ? fbJson.data : Array.isArray(fbJson) ? fbJson : []);
 
-      const rawList = Array.isArray(rJson) ? rJson : rJson.data || [];
+      const rawList = Array.isArray(rJson?.data) ? rJson.data : Array.isArray(rJson) ? rJson : [];
       const mapped: BusRoute[] = rawList.map((r: any) => ({
         id: r.id,
         code: r.code,
         name: r.name,
         status: r.status,
-        stations: (r.routeStops || []).map((rs: any) => ({
-          id: rs.stop?.id || rs.stopId,
-          name: rs.stop?.name || 'Trạm đón trả',
-          address: rs.stop?.address || '',
+        stations: (Array.isArray(r.stops) ? r.stops : Array.isArray(r.routeStops) ? r.routeStops : []).map((rs: any) => ({
+          id: rs.stop?.id || rs.stopId || rs.id || `st-${rs.stopOrder}`,
+          name: rs.stop?.name || rs.name || 'Trạm đón trả',
+          address: rs.stop?.address || rs.address || '',
           order: rs.stopOrder,
         })),
       }));
       setRoutes(mapped);
     } catch (e) {
       console.error(e);
+      setFeedbacks([]);
+      setRoutes([]);
     }
   }, []);
 
@@ -166,7 +181,12 @@ export const PassengerPortalPage: React.FC = () => {
       // Refresh seats
       const seatsRes = await fetch(getApiUrl(`/api/v1/ticketing/trips/${selectedTripId}/seats`));
       const seatsJson = await seatsRes.json();
-      setSeats(seatsJson.data?.seats || seatsJson.seats || []);
+      const rawSeats = Array.isArray(seatsJson?.data?.seats)
+        ? seatsJson.data.seats
+        : Array.isArray(seatsJson?.seats)
+        ? seatsJson.seats
+        : [];
+      setSeats(rawSeats);
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -353,7 +373,7 @@ export const PassengerPortalPage: React.FC = () => {
                     onChange={(e) => setSelectedTripId(e.target.value)}
                     style={{ width: '100%', borderRadius: '12px', height: '46px' }}
                   >
-                    {trips.map((t) => (
+                    {(Array.isArray(trips) ? trips : []).map((t) => (
                       <option key={t.id} value={t.id}>
                         [{t.code}] {t.routeName} - Xe {t.plateNumber} ({new Date(t.departureTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })})
                       </option>
@@ -409,7 +429,7 @@ export const PassengerPortalPage: React.FC = () => {
                     border: '1px solid rgba(255, 255, 255, 0.06)',
                   }}
                 >
-                  {seats.map((s) => {
+                  {(Array.isArray(seats) ? seats : []).map((s) => {
                     const isSelected = selectedSeat === s.seatNumber;
                     return (
                       <button
@@ -682,7 +702,7 @@ export const PassengerPortalPage: React.FC = () => {
 
             <h3 style={{ fontSize: '18px', margin: '0 0 14px' }}>Các đánh giá gần đây:</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {feedbacks.map((fb) => (
+              {(Array.isArray(feedbacks) ? feedbacks : []).map((fb) => (
                 <div
                   key={fb.id}
                   className="liquid-glass"
@@ -725,7 +745,7 @@ export const PassengerPortalPage: React.FC = () => {
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {routes.map((r) => (
+              {(Array.isArray(routes) ? routes : []).map((r) => (
                 <div key={r.id} className="liquid-glass" style={{ padding: '20px', borderRadius: '16px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                     <div>
@@ -736,11 +756,11 @@ export const PassengerPortalPage: React.FC = () => {
                   </div>
 
                   <div style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '8px' }}>
-                    Lộ trình qua {r.stations.length} trạm dừng:
+                    Lộ trình qua {Array.isArray(r.stations) ? r.stations.length : 0} trạm dừng:
                   </div>
 
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                    {r.stations.map((st, i) => (
+                    {(Array.isArray(r.stations) ? r.stations : []).map((st, i) => (
                       <span
                         key={st.id}
                         style={{

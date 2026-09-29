@@ -27,7 +27,7 @@ function RouteTable({
         </thead>
 
         <tbody>
-          {routes.map((route) => (
+          {(Array.isArray(routes) ? routes : []).map((route) => (
             <tr key={route.id}>
               <td>
                 <strong>{route.code}</strong>
@@ -35,7 +35,7 @@ function RouteTable({
 
               <td>{route.name}</td>
 
-              <td>{route.stations.length} trạm</td>
+              <td>{Array.isArray(route.stations) ? route.stations.length : 0} trạm</td>
 
               <td>
                 <span

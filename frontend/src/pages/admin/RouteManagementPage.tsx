@@ -8,6 +8,7 @@ import TicketBookingView from '../../components/admin/TicketBookingView';
 import UserManagementView from '../../components/admin/UserManagementView';
 import OperationsView from '../../components/admin/OperationsView';
 import type { BusRoute } from '../../types/route';
+import { getApiUrl } from '../../api/client';
 
 function RouteManagementPage() {
   const [activeTab, setActiveTab] = useState<AdminTab>('routes');
@@ -26,7 +27,7 @@ function RouteManagementPage() {
     setDbError(null);
     try {
       const token = localStorage.getItem('smartbus_access_token');
-      const res = await fetch('/api/v1/routes', {
+      const res = await fetch(getApiUrl('/api/v1/routes'), {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
 
@@ -35,14 +36,18 @@ function RouteManagementPage() {
       }
 
       const json = await res.json();
-      const rawList = Array.isArray(json) ? json : json.data || [];
+      const rawList = Array.isArray(json?.data)
+        ? json.data
+        : Array.isArray(json)
+        ? json
+        : [];
 
       const mapped: BusRoute[] = rawList.map((r: any) => ({
         id: r.id,
         code: r.code,
         name: r.name,
         status: (r.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE') as any,
-        stations: (r.stops || r.routeStops || []).map((rs: any) => ({
+        stations: (Array.isArray(r.stops) ? r.stops : Array.isArray(r.routeStops) ? r.routeStops : []).map((rs: any) => ({
           id: rs.stopId || rs.stop?.id || rs.id || `rs-${rs.stopOrder}`,
           name: rs.name || rs.stop?.name || 'Trạm đón trả',
           address: rs.address || rs.stop?.address || '',
@@ -100,7 +105,7 @@ function RouteManagementPage() {
 
     try {
       const token = localStorage.getItem('smartbus_access_token');
-      const res = await fetch(`/api/v1/routes/${route.id}`, {
+      const res = await fetch(getApiUrl(`/api/v1/routes/${route.id}`), {
         method: 'DELETE',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -132,7 +137,7 @@ function RouteManagementPage() {
     try {
       if (modalMode === 'add') {
         // Ghi mới tuyến xe vào MySQL qua POST /api/v1/routes
-        const res = await fetch('/api/v1/routes', {
+        const res = await fetch(getApiUrl('/api/v1/routes'), {
           method: 'POST',
           headers,
           body: JSON.stringify({
@@ -151,7 +156,7 @@ function RouteManagementPage() {
         }
       } else {
         // Cập nhật tuyến xe trong MySQL qua PATCH /api/v1/routes/:id
-        const res = await fetch(`/api/v1/routes/${route.id}`, {
+        const res = await fetch(getApiUrl(`/api/v1/routes/${route.id}`), {
           method: 'PATCH',
           headers,
           body: JSON.stringify({

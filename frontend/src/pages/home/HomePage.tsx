@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Navbar } from '../../components/layout/Navbar';
 import apiClient from '../../api/client';
 
+import { DEFAULT_STOPS, DEFAULT_ROUTES } from '../../constants/defaultData';
+
 interface StopItem {
   id: number;
   code: string;
@@ -22,10 +24,10 @@ interface RouteItem {
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
-  const [stops, setStops] = useState<StopItem[]>([]);
-  const [routes, setRoutes] = useState<RouteItem[]>([]);
-  const [originStopId, setOriginStopId] = useState<string>('');
-  const [destStopId, setDestStopId] = useState<string>('');
+  const [stops, setStops] = useState<StopItem[]>(DEFAULT_STOPS);
+  const [routes, setRoutes] = useState<RouteItem[]>(DEFAULT_ROUTES);
+  const [originStopId, setOriginStopId] = useState<string>(String(DEFAULT_STOPS[0].id));
+  const [destStopId, setDestStopId] = useState<string>(String(DEFAULT_STOPS[1].id));
   const [departureDate, setDepartureDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
@@ -34,6 +36,7 @@ export const HomePage: React.FC = () => {
 
   // Nạp danh sách trạm dừng và tuyến xe trực tiếp từ MySQL
   useEffect(() => {
+    let isMounted = true;
     const fetchData = async () => {
       try {
         setIsLoading(true);
@@ -44,25 +47,52 @@ export const HomePage: React.FC = () => {
           apiClient.get('/routes'),
         ]);
 
-        const stopsData = stopsRes.data?.data || stopsRes.data || [];
-        const routesData = routesRes.data?.data || routesRes.data || [];
+        const rawStops = stopsRes?.data;
+        const rawRoutes = routesRes?.data;
 
-        setStops(stopsData);
-        setRoutes(routesData);
+        const stopsData = Array.isArray(rawStops?.data)
+          ? rawStops.data
+          : Array.isArray(rawStops)
+          ? rawStops
+          : [];
 
-        if (stopsData.length >= 2) {
-          setOriginStopId(String(stopsData[0].id));
-          setDestStopId(String(stopsData[1].id));
+        const routesData = Array.isArray(rawRoutes?.data)
+          ? rawRoutes.data
+          : Array.isArray(rawRoutes)
+          ? rawRoutes
+          : [];
+
+        if (!isMounted) return;
+
+        const finalStops = stopsData.length > 0 ? stopsData : DEFAULT_STOPS;
+        const finalRoutes = routesData.length > 0 ? routesData : DEFAULT_ROUTES;
+
+        setStops(finalStops);
+        setRoutes(finalRoutes);
+
+        if (finalStops.length >= 2) {
+          setOriginStopId(String(finalStops[0].id));
+          setDestStopId(String(finalStops[1].id));
         }
       } catch (err: any) {
         console.error('Lỗi nạp dữ liệu từ MySQL:', err);
-        setErrorMsg('Không thể kết nối cơ sở dữ liệu MySQL thật. Hãy đảm bảo Docker MySQL và Backend đang chạy!');
+        if (!isMounted) return;
+        setErrorMsg('Đang hoạt động ở chế độ dữ liệu mặc định (Chưa kết nối CSDL MySQL).');
+        setStops(DEFAULT_STOPS);
+        setRoutes(DEFAULT_ROUTES);
+        setOriginStopId(String(DEFAULT_STOPS[0].id));
+        setDestStopId(String(DEFAULT_STOPS[1].id));
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
     fetchData();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const handleSearch = (e: React.FormEvent) => {
@@ -210,9 +240,9 @@ export const HomePage: React.FC = () => {
                       fontSize: '14px',
                       outline: 'none',
                     }}
-                    disabled={isLoading || stops.length === 0}
+                    disabled={isLoading || !Array.isArray(stops) || stops.length === 0}
                   >
-                    {stops.map((stop) => (
+                    {(Array.isArray(stops) ? stops : []).map((stop) => (
                       <option key={stop.id} value={stop.id} style={{ background: '#111827', color: '#f8fafc' }}>
                         [{stop.code}] {stop.name}
                       </option>
@@ -262,9 +292,9 @@ export const HomePage: React.FC = () => {
                       fontSize: '14px',
                       outline: 'none',
                     }}
-                    disabled={isLoading || stops.length === 0}
+                    disabled={isLoading || !Array.isArray(stops) || stops.length === 0}
                   >
-                    {stops.map((stop) => (
+                    {(Array.isArray(stops) ? stops : []).map((stop) => (
                       <option key={stop.id} value={stop.id} style={{ background: '#111827', color: '#f8fafc' }}>
                         [{stop.code}] {stop.name}
                       </option>
@@ -344,7 +374,7 @@ export const HomePage: React.FC = () => {
           gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
           gap: '20px',
         }}>
-          {routes.map((route) => (
+          {(Array.isArray(routes) ? routes : []).map((route) => (
             <div
               key={route.id}
               style={{
@@ -391,7 +421,7 @@ export const HomePage: React.FC = () => {
                   <span>💵 Giá gốc: {route.basePrice?.toLocaleString()} đ</span>
                 </div>
 
-                {route.stops && route.stops.length > 0 && (
+                {Array.isArray(route.stops) && route.stops.length > 0 && (
                   <div style={{
                     fontSize: '12px',
                     color: '#64748b',
@@ -415,7 +445,7 @@ export const HomePage: React.FC = () => {
 
               <button
                 onClick={() => {
-                  if (route.stops && route.stops.length >= 2) {
+                  if (Array.isArray(route.stops) && route.stops.length >= 2) {
                     navigate(
                       `/search?origin_stop_id=${route.stops[0].stopId}&destination_stop_id=${route.stops[route.stops.length - 1].stopId}&departure_date=${departureDate}`
                     );

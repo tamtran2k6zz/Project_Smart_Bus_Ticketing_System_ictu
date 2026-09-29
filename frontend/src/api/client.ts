@@ -42,9 +42,18 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Response Interceptor: Bắt lỗi 401 Unauthorized để điều hướng về đăng nhập
+// Response Interceptor: Bắt lỗi 401 Unauthorized và phát hiện phản hồi HTML do SPA fallback
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => {
+    // Nếu API trả về HTML (xảy ra khi SPA rewrite trên Vercel hoặc static host trả về index.html thay vì JSON)
+    if (
+      typeof response.data === 'string' &&
+      (response.data.trim().startsWith('<!doctype') ||
+       response.data.trim().startsWith('<html') ||
+       response.headers['content-type']?.includes('text/html'))
+    ) {
+      return Promise.reject(new Error('Phản hồi từ máy chủ không phải định dạng JSON hợp lệ (HTML SPA rewrite)'));
+    }
     return response;
   },
   (error) => {

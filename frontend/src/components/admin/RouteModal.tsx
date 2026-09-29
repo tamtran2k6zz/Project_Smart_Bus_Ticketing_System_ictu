@@ -45,7 +45,7 @@ function RouteModal({
       setCode(route.code);
       setName(route.name);
       setStatus(route.status);
-      setStations([...route.stations]);
+      setStations(Array.isArray(route.stations) ? [...route.stations] : []);
       return;
     }
 
