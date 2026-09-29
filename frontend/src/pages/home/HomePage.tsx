@@ -433,7 +433,7 @@ export const HomePage: React.FC = () => {
                     <div style={{ fontWeight: 600, color: '#94a3b8', marginBottom: '4px' }}>
                       Các trạm qua tuyến ({route.stops.length} trạm):
                     </div>
-                    {route.stops.map((s, idx) => (
+                    {(Array.isArray(route.stops) ? route.stops : []).map((s, idx) => (
                       <span key={s.stopId || idx}>
                         {s.name}
                         {idx < (route.stops?.length || 0) - 1 ? ' ➔ ' : ''}

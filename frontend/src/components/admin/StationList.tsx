@@ -111,8 +111,9 @@ function StationList({
       return;
     }
 
+    const safeStations = Array.isArray(stations) ? stations : [];
     const reorderedStations = arrayMove(
-      stations,
+      safeStations,
       oldIndex,
       newIndex,
     ).map((station, index) => ({
@@ -124,7 +125,8 @@ function StationList({
   };
 
   const handleRemove = (stationId: string) => {
-    const updatedStations = stations
+    const safeStations = Array.isArray(stations) ? stations : [];
+    const updatedStations = safeStations
       .filter((station) => station.id !== stationId)
       .map((station, index) => ({
         ...station,

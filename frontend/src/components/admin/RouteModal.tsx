@@ -110,7 +110,7 @@ function RouteModal({
       code: code.trim(),
       name: name.trim(),
       status,
-      stations: stations.map((station, index) => ({
+      stations: (Array.isArray(stations) ? stations : []).map((station, index) => ({
         ...station,
         order: index + 1,
       })),

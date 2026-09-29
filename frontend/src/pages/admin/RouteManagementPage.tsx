@@ -71,7 +71,7 @@ function RouteManagementPage() {
   const filteredRoutes = useMemo(() => {
     const keyword = search.trim().toLowerCase();
 
-    return routes.filter((route) => {
+    return (Array.isArray(routes) ? routes : []).filter((route) => {
       const matchesSearch =
         !keyword ||
         route.code.toLowerCase().includes(keyword) ||
