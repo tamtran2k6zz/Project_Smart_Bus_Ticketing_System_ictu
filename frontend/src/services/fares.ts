@@ -43,8 +43,14 @@ interface ApiRoute {
   }>;
 }
 
+import { getApiUrl } from '../api/client';
+
 export async function getFares(): Promise<FareConfiguration[]> {
-  const response = await fetch('/api/v1/routes');
+  const response = await fetch(getApiUrl('/api/v1/routes'), {
+    headers: {
+      'ngrok-skip-browser-warning': 'true',
+    },
+  });
   const contentType = response.headers.get('content-type') ?? '';
   if (!contentType.includes('application/json')) {
     throw new Error('API tuyến xe không trả về JSON. Kiểm tra kết nối backend.');

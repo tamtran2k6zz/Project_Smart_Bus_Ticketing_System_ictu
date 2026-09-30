@@ -22,6 +22,7 @@ const apiClient: AxiosInstance = axios.create({
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
   },
 });
 
@@ -32,8 +33,11 @@ apiClient.interceptors.request.use(
       localStorage.getItem('smartbus_access_token') ||
       localStorage.getItem('token');
 
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (config.headers) {
+      config.headers['ngrok-skip-browser-warning'] = 'true';
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     }
     return config;
   },
