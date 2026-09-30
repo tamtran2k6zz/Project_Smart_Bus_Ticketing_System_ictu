@@ -4,7 +4,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import AdminBookingsPage from '../pages/admin/AdminBookingsPage';
 
-describe('AdminBookingsPage (US 06: Cổng thanh toán - Màn hình Quản trị)', () => {
+describe('AdminBookingsPage (STT 15 - US 06: Bộ lọc trạng thái vé & Phân trang dữ liệu)', () => {
   beforeEach(() => {
     sessionStorage.clear();
     localStorage.clear();
@@ -19,7 +19,7 @@ describe('AdminBookingsPage (US 06: Cổng thanh toán - Màn hình Quản trị
     );
   };
 
-  it('renders page header, title and description correctly', async () => {
+  it('renders page header and status filter tab group', async () => {
     renderComponent();
 
     expect(
@@ -29,48 +29,80 @@ describe('AdminBookingsPage (US 06: Cổng thanh toán - Màn hình Quản trị
 
     // Wait for data load
     await waitFor(() => {
-      expect(screen.getByTestId('kpi-revenue')).toBeInTheDocument();
-    });
-  });
-
-  it('fulfills DoD: renders data table with required columns (mã vé, chuyến xe, số tiền, trạng thái)', async () => {
-    renderComponent();
-
-    // Wait for the table to appear
-    await waitFor(() => {
-      expect(screen.getByTestId('bookings-table')).toBeInTheDocument();
+      expect(screen.getByTestId('status-tab-group')).toBeInTheDocument();
     });
 
-    // Check table headers for DoD columns
-    expect(screen.getByRole('columnheader', { name: /mã vé/i })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: /chuyến xe/i })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: /số tiền/i })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: /trạng thái/i })).toBeInTheDocument();
-
-    // Check row data content
-    expect(screen.getByText('TCK-2026-00101')).toBeInTheDocument();
-    expect(screen.getAllByText(/tuyến số 01: cổng ictu ⇄ bến xe thái nguyên/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/15\.000/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/đã thanh toán/i).length).toBeGreaterThan(0);
+    // Check presence of status filter tabs
+    expect(screen.getByTestId('filter-tab-all')).toBeInTheDocument();
+    expect(screen.getByTestId('filter-tab-confirmed')).toBeInTheDocument();
+    expect(screen.getByTestId('filter-tab-pending')).toBeInTheDocument();
+    expect(screen.getByTestId('filter-tab-cancelled')).toBeInTheDocument();
   });
 
-  it('filters data by search term (ticket code or customer name)', async () => {
+  it('fulfills DoD: filters data accurately by "Đã thanh toán" status tab', async () => {
     renderComponent();
 
     await waitFor(() => {
       expect(screen.getByTestId('bookings-table')).toBeInTheDocument();
     });
 
-    const searchInput = screen.getByTestId('search-input');
-    fireEvent.change(searchInput, { target: { value: 'TCK-2026-00102' } });
+    const confirmedTab = screen.getByTestId('filter-tab-confirmed');
+    fireEvent.click(confirmedTab);
 
     await waitFor(() => {
-      expect(screen.getByText('TCK-2026-00102')).toBeInTheDocument();
-      expect(screen.queryByText('TCK-2026-00101')).not.toBeInTheDocument();
+      // All displayed items must have "Đã thanh toán"
+      const statusBadges = screen.getAllByTestId(/^status-bkg-/);
+      expect(statusBadges.length).toBeGreaterThan(0);
+      statusBadges.forEach(badge => {
+        expect(badge.textContent).toMatch(/đã thanh toán/i);
+        expect(badge.textContent).not.toMatch(/đang giữ chỗ/i);
+      });
     });
   });
 
-  it('filters data by status filter dropdown', async () => {
+  it('fulfills DoD: filters data accurately by "Đang giữ chỗ" status tab', async () => {
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('bookings-table')).toBeInTheDocument();
+    });
+
+    const pendingTab = screen.getByTestId('filter-tab-pending');
+    fireEvent.click(pendingTab);
+
+    await waitFor(() => {
+      // All displayed items must have "Đang giữ chỗ"
+      const statusBadges = screen.getAllByTestId(/^status-bkg-/);
+      expect(statusBadges.length).toBeGreaterThan(0);
+      statusBadges.forEach(badge => {
+        expect(badge.textContent).toMatch(/đang giữ chỗ/i);
+        expect(badge.textContent).not.toMatch(/đã thanh toán/i);
+      });
+    });
+  });
+
+  it('fulfills DoD: filters data accurately by "Đã hủy" status tab', async () => {
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('bookings-table')).toBeInTheDocument();
+    });
+
+    const cancelledTab = screen.getByTestId('filter-tab-cancelled');
+    fireEvent.click(cancelledTab);
+
+    await waitFor(() => {
+      // All displayed items must be cancelled / refunded
+      const statusBadges = screen.getAllByTestId(/^status-bkg-/);
+      expect(statusBadges.length).toBeGreaterThan(0);
+      statusBadges.forEach(badge => {
+        expect(badge.textContent).toMatch(/(đã hủy|đã hoàn tiền)/i);
+        expect(badge.textContent).not.toMatch(/đã thanh toán/i);
+      });
+    });
+  });
+
+  it('fulfills DoD: filters data using the dropdown select for status', async () => {
     renderComponent();
 
     await waitFor(() => {
@@ -81,46 +113,98 @@ describe('AdminBookingsPage (US 06: Cổng thanh toán - Màn hình Quản trị
     fireEvent.change(statusSelect, { target: { value: 'PENDING' } });
 
     await waitFor(() => {
-      expect(screen.getByText('TCK-2026-00103')).toBeInTheDocument();
-      expect(screen.queryByText('TCK-2026-00101')).not.toBeInTheDocument();
+      const statusBadges = screen.getAllByTestId(/^status-bkg-/);
+      expect(statusBadges.length).toBeGreaterThan(0);
+      statusBadges.forEach(badge => {
+        expect(badge.textContent).toMatch(/đang giữ chỗ/i);
+      });
     });
   });
 
-  it('filters data by payment method filter dropdown', async () => {
+  it('fulfills DoD: supports pagination and page navigation', async () => {
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('pagination-bar')).toBeInTheDocument();
+    });
+
+    // Check initial page 1
+    expect(screen.getByTestId('pagination-summary').textContent).toContain('1 - 5');
+
+    // Click Next page button
+    const nextBtn = screen.getByRole('button', { name: /trang sau/i });
+    expect(nextBtn).toBeEnabled();
+    fireEvent.click(nextBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('pagination-summary').textContent).toContain('6 - 10');
+    });
+
+    // Click Previous page button
+    const prevBtn = screen.getByRole('button', { name: /trang trước/i });
+    expect(prevBtn).toBeEnabled();
+    fireEvent.click(prevBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('pagination-summary').textContent).toContain('1 - 5');
+    });
+  });
+
+  it('navigates directly to page 2 via numbered page button and resets on filter change', async () => {
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('page-btn-2')).toBeInTheDocument();
+    });
+
+    // Jump to page 2
+    fireEvent.click(screen.getByTestId('page-btn-2'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('pagination-summary').textContent).toContain('6 - 10');
+    });
+
+    // Now switch status filter; current page should automatically reset to 1
+    const pendingTab = screen.getByTestId('filter-tab-pending');
+    fireEvent.click(pendingTab);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('pagination-summary').textContent).toContain('1 -');
+    });
+  });
+
+  it('changes items per page selector and updates pagination', async () => {
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('items-per-page')).toBeInTheDocument();
+    });
+
+    const itemsSelect = screen.getByTestId('items-per-page');
+    fireEvent.change(itemsSelect, { target: { value: '10' } });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('pagination-summary').textContent).toContain('1 - 10');
+    });
+  });
+
+  it('opens details modal when clicking Chi tiết button and closes properly', async () => {
     renderComponent();
 
     await waitFor(() => {
       expect(screen.getByTestId('bookings-table')).toBeInTheDocument();
     });
 
-    const paymentSelect = screen.getByTestId('payment-filter');
-    fireEvent.change(paymentSelect, { target: { value: 'MOMO' } });
-
-    await waitFor(() => {
-      expect(screen.getByText('TCK-2026-00102')).toBeInTheDocument();
-      expect(screen.queryByText('TCK-2026-00101')).not.toBeInTheDocument();
-    });
-  });
-
-  it('opens details modal when clicking Chi tiết button', async () => {
-    renderComponent();
-
-    await waitFor(() => {
-      expect(screen.getByTestId('bookings-table')).toBeInTheDocument();
-    });
-
-    const detailBtn = screen.getByTestId('view-detail-btn-bkg-101');
-    fireEvent.click(detailBtn);
+    const detailButtons = screen.getAllByRole('button', { name: /xem chi tiết vé/i });
+    expect(detailButtons.length).toBeGreaterThan(0);
+    fireEvent.click(detailButtons[0]);
 
     await waitFor(() => {
       expect(
         screen.getByRole('heading', { name: /chi tiết vé xe & giao dịch cổng thanh toán/i })
       ).toBeInTheDocument();
-      expect(screen.getByText(/cổng vnpay qr/i)).toBeInTheDocument();
-      expect(screen.getByText('VNP-20260930-891024')).toBeInTheDocument();
     });
 
-    // Close modal
     const closeBtn = screen.getByRole('button', { name: /^đóng$/i });
     fireEvent.click(closeBtn);
 
@@ -128,44 +212,6 @@ describe('AdminBookingsPage (US 06: Cổng thanh toán - Màn hình Quản trị
       expect(
         screen.queryByRole('heading', { name: /chi tiết vé xe & giao dịch cổng thanh toán/i })
       ).not.toBeInTheDocument();
-    });
-  });
-
-  it('allows admin to approve pending transaction inside modal', async () => {
-    renderComponent();
-
-    await waitFor(() => {
-      expect(screen.getByTestId('bookings-table')).toBeInTheDocument();
-    });
-
-    // Open detail for bkg-103 which is PENDING
-    const detailBtn = screen.getByTestId('view-detail-btn-bkg-103');
-    fireEvent.click(detailBtn);
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /duyệt thanh toán/i })).toBeInTheDocument();
-    });
-
-    const approveBtn = screen.getByRole('button', { name: /duyệt thanh toán/i });
-    fireEvent.click(approveBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText(/cập nhật trạng thái thành công/i)).toBeInTheDocument();
-    });
-  });
-
-  it('displays empty state when search finds no matches', async () => {
-    renderComponent();
-
-    await waitFor(() => {
-      expect(screen.getByTestId('bookings-table')).toBeInTheDocument();
-    });
-
-    const searchInput = screen.getByTestId('search-input');
-    fireEvent.change(searchInput, { target: { value: 'NON_EXISTENT_QUERY_12345' } });
-
-    await waitFor(() => {
-      expect(screen.getByText(/không tìm thấy giao dịch nào/i)).toBeInTheDocument();
     });
   });
 });

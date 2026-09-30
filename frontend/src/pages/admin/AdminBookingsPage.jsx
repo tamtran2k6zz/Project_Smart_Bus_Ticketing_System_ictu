@@ -24,6 +24,7 @@ import {
   ChevronRight,
   ShieldCheck,
   AlertCircle,
+  Filter,
 } from 'lucide-react';
 import Button from '../../components/common/Button';
 import Alert from '../../components/common/Alert';
@@ -40,14 +41,14 @@ export const AdminBookingsPage = () => {
 
   // Filters & search
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'CONFIRMED' | 'PENDING' | 'CANCELLED'
   const [paymentFilter, setPaymentFilter] = useState('ALL');
   const [routeFilter, setRouteFilter] = useState('ALL');
 
-  // Pagination
+  // Pagination (DoD STT 15: có phân trang dữ liệu)
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
-  const [paginationInfo, setPaginationInfo] = useState({ totalItems: 0, totalPages: 1 });
+  const [itemsPerPage, setItemsPerPage] = useState(5); // Default to 5 to demonstrate pagination across 16 items
+  const [paginationInfo, setPaginationInfo] = useState({ totalItems: 0, totalPages: 1, page: 1, limit: 5 });
 
   // Detail Modal
   const [selectedBooking, setSelectedBooking] = useState(null);
@@ -156,7 +157,7 @@ export const AdminBookingsPage = () => {
     document.body.removeChild(link);
   };
 
-  // Status configuration mapping
+  // Status configuration mapping (DoD: Đã thanh toán, Đang giữ chỗ, Đã hủy)
   const statusConfig = useMemo(
     () => ({
       CONFIRMED: {
@@ -166,7 +167,13 @@ export const AdminBookingsPage = () => {
         icon: CheckCircle2,
       },
       PENDING: {
-        label: 'Chờ thanh toán',
+        label: 'Đang giữ chỗ',
+        bg: 'bg-amber-50 text-amber-700 border-amber-200',
+        badgeDot: 'bg-amber-500',
+        icon: Clock,
+      },
+      RESERVED: {
+        label: 'Đang giữ chỗ',
         bg: 'bg-amber-50 text-amber-700 border-amber-200',
         badgeDot: 'bg-amber-500',
         icon: Clock,
@@ -195,6 +202,12 @@ export const AdminBookingsPage = () => {
     CASH: { label: 'Tiền mặt / POS', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   };
 
+  // Switch status filter and reset page
+  const handleSelectStatusFilter = newStatus => {
+    setStatusFilter(newStatus);
+    setCurrentPage(1);
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Banner / Header */}
@@ -209,7 +222,7 @@ export const AdminBookingsPage = () => {
               Quản lý Giao dịch & Danh sách Vé đã đặt
             </h1>
             <p className="text-slate-300 text-sm mt-1.5 max-w-2xl">
-              Theo dõi đối soát luồng thanh toán VNPay, MoMo, kiểm tra mã vé, chuyến xe buýt ICTU và trạng thái giao dịch thời gian thực.
+              Theo dõi đối soát luồng thanh toán VNPay, MoMo, kiểm tra mã vé, chuyến xe buýt ICTU và bộ lọc trạng thái vé đa năng.
             </p>
           </div>
 
@@ -289,17 +302,17 @@ export const AdminBookingsPage = () => {
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Giao dịch chờ xử lý
+              Đang giữ chỗ
             </span>
             <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
               <Clock className="w-4 h-4" />
             </div>
           </div>
           <p className="text-2xl font-bold text-amber-600" data-testid="kpi-pending">
-            {stats ? `${stats.pendingCount} đơn` : '0 đơn'}
+            {stats ? `${stats.pendingCount} vé` : '0 vé'}
           </p>
           <span className="text-xs text-amber-700/80 mt-1 block">
-            Đang chờ quét mã / OTP ngân hàng
+            Chờ thanh toán / Giữ chỗ tạm thời
           </span>
         </div>
 
@@ -316,9 +329,97 @@ export const AdminBookingsPage = () => {
             {stats ? `${stats.successRate}%` : '0%'}
           </p>
           <span className="text-xs text-purple-600 font-medium mt-1 block">
-            {stats?.refundedCount || 0} vé hoàn tiền
+            {stats?.cancelledCount || 0} vé đã hủy / hoàn
           </span>
         </div>
+      </div>
+
+      {/* STT 15 DoD: Quick Status Filter Pills (Đã thanh toán, Đang giữ chỗ, Đã hủy) */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1" data-testid="status-tab-group">
+        <button
+          type="button"
+          data-testid="filter-tab-all"
+          onClick={() => handleSelectStatusFilter('ALL')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all select-none whitespace-nowrap cursor-pointer ${
+            statusFilter === 'ALL'
+              ? 'bg-slate-900 text-white shadow-md ring-2 ring-slate-900/20'
+              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <span>Tất cả vé</span>
+          <span
+            className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+              statusFilter === 'ALL' ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-700'
+            }`}
+          >
+            {stats?.statusCounts?.ALL ?? stats?.totalTransactions ?? 0}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          data-testid="filter-tab-confirmed"
+          onClick={() => handleSelectStatusFilter('CONFIRMED')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all select-none whitespace-nowrap cursor-pointer ${
+            statusFilter === 'CONFIRMED'
+              ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-600/20'
+              : 'bg-white text-emerald-700 hover:bg-emerald-50 border border-emerald-200'
+          }`}
+        >
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          <span>Đã thanh toán</span>
+          <span
+            className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+              statusFilter === 'CONFIRMED'
+                ? 'bg-emerald-700 text-white'
+                : 'bg-emerald-100 text-emerald-800'
+            }`}
+          >
+            {stats?.statusCounts?.CONFIRMED ?? 0}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          data-testid="filter-tab-pending"
+          onClick={() => handleSelectStatusFilter('PENDING')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all select-none whitespace-nowrap cursor-pointer ${
+            statusFilter === 'PENDING'
+              ? 'bg-amber-500 text-white shadow-md ring-2 ring-amber-500/20'
+              : 'bg-white text-amber-700 hover:bg-amber-50 border border-amber-200'
+          }`}
+        >
+          <Clock className="w-4 h-4 shrink-0" />
+          <span>Đang giữ chỗ</span>
+          <span
+            className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+              statusFilter === 'PENDING' ? 'bg-amber-600 text-white' : 'bg-amber-100 text-amber-800'
+            }`}
+          >
+            {stats?.statusCounts?.PENDING ?? 0}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          data-testid="filter-tab-cancelled"
+          onClick={() => handleSelectStatusFilter('CANCELLED')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all select-none whitespace-nowrap cursor-pointer ${
+            statusFilter === 'CANCELLED'
+              ? 'bg-slate-700 text-white shadow-md ring-2 ring-slate-700/20'
+              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <XCircle className="w-4 h-4 shrink-0" />
+          <span>Đã hủy</span>
+          <span
+            className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+              statusFilter === 'CANCELLED' ? 'bg-slate-600 text-white' : 'bg-slate-100 text-slate-700'
+            }`}
+          >
+            {stats?.statusCounts?.CANCELLED ?? 0}
+          </span>
+        </button>
       </div>
 
       {/* Filter and Search Bar */}
@@ -340,7 +441,7 @@ export const AdminBookingsPage = () => {
             />
           </div>
 
-          {/* Status filter */}
+          {/* Status filter dropdown (DoD: Đã thanh toán, Đang giữ chỗ, Đã hủy) */}
           <div className="md:col-span-2">
             <select
               data-testid="status-filter"
@@ -349,13 +450,12 @@ export const AdminBookingsPage = () => {
                 setStatusFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white text-slate-700"
+              className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white text-slate-700 font-medium"
             >
-              <option value="ALL">Mọi trạng thái</option>
+              <option value="ALL">Mọi trạng thái (Tất cả)</option>
               <option value="CONFIRMED">Đã thanh toán</option>
-              <option value="PENDING">Chờ thanh toán</option>
+              <option value="PENDING">Đang giữ chỗ</option>
               <option value="CANCELLED">Đã hủy</option>
-              <option value="REFUNDED">Đã hoàn tiền</option>
             </select>
           </div>
 
@@ -415,6 +515,67 @@ export const AdminBookingsPage = () => {
             )}
           </div>
         </div>
+
+        {/* Active Filters Display */}
+        {(statusFilter !== 'ALL' || paymentFilter !== 'ALL' || routeFilter !== 'ALL' || searchTerm) && (
+          <div className="pt-2 border-t border-slate-100 flex items-center gap-2 flex-wrap text-xs text-slate-500">
+            <span className="flex items-center gap-1 font-semibold text-slate-600">
+              <Filter className="w-3.5 h-3.5" /> Đang lọc:
+            </span>
+            {statusFilter !== 'ALL' && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-medium">
+                Trạng thái: {statusConfig[statusFilter]?.label || statusFilter}
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('ALL')}
+                  className="hover:text-blue-900"
+                  aria-label="Bỏ lọc trạng thái"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {paymentFilter !== 'ALL' && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 font-medium">
+                Cổng: {paymentFilter}
+                <button
+                  type="button"
+                  onClick={() => setPaymentFilter('ALL')}
+                  className="hover:text-purple-900"
+                  aria-label="Bỏ lọc cổng thanh toán"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {routeFilter !== 'ALL' && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-medium">
+                Tuyến: {routeFilter}
+                <button
+                  type="button"
+                  onClick={() => setRouteFilter('ALL')}
+                  className="hover:text-amber-900"
+                  aria-label="Bỏ lọc tuyến"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {searchTerm && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-medium">
+                Từ khóa: &quot;{searchTerm}&quot;
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  className="hover:text-slate-900"
+                  aria-label="Bỏ từ khóa tìm kiếm"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Main Data Table Card */}
@@ -426,12 +587,12 @@ export const AdminBookingsPage = () => {
             <h2 className="text-base font-bold text-slate-900">
               Bảng Dữ liệu Vé đặt & Giao dịch thanh toán
             </h2>
-            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800" data-testid="total-items-badge">
               {paginationInfo.totalItems} bản ghi
             </span>
           </div>
           <div className="text-xs text-slate-500">
-            Hiển thị trang <strong className="text-slate-800">{paginationInfo.page}</strong> / {paginationInfo.totalPages}
+            Hiển thị trang <strong className="text-slate-800">{paginationInfo.page}</strong> / {paginationInfo.totalPages || 1}
           </div>
         </div>
 
@@ -500,7 +661,7 @@ export const AdminBookingsPage = () => {
                             <button
                               type="button"
                               onClick={() => handleCopy(item.ticketCode, 'tck')}
-                              className="text-slate-400 hover:text-blue-600 transition-colors"
+                              className="text-slate-400 hover:text-blue-600 transition-colors cursor-pointer"
                               title="Sao chép mã vé"
                               aria-label={`Sao chép mã vé ${item.ticketCode}`}
                             >
@@ -574,7 +735,7 @@ export const AdminBookingsPage = () => {
                         </div>
                       </td>
 
-                      {/* Cột 5: Trạng thái (DoD) */}
+                      {/* Cột 5: Trạng thái (DoD: Đã thanh toán, Đang giữ chỗ, Đã hủy) */}
                       <td className="px-5 py-4 align-top">
                         <div>
                           <span
@@ -613,18 +774,57 @@ export const AdminBookingsPage = () => {
           </div>
         )}
 
-        {/* Pagination Bar */}
-        {!isLoading && bookings.length > 0 && (
-          <div className="px-5 py-3.5 border-t border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="text-xs text-slate-500">
-              Hiển thị <strong className="text-slate-800">{(currentPage - 1) * itemsPerPage + 1}</strong> -{' '}
-              <strong className="text-slate-800">
-                {Math.min(currentPage * itemsPerPage, paginationInfo.totalItems)}
-              </strong>{' '}
-              trên tổng số <strong className="text-slate-800">{paginationInfo.totalItems}</strong> giao dịch
+        {/* Pagination Bar - DoD STT 15: có phân trang dữ liệu */}
+        {!isLoading && paginationInfo.totalItems > 0 && (
+          <div
+            className="px-5 py-4 border-t border-slate-200 bg-slate-50/70 flex flex-col sm:flex-row items-center justify-between gap-4"
+            data-testid="pagination-bar"
+          >
+            <div className="flex items-center gap-3 text-xs sm:text-sm text-slate-600">
+              <span data-testid="pagination-summary">
+                Hiển thị{' '}
+                <strong className="text-slate-900">
+                  {paginationInfo.totalItems === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}
+                </strong>{' '}
+                -{' '}
+                <strong className="text-slate-900">
+                  {Math.min(currentPage * itemsPerPage, paginationInfo.totalItems)}
+                </strong>{' '}
+                trong tổng số <strong className="text-slate-900">{paginationInfo.totalItems}</strong> vé đặt
+              </span>
+
+              {/* Items per page selector */}
+              <div className="flex items-center gap-1.5 pl-3 border-l border-slate-200">
+                <span className="text-xs text-slate-400">Mỗi trang:</span>
+                <select
+                  data-testid="items-per-page"
+                  value={itemsPerPage}
+                  onChange={e => {
+                    setItemsPerPage(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="px-2 py-1 text-xs bg-white border border-slate-200 rounded-md text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                >
+                  <option value={5}>5 vé/trang</option>
+                  <option value={10}>10 vé/trang</option>
+                  <option value={20}>20 vé/trang</option>
+                </select>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage(1)}
+                className="px-2.5 text-xs"
+                title="Trang đầu"
+                aria-label="Trang đầu"
+              >
+                &laquo; Đầu
+              </Button>
+
               <Button
                 variant="outline"
                 size="sm"
@@ -636,12 +836,14 @@ export const AdminBookingsPage = () => {
                 Trước
               </Button>
 
+              {/* Page numbers */}
               <div className="flex items-center gap-1">
                 {Array.from({ length: paginationInfo.totalPages }, (_, i) => i + 1).map(p => (
                   <button
                     key={p}
+                    data-testid={`page-btn-${p}`}
                     onClick={() => setCurrentPage(p)}
-                    className={`w-8 h-8 rounded-lg text-xs font-semibold transition-colors ${
+                    className={`min-w-8 h-8 px-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                       currentPage === p
                         ? 'bg-blue-600 text-white shadow-xs'
                         : 'text-slate-600 hover:bg-slate-200'
@@ -661,6 +863,18 @@ export const AdminBookingsPage = () => {
                 aria-label="Trang sau"
               >
                 Sau
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage >= paginationInfo.totalPages}
+                onClick={() => setCurrentPage(paginationInfo.totalPages)}
+                className="px-2.5 text-xs"
+                title="Trang cuối"
+                aria-label="Trang cuối"
+              >
+                Cuối &raquo;
               </Button>
             </div>
           </div>
@@ -684,7 +898,7 @@ export const AdminBookingsPage = () => {
               <button
                 type="button"
                 onClick={() => setSelectedBooking(null)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors"
+                className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
                 aria-label="Đóng cửa sổ"
               >
                 <X className="w-5 h-5" />
@@ -702,7 +916,7 @@ export const AdminBookingsPage = () => {
                     <button
                       type="button"
                       onClick={() => handleCopy(selectedBooking.ticketCode, 'detail-tck')}
-                      className="text-blue-500 hover:text-blue-700"
+                      className="text-blue-500 hover:text-blue-700 cursor-pointer"
                       title="Sao chép"
                     >
                       {copiedCode === `detail-tck-${selectedBooking.ticketCode}` ? (
@@ -841,7 +1055,7 @@ export const AdminBookingsPage = () => {
             {/* Modal Actions */}
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                {selectedBooking.status === 'PENDING' && (
+                {(selectedBooking.status === 'PENDING' || selectedBooking.status === 'RESERVED') && (
                   <Button
                     variant="primary"
                     size="sm"
@@ -853,7 +1067,7 @@ export const AdminBookingsPage = () => {
                         'Admin duyệt thanh toán thủ công'
                       )
                     }
-                    className="bg-emerald-600 hover:bg-emerald-700"
+                    className="bg-emerald-600 hover:bg-emerald-700 cursor-pointer"
                     icon={CheckCircle2}
                   >
                     Duyệt thanh toán
@@ -872,14 +1086,14 @@ export const AdminBookingsPage = () => {
                         'Khách hủy vé, hoàn tiền qua cổng thanh toán'
                       )
                     }
-                    className="text-rose-600 border-rose-200 hover:bg-rose-50"
+                    className="text-rose-600 border-rose-200 hover:bg-rose-50 cursor-pointer"
                     icon={RotateCcw}
                   >
                     Hoàn tiền (Refund)
                   </Button>
                 )}
 
-                {selectedBooking.status === 'PENDING' && (
+                {(selectedBooking.status === 'PENDING' || selectedBooking.status === 'RESERVED') && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -891,7 +1105,7 @@ export const AdminBookingsPage = () => {
                         'Hết hạn thanh toán / Hủy yêu cầu'
                       )
                     }
-                    className="text-slate-600 border-slate-300 hover:bg-slate-100"
+                    className="text-slate-600 border-slate-300 hover:bg-slate-100 cursor-pointer"
                     icon={XCircle}
                   >
                     Hủy vé
