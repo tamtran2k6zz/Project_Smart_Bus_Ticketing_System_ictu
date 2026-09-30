@@ -169,6 +169,14 @@ const INITIAL_BOOKINGS = [
     paidAt: '2026-09-30T06:50:00+07:00',
     createdAt: '2026-09-30T06:48:00+07:00',
     notes: 'Khách hàng hủy chuyến trước 2 giờ - Đã hoàn tiền tự động 100%',
+    refundDetails: {
+      refundedAt: '2026-09-30T07:15:00+07:00',
+      refundAmount: 36000,
+      refundFee: 0,
+      refundTxnId: 'REF-ZP-20260930-991204',
+      approvedBy: 'Admin (Nguyễn Hoàng Đức)',
+      note: 'Khách hàng hủy chuyến trước 2 giờ - Đã duyệt hoàn tiền tự động 100%',
+    },
   },
   {
     id: 'bkg-106',
@@ -459,13 +467,24 @@ const INITIAL_BOOKINGS = [
     quantity: 2,
     unitPrice: 10000,
     totalAmount: 20000,
-    status: 'CONFIRMED',
+    status: 'REFUND_REQUESTED',
     paymentMethod: 'VNPAY',
     paymentChannel: 'Cổng VNPay QR (VietinBank)',
     transactionId: 'VNP-20260930-662819',
     paidAt: '2026-09-30T10:15:30+07:00',
     createdAt: '2026-09-30T10:12:00+07:00',
-    notes: 'Thanh toán thành công qua ứng dụng iPay VietinBank',
+    notes: 'Khách hàng gửi yêu cầu hoàn tiền trực tuyến qua ứng dụng',
+    refundRequest: {
+      requestId: 'REQ-REF-00114',
+      requestedAt: '2026-09-30T11:00:00+07:00',
+      reason: 'Bận lịch học bù môn Tin học đại cương tại ICTU, không thể tham gia chuyến xe',
+      refundPercentage: 100,
+      refundAmount: 20000,
+      bankName: 'VietinBank',
+      accountNumber: '1023456789',
+      accountHolder: 'DUONG VAN HAI',
+      status: 'PENDING_APPROVAL',
+    },
   },
   {
     id: 'bkg-115',
@@ -607,6 +626,10 @@ export const adminBookingApi = {
         data = data.filter(item => item.status === 'CONFIRMED' || item.status === 'BOOKED');
       } else if (status === 'PENDING' || status === 'RESERVED') {
         data = data.filter(item => item.status === 'PENDING' || item.status === 'RESERVED');
+      } else if (status === 'REFUND_REQUESTED') {
+        data = data.filter(item => item.status === 'REFUND_REQUESTED');
+      } else if (status === 'REFUNDED') {
+        data = data.filter(item => item.status === 'REFUNDED');
       } else if (status === 'CANCELLED') {
         data = data.filter(item => item.status === 'CANCELLED' || item.status === 'REFUNDED');
       } else {
@@ -714,7 +737,157 @@ export const adminBookingApi = {
    * Refund transaction
    */
   async refundTransaction(id, reason = 'Hoàn tiền theo yêu cầu') {
-    return this.updateBookingStatus(id, 'REFUNDED', reason);
+    return this.approveRefund(id, { note: reason });
+  },
+
+  /**
+   * Approve a customer's refund request (US 05 - STT 35)
+   * Tiêu chí nghiệm thu (DoD): Admin có thể xem chi tiết vé và bấm duyệt yêu cầu hoàn tiền cho khách.
+   */
+  async approveRefund(id, { refundAmount, note = '', fee = 0 } = {}) {
+    if (import.meta.env.VITE_USE_REAL_API === 'true') {
+      try {
+        const response = await apiClient.post(`/admin/bookings/${id}/refund/approve`, {
+          refundAmount,
+          note,
+          fee,
+        });
+        if (response && response.data) return response.data;
+      } catch (_err) {
+        // fallback
+      }
+    }
+
+    const data = getStoredBookings();
+    const index = data.findIndex(b => b.id === id);
+    if (index === -1) {
+      throw new Error('Không tìm thấy thông tin vé cần duyệt hoàn tiền');
+    }
+
+    const targetBooking = data[index];
+    const finalRefundAmount =
+      Number(refundAmount) || targetBooking.refundRequest?.refundAmount || targetBooking.totalAmount;
+    const refundTxnId = `REF-${targetBooking.paymentMethod || 'GATEWAY'}-${new Date()
+      .toISOString()
+      .replace(/[-:T.]/g, '')
+      .slice(0, 14)}`;
+
+    data[index] = {
+      ...targetBooking,
+      status: 'REFUNDED',
+      refundDetails: {
+        refundedAt: new Date().toISOString(),
+        refundAmount: finalRefundAmount,
+        refundFee: fee,
+        refundTxnId,
+        approvedBy: 'Quản trị viên (Admin ICTU)',
+        note: note || 'Admin đã duyệt yêu cầu hoàn tiền qua cổng thanh toán',
+      },
+      refundRequest: targetBooking.refundRequest
+        ? {
+            ...targetBooking.refundRequest,
+            status: 'APPROVED',
+            approvedAt: new Date().toISOString(),
+          }
+        : null,
+      notes: `${targetBooking.notes || ''} [Đã duyệt hoàn tiền: ${finalRefundAmount.toLocaleString('vi-VN')} đ - Mã: ${refundTxnId}]`,
+      updatedAt: new Date().toISOString(),
+    };
+
+    saveStoredBookings(data);
+    return {
+      statusCode: 200,
+      data: data[index],
+      message: 'Duyệt yêu cầu hoàn tiền thành công! Cổng thanh toán đã chuyển hoàn tiền cho hành khách.',
+    };
+  },
+
+  /**
+   * Reject a customer's refund request (US 05)
+   */
+  async rejectRefund(id, { reason = 'Không đủ điều kiện theo chính sách hoàn vé của ICTU' } = {}) {
+    if (import.meta.env.VITE_USE_REAL_API === 'true') {
+      try {
+        const response = await apiClient.post(`/admin/bookings/${id}/refund/reject`, { reason });
+        if (response && response.data) return response.data;
+      } catch (_err) {
+        // fallback
+      }
+    }
+
+    const data = getStoredBookings();
+    const index = data.findIndex(b => b.id === id);
+    if (index === -1) {
+      throw new Error('Không tìm thấy thông tin vé cần từ chối hoàn tiền');
+    }
+
+    data[index] = {
+      ...data[index],
+      status: 'CONFIRMED',
+      refundRequest: data[index].refundRequest
+        ? {
+            ...data[index].refundRequest,
+            status: 'REJECTED',
+            rejectionReason: reason,
+            rejectedAt: new Date().toISOString(),
+          }
+        : null,
+      notes: `${data[index].notes || ''} [Admin từ chối hoàn tiền: ${reason}]`,
+      updatedAt: new Date().toISOString(),
+    };
+
+    saveStoredBookings(data);
+    return {
+      statusCode: 200,
+      data: data[index],
+      message: 'Đã từ chối yêu cầu hoàn tiền thành công',
+    };
+  },
+
+  /**
+   * Request refund for a confirmed booking (US 05)
+   */
+  async requestRefund(id, { reason = '', refundPercentage = 100, bankName = '', accountNumber = '', accountHolder = '' } = {}) {
+    const data = getStoredBookings();
+    const index = data.findIndex(b => b.id === id);
+    if (index === -1) {
+      throw new Error('Không tìm thấy vé');
+    }
+
+    const target = data[index];
+    const refundAmount = Math.round((target.totalAmount * refundPercentage) / 100);
+
+    data[index] = {
+      ...target,
+      status: 'REFUND_REQUESTED',
+      refundRequest: {
+        requestId: `REQ-REF-${Date.now().toString().slice(-6)}`,
+        requestedAt: new Date().toISOString(),
+        reason: reason || 'Khách hàng liên hệ yêu cầu hủy vé và hoàn tiền',
+        refundPercentage,
+        refundAmount,
+        bankName: bankName || target.paymentChannel || 'Cổng thanh toán ban đầu',
+        accountNumber: accountNumber || '---',
+        accountHolder: accountHolder || target.customer.name,
+        status: 'PENDING_APPROVAL',
+      },
+      notes: `${target.notes || ''} [Khởi tạo yêu cầu hoàn tiền: ${reason}]`,
+      updatedAt: new Date().toISOString(),
+    };
+
+    saveStoredBookings(data);
+    return {
+      statusCode: 200,
+      data: data[index],
+      message: 'Yêu cầu hoàn tiền đã được gửi vào danh sách chờ duyệt',
+    };
+  },
+
+  /**
+   * Cancel ticket directly (US 05)
+   */
+  async cancelTicket(id, reason = 'Admin hủy vé theo yêu cầu') {
+    return this.updateBookingStatus(id, 'CANCELLED', reason);
   },
 
   /**
@@ -729,6 +902,7 @@ export const adminBookingApi = {
     const pendingCount = data.filter(d => d.status === 'PENDING' || d.status === 'RESERVED').length;
     const cancelledCount = data.filter(d => d.status === 'CANCELLED' || d.status === 'REFUNDED').length;
     const refundedCount = data.filter(d => d.status === 'REFUNDED').length;
+    const refundRequestedCount = data.filter(d => d.status === 'REFUND_REQUESTED').length;
     const totalTicketsSold = confirmedList.reduce((acc, curr) => acc + curr.quantity, 0);
 
     return {
@@ -739,11 +913,14 @@ export const adminBookingApi = {
         totalTicketsSold,
         pendingCount,
         refundedCount,
+        refundRequestedCount,
         cancelledCount,
         statusCounts: {
           ALL: totalTransactions,
           CONFIRMED: confirmedCount,
+          REFUND_REQUESTED: refundRequestedCount,
           PENDING: pendingCount,
+          REFUNDED: refundedCount,
           CANCELLED: cancelledCount,
         },
         successRate: totalTransactions ? Math.round((confirmedList.length / totalTransactions) * 100) : 0,

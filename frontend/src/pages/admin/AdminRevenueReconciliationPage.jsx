@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   TrendingUp,
   CreditCard,
+  Building,
   Eye,
   X,
   FileSpreadsheet,

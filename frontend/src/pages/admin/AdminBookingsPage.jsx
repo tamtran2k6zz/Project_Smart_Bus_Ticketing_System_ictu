@@ -24,6 +24,7 @@ import {
   ChevronRight,
   ShieldCheck,
   AlertCircle,
+  AlertTriangle,
   Filter,
 } from 'lucide-react';
 import Button from '../../components/common/Button';
@@ -54,6 +55,85 @@ export const AdminBookingsPage = () => {
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [copiedCode, setCopiedCode] = useState(null);
+
+  // US 05: Refund & Cancellation handling states
+  const [refundFormOpen, setRefundFormOpen] = useState(false);
+  const [refundAmountInput, setRefundAmountInput] = useState('');
+  const [refundNoteInput, setRefundNoteInput] = useState('');
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [cancelReasonInput, setCancelReasonInput] = useState('');
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [rejectReasonInput, setRejectReasonInput] = useState('');
+
+  // Open refund approval dialog
+  const handleOpenApproveRefund = booking => {
+    const defaultAmount = booking.refundRequest?.refundAmount || booking.totalAmount;
+    setRefundAmountInput(defaultAmount);
+    setRefundNoteInput(`Duyệt hoàn tiền 100% cho vé ${booking.ticketCode} qua ${booking.paymentMethod || 'cổng thanh toán'}`);
+    setRefundFormOpen(true);
+  };
+
+  // Submit refund approval
+  const handleConfirmApproveRefund = async () => {
+    if (!selectedBooking) return;
+    setIsUpdatingStatus(true);
+    setError(null);
+    try {
+      const res = await adminBookingApi.approveRefund(selectedBooking.id, {
+        refundAmount: Number(refundAmountInput) || selectedBooking.totalAmount,
+        note: refundNoteInput,
+      });
+      setSuccessMessage(res.message || `Đã duyệt hoàn tiền thành công cho vé ${selectedBooking.ticketCode}`);
+      setSelectedBooking(res.data);
+      setRefundFormOpen(false);
+      await loadData();
+    } catch (err) {
+      setError(err.message || 'Không thể duyệt hoàn tiền');
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  // Submit refund rejection
+  const handleConfirmRejectRefund = async () => {
+    if (!selectedBooking) return;
+    setIsUpdatingStatus(true);
+    setError(null);
+    try {
+      const res = await adminBookingApi.rejectRefund(selectedBooking.id, {
+        reason: rejectReasonInput || 'Không đủ điều kiện theo chính sách hoàn vé',
+      });
+      setSuccessMessage(res.message || 'Đã từ chối yêu cầu hoàn tiền');
+      setSelectedBooking(res.data);
+      setRejectModalOpen(false);
+      await loadData();
+    } catch (err) {
+      setError(err.message || 'Không thể từ chối yêu cầu hoàn tiền');
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  // Submit ticket cancellation
+  const handleConfirmCancelTicket = async () => {
+    if (!selectedBooking) return;
+    setIsUpdatingStatus(true);
+    setError(null);
+    try {
+      const res = await adminBookingApi.cancelTicket(
+        selectedBooking.id,
+        cancelReasonInput || 'Admin hủy vé theo yêu cầu'
+      );
+      setSuccessMessage(`Đã hủy vé ${selectedBooking.ticketCode} thành công`);
+      setSelectedBooking(res.data);
+      setCancelModalOpen(false);
+      await loadData();
+    } catch (err) {
+      setError(err.message || 'Không thể hủy vé');
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
 
   // Load data
   const loadData = useCallback(async () => {
@@ -184,10 +264,16 @@ export const AdminBookingsPage = () => {
         badgeDot: 'bg-slate-500',
         icon: XCircle,
       },
+      REFUND_REQUESTED: {
+        label: 'Chờ duyệt hoàn tiền',
+        bg: 'bg-rose-50 text-rose-700 border-rose-300 font-bold',
+        badgeDot: 'bg-rose-500',
+        icon: RotateCcw,
+      },
       REFUNDED: {
         label: 'Đã hoàn tiền',
-        bg: 'bg-rose-50 text-rose-700 border-rose-200',
-        badgeDot: 'bg-rose-500',
+        bg: 'bg-purple-50 text-purple-700 border-purple-200',
+        badgeDot: 'bg-purple-500',
         icon: RotateCcw,
       },
     }),
@@ -334,6 +420,38 @@ export const AdminBookingsPage = () => {
         </div>
       </div>
 
+      {/* US 05 DoD Alert Banner: Khi có yêu cầu hoàn tiền đang chờ duyệt */}
+      {stats?.statusCounts?.REFUND_REQUESTED > 0 && (
+        <div
+          data-testid="banner-pending-refunds"
+          onClick={() => handleSelectStatusFilter('REFUND_REQUESTED')}
+          className="bg-gradient-to-r from-rose-500 via-rose-600 to-amber-500 text-white p-4 rounded-2xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 cursor-pointer hover:shadow-md transition-all"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+              <RotateCcw className="w-5 h-5 text-white animate-spin-slow" />
+            </div>
+            <div>
+              <p className="text-sm font-bold flex items-center gap-2">
+                <span>US 05: Có {stats.statusCounts.REFUND_REQUESTED} yêu cầu hoàn tiền đang chờ Admin xét duyệt</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white text-rose-700">
+                  Cần xử lý
+                </span>
+              </p>
+              <p className="text-xs text-rose-100 mt-0.5">
+                Hành khách đã gửi yêu cầu hủy vé & hoàn tiền qua ứng dụng. Bấm vào đây để lọc danh sách và duyệt ngay.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="text-xs bg-white text-rose-700 font-bold px-3.5 py-1.5 rounded-lg shrink-0 shadow-xs hover:bg-rose-50 cursor-pointer"
+          >
+            Duyệt yêu cầu hoàn tiền →
+          </button>
+        </div>
+      )}
+
       {/* STT 15 DoD: Quick Status Filter Pills (Đã thanh toán, Đang giữ chỗ, Đã hủy) */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1" data-testid="status-tab-group">
         <button
@@ -402,6 +520,52 @@ export const AdminBookingsPage = () => {
 
         <button
           type="button"
+          data-testid="filter-tab-refund-requested"
+          onClick={() => handleSelectStatusFilter('REFUND_REQUESTED')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all select-none whitespace-nowrap cursor-pointer ${
+            statusFilter === 'REFUND_REQUESTED'
+              ? 'bg-rose-600 text-white shadow-md ring-2 ring-rose-600/20'
+              : 'bg-white text-rose-700 hover:bg-rose-50 border border-rose-200'
+          }`}
+        >
+          <RotateCcw className="w-4 h-4 shrink-0" />
+          <span>Chờ duyệt hoàn tiền (US 05)</span>
+          <span
+            className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+              statusFilter === 'REFUND_REQUESTED'
+                ? 'bg-rose-700 text-white'
+                : 'bg-rose-100 text-rose-800'
+            }`}
+          >
+            {stats?.statusCounts?.REFUND_REQUESTED ?? 0}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          data-testid="filter-tab-refunded"
+          onClick={() => handleSelectStatusFilter('REFUNDED')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all select-none whitespace-nowrap cursor-pointer ${
+            statusFilter === 'REFUNDED'
+              ? 'bg-purple-600 text-white shadow-md ring-2 ring-purple-600/20'
+              : 'bg-white text-purple-700 hover:bg-purple-50 border border-purple-200'
+          }`}
+        >
+          <RotateCcw className="w-4 h-4 shrink-0" />
+          <span>Đã hoàn tiền</span>
+          <span
+            className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+              statusFilter === 'REFUNDED'
+                ? 'bg-purple-700 text-white'
+                : 'bg-purple-100 text-purple-800'
+            }`}
+          >
+            {stats?.statusCounts?.REFUNDED ?? 0}
+          </span>
+        </button>
+
+        <button
+          type="button"
           data-testid="filter-tab-cancelled"
           onClick={() => handleSelectStatusFilter('CANCELLED')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all select-none whitespace-nowrap cursor-pointer ${
@@ -454,7 +618,9 @@ export const AdminBookingsPage = () => {
             >
               <option value="ALL">Mọi trạng thái (Tất cả)</option>
               <option value="CONFIRMED">Đã thanh toán</option>
+              <option value="REFUND_REQUESTED">Chờ duyệt hoàn tiền (US 05)</option>
               <option value="PENDING">Đang giữ chỗ</option>
+              <option value="REFUNDED">Đã hoàn tiền (US 05)</option>
               <option value="CANCELLED">Đã hủy</option>
             </select>
           </div>
@@ -754,6 +920,22 @@ export const AdminBookingsPage = () => {
                       {/* Cột 6: Thao tác */}
                       <td className="px-5 py-4 align-top text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          {item.status === 'REFUND_REQUESTED' && (
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              className="bg-rose-600 hover:bg-rose-700 text-white cursor-pointer shadow-xs"
+                              onClick={() => {
+                                setSelectedBooking(item);
+                                handleOpenApproveRefund(item);
+                              }}
+                              icon={RotateCcw}
+                              data-testid={`quick-approve-${item.id}`}
+                              aria-label={`Duyệt hoàn tiền vé ${item.ticketCode}`}
+                            >
+                              Duyệt hoàn
+                            </Button>
+                          )}
                           <Button
                             variant="secondary"
                             size="sm"
@@ -1040,6 +1222,253 @@ export const AdminBookingsPage = () => {
                 </div>
               </div>
 
+              {/* US 05: Thông tin Yêu cầu Hoàn tiền của Khách hàng */}
+              {selectedBooking.refundRequest && (
+                <div
+                  className="bg-rose-50 border-2 border-rose-200 rounded-xl p-4 space-y-3"
+                  data-testid="refund-request-info"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-rose-800 font-bold text-sm">
+                      <RotateCcw className="w-4 h-4 text-rose-600" />
+                      <span>Yêu cầu Hủy vé & Hoàn tiền (US 05)</span>
+                    </div>
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-200 text-rose-900">
+                      {selectedBooking.refundRequest.status === 'PENDING_APPROVAL'
+                        ? 'Chờ Admin duyệt'
+                        : selectedBooking.refundRequest.status === 'APPROVED'
+                        ? 'Đã chấp thuận'
+                        : 'Bị từ chối'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-white/80 p-3 rounded-lg border border-rose-100">
+                    <div>
+                      <span className="text-slate-500 block">Thời gian gửi yêu cầu:</span>
+                      <strong className="text-slate-800">
+                        {formatDateTime(selectedBooking.refundRequest.requestedAt)}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block">Số tiền yêu cầu hoàn lại:</span>
+                      <strong className="text-base text-rose-600 font-bold" data-testid="refund-amount">
+                        {formatVND(selectedBooking.refundRequest.refundAmount)}
+                      </strong>{' '}
+                      <span className="text-slate-400">
+                        ({selectedBooking.refundRequest.refundPercentage}% giá trị vé)
+                      </span>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <span className="text-slate-500 block">Lý do khách xin hủy vé:</span>
+                      <p className="text-slate-800 font-medium italic mt-1 bg-rose-50/50 p-2.5 rounded border border-rose-100">
+                        &quot;{selectedBooking.refundRequest.reason}&quot;
+                      </p>
+                    </div>
+                    {selectedBooking.refundRequest.bankName && (
+                      <div className="sm:col-span-2 text-slate-600 pt-1 border-t border-rose-100">
+                        <span className="text-slate-400 block">Tài khoản nhận tiền hoàn:</span>
+                        <strong>{selectedBooking.refundRequest.bankName}</strong> • STK:{' '}
+                        <strong className="font-mono">{selectedBooking.refundRequest.accountNumber}</strong> • Chủ TK:{' '}
+                        <strong>{selectedBooking.refundRequest.accountHolder}</strong>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* US 05: Thông tin Đã hoàn tiền thành công */}
+              {selectedBooking.status === 'REFUNDED' && selectedBooking.refundDetails && (
+                <div
+                  className="bg-purple-50 border border-purple-200 rounded-xl p-4 space-y-2 text-xs"
+                  data-testid="refund-completed-info"
+                >
+                  <div className="flex items-center gap-2 font-bold text-purple-900 text-sm">
+                    <CheckCircle2 className="w-4 h-4 text-purple-600" />
+                    <span>Đã hoàn tiền thành công qua Cổng thanh toán (US 05)</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-purple-800 pt-1">
+                    <div>
+                      Mã đối soát hoàn tiền: <strong className="font-mono">{selectedBooking.refundDetails.refundTxnId}</strong>
+                    </div>
+                    <div>
+                      Số tiền đã hoàn: <strong className="text-emerald-700 font-bold">{formatVND(selectedBooking.refundDetails.refundAmount)}</strong>
+                    </div>
+                    <div>
+                      Thời gian hoàn tất: <span>{formatDateTime(selectedBooking.refundDetails.refundedAt)}</span>
+                    </div>
+                    <div>
+                      Người thực hiện duyệt: <strong>{selectedBooking.refundDetails.approvedBy}</strong>
+                    </div>
+                  </div>
+                  {selectedBooking.refundDetails.note && (
+                    <div className="text-[11px] text-purple-700 bg-white/60 p-2 rounded border border-purple-100 mt-1">
+                      <strong>Ghi chú hoàn tiền:</strong> {selectedBooking.refundDetails.note}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* US 05 Form: Xác nhận Duyệt Hoàn tiền */}
+              {refundFormOpen && (
+                <div
+                  className="bg-emerald-50 border-2 border-emerald-300 rounded-xl p-4 space-y-3 animate-in fade-in"
+                  data-testid="approve-refund-form"
+                >
+                  <div className="flex items-center gap-2 text-emerald-900 font-bold text-sm">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                    <span>Xác nhận Duyệt Yêu cầu Hoàn tiền cho Hành khách (DoD STT 35)</span>
+                  </div>
+                  <p className="text-xs text-emerald-800">
+                    Hệ thống sẽ gửi lệnh hoàn tiền tự động qua cổng thanh toán{' '}
+                    <strong>{selectedBooking.paymentChannel}</strong> với mã tham chiếu gốc{' '}
+                    <code className="font-mono font-bold">{selectedBooking.transactionId}</code>.
+                  </p>
+
+                  <div className="space-y-3 text-xs">
+                    <div>
+                      <label className="block text-slate-700 font-semibold mb-1">
+                        Số tiền duyệt hoàn (VND):
+                      </label>
+                      <input
+                        type="number"
+                        data-testid="input-refund-amount"
+                        value={refundAmountInput}
+                        onChange={e => setRefundAmountInput(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-700 font-semibold mb-1">
+                        Ghi chú phê duyệt của Admin:
+                      </label>
+                      <textarea
+                        rows={2}
+                        data-testid="input-refund-note"
+                        value={refundNoteInput}
+                        onChange={e => setRefundNoteInput(e.target.value)}
+                        placeholder="Nhập ghi chú điều phối hoặc lý do chấp thuận..."
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-emerald-200">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      data-testid="cancel-approve-refund"
+                      onClick={() => setRefundFormOpen(false)}
+                    >
+                      Hủy bỏ
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      isLoading={isUpdatingStatus}
+                      data-testid="confirm-approve-refund"
+                      onClick={handleConfirmApproveRefund}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
+                      icon={CheckCircle2}
+                    >
+                      Xác nhận Duyệt hoàn tiền
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* US 05 Form: Xác nhận Hủy vé */}
+              {cancelModalOpen && (
+                <div
+                  className="bg-rose-50 border-2 border-rose-300 rounded-xl p-4 space-y-3 animate-in fade-in"
+                  data-testid="cancel-ticket-form"
+                >
+                  <div className="flex items-center gap-2 text-rose-900 font-bold text-sm">
+                    <XCircle className="w-5 h-5 text-rose-600" />
+                    <span>Xác nhận Hủy Vé xe (US 05)</span>
+                  </div>
+                  <div>
+                    <label className="block text-slate-700 font-semibold mb-1 text-xs">
+                      Lý do hủy vé:
+                    </label>
+                    <input
+                      type="text"
+                      data-testid="input-cancel-reason"
+                      value={cancelReasonInput}
+                      onChange={e => setCancelReasonInput(e.target.value)}
+                      placeholder="Nhập lý do hủy vé..."
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                    />
+                  </div>
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-rose-200">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setCancelModalOpen(false)}
+                    >
+                      Quay lại
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      isLoading={isUpdatingStatus}
+                      data-testid="confirm-cancel-ticket"
+                      onClick={handleConfirmCancelTicket}
+                      className="bg-rose-600 hover:bg-rose-700 text-white cursor-pointer"
+                      icon={XCircle}
+                    >
+                      Xác nhận Hủy vé
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* US 05 Form: Xác nhận Từ chối Hoàn tiền */}
+              {rejectModalOpen && (
+                <div
+                  className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 space-y-3 animate-in fade-in"
+                  data-testid="reject-refund-form"
+                >
+                  <div className="flex items-center gap-2 text-amber-900 font-bold text-sm">
+                    <AlertTriangle className="w-5 h-5 text-amber-600" />
+                    <span>Từ chối Yêu cầu Hoàn tiền (US 05)</span>
+                  </div>
+                  <div>
+                    <label className="block text-slate-700 font-semibold mb-1 text-xs">
+                      Lý do từ chối yêu cầu:
+                    </label>
+                    <input
+                      type="text"
+                      data-testid="input-reject-reason"
+                      value={rejectReasonInput}
+                      onChange={e => setRejectReasonInput(e.target.value)}
+                      placeholder="Không đủ điều kiện hủy trước 2h..."
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-amber-200">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setRejectModalOpen(false)}
+                    >
+                      Quay lại
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      isLoading={isUpdatingStatus}
+                      data-testid="confirm-reject-refund"
+                      onClick={handleConfirmRejectRefund}
+                      className="bg-amber-600 hover:bg-amber-700 text-white cursor-pointer"
+                      icon={XCircle}
+                    >
+                      Xác nhận Từ chối
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {/* Notes / Admin Audit */}
               {selectedBooking.notes && (
                 <div className="text-xs bg-amber-50/70 border border-amber-200 rounded-lg p-3 text-amber-900 flex items-start gap-2">
@@ -1054,62 +1483,104 @@ export const AdminBookingsPage = () => {
 
             {/* Modal Actions */}
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                {(selectedBooking.status === 'PENDING' || selectedBooking.status === 'RESERVED') && (
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    disabled={isUpdatingStatus}
-                    onClick={() =>
-                      handleStatusChange(
-                        selectedBooking.id,
-                        'CONFIRMED',
-                        'Admin duyệt thanh toán thủ công'
-                      )
-                    }
-                    className="bg-emerald-600 hover:bg-emerald-700 cursor-pointer"
-                    icon={CheckCircle2}
-                  >
-                    Duyệt thanh toán
-                  </Button>
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* STT 35 DoD: Khi vé có yêu cầu hoàn tiền, Admin bấm duyệt yêu cầu hoàn tiền cho khách */}
+                {selectedBooking.status === 'REFUND_REQUESTED' && !refundFormOpen && !rejectModalOpen && (
+                  <>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      disabled={isUpdatingStatus}
+                      onClick={() => handleOpenApproveRefund(selectedBooking)}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-xs"
+                      icon={CheckCircle2}
+                      data-testid="btn-approve-refund"
+                    >
+                      Duyệt hoàn tiền
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={isUpdatingStatus}
+                      onClick={() => {
+                        setRejectReasonInput('Không đủ điều kiện theo quy định hủy vé');
+                        setRejectModalOpen(true);
+                      }}
+                      className="text-amber-700 border-amber-300 hover:bg-amber-50 cursor-pointer"
+                      icon={XCircle}
+                      data-testid="btn-reject-refund"
+                    >
+                      Từ chối hoàn tiền
+                    </Button>
+                  </>
                 )}
 
-                {selectedBooking.status === 'CONFIRMED' && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={isUpdatingStatus}
-                    onClick={() =>
-                      handleStatusChange(
-                        selectedBooking.id,
-                        'REFUNDED',
-                        'Khách hủy vé, hoàn tiền qua cổng thanh toán'
-                      )
-                    }
-                    className="text-rose-600 border-rose-200 hover:bg-rose-50 cursor-pointer"
-                    icon={RotateCcw}
-                  >
-                    Hoàn tiền (Refund)
-                  </Button>
+                {/* Khi vé Đã thanh toán (CONFIRMED), Admin có thể bấm Hoàn tiền hoặc Hủy vé */}
+                {selectedBooking.status === 'CONFIRMED' && !refundFormOpen && !cancelModalOpen && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={isUpdatingStatus}
+                      onClick={() => handleOpenApproveRefund(selectedBooking)}
+                      className="text-rose-600 border-rose-200 hover:bg-rose-50 cursor-pointer"
+                      icon={RotateCcw}
+                      data-testid="btn-approve-refund"
+                    >
+                      Hoàn tiền (Refund)
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={isUpdatingStatus}
+                      onClick={() => {
+                        setCancelReasonInput('Khách hàng yêu cầu hủy chuyến xe');
+                        setCancelModalOpen(true);
+                      }}
+                      className="text-slate-600 border-slate-300 hover:bg-slate-100 cursor-pointer"
+                      icon={XCircle}
+                      data-testid="btn-cancel-ticket"
+                    >
+                      Hủy vé
+                    </Button>
+                  </>
                 )}
 
-                {(selectedBooking.status === 'PENDING' || selectedBooking.status === 'RESERVED') && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={isUpdatingStatus}
-                    onClick={() =>
-                      handleStatusChange(
-                        selectedBooking.id,
-                        'CANCELLED',
-                        'Hết hạn thanh toán / Hủy yêu cầu'
-                      )
-                    }
-                    className="text-slate-600 border-slate-300 hover:bg-slate-100 cursor-pointer"
-                    icon={XCircle}
-                  >
-                    Hủy vé
-                  </Button>
+                {/* Khi vé Đang giữ chỗ, Admin có thể Duyệt thanh toán hoặc Hủy giữ chỗ */}
+                {(selectedBooking.status === 'PENDING' || selectedBooking.status === 'RESERVED') && !cancelModalOpen && (
+                  <>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      disabled={isUpdatingStatus}
+                      onClick={() =>
+                        handleStatusChange(
+                          selectedBooking.id,
+                          'CONFIRMED',
+                          'Admin duyệt thanh toán thủ công'
+                        )
+                      }
+                      className="bg-emerald-600 hover:bg-emerald-700 cursor-pointer"
+                      icon={CheckCircle2}
+                      data-testid="btn-confirm-payment"
+                    >
+                      Duyệt thanh toán
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={isUpdatingStatus}
+                      onClick={() => {
+                        setCancelReasonInput('Hết hạn giữ chỗ');
+                        setCancelModalOpen(true);
+                      }}
+                      className="text-slate-600 border-slate-300 hover:bg-slate-100 cursor-pointer"
+                      icon={XCircle}
+                      data-testid="btn-cancel-ticket"
+                    >
+                      Hủy vé
+                    </Button>
+                  </>
                 )}
               </div>
 
@@ -1125,7 +1596,13 @@ export const AdminBookingsPage = () => {
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => setSelectedBooking(null)}
+                  onClick={() => {
+                    setSelectedBooking(null);
+                    setRefundFormOpen(false);
+                    setCancelModalOpen(false);
+                    setRejectModalOpen(false);
+                  }}
+                  data-testid="close-detail-modal"
                 >
                   Đóng
                 </Button>
