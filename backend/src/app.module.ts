@@ -8,6 +8,7 @@ import { RoutesModule } from './routes/routes.module';
 import { FaresModule } from './fares/fares.module';
 import { TicketingModule } from './ticketing/ticketing.module';
 import { OperationsModule } from './operations/operations.module';
+import { RedisModule } from './redis/redis.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { OperationsModule } from './operations/operations.module';
     FaresModule,
     TicketingModule,
     OperationsModule,
+    RedisModule,
   ],
 })
 export class AppModule {}

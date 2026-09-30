@@ -43,7 +43,23 @@ services:
         condition: service_healthy
 
   # =============================================================================
-  # 3. DỊCH VỤ BACKEND API (NODE.JS / TYPESCRIPT / EXPRESS / CỔNG 5000)
+  # 3. DỊCH VỤ REDIS DÙNG CHO KHÓA GHẾ
+  # =============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: smartbus_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # =============================================================================
+  # 4. DỊCH VỤ BACKEND API (NODE.JS / TYPESCRIPT / EXPRESS / CỔNG 5000)
   # =============================================================================
   backend:
     build:
@@ -60,14 +76,17 @@ services:
       DB_USER: smartbus_user
       DB_PASSWORD: smartbus_pass
       DB_NAME: smartbus_db
+      REDIS_URL: redis://redis:6379
       JWT_SECRET: smartbus_jwt_secret_key_sprint1_2026
       JWT_EXPIRES_IN: 86400
     depends_on:
       mysql:
         condition: service_healthy
+      redis:
+        condition: service_healthy
 
   # =============================================================================
-  # 4. DỊCH VỤ FRONTEND CLIENT (REACT / TYPESCRIPT / VITE / CỔNG 3000)
+  # 5. DỊCH VỤ FRONTEND CLIENT (REACT / TYPESCRIPT / VITE / CỔNG 3000)
   # =============================================================================
   frontend:
     build:
@@ -84,4 +103,6 @@ services:
 
 volumes:
   mysql_data:
+    driver: local
+  redis_data:
     driver: local

@@ -30,7 +30,7 @@
 
 ## 🏗️ 1. Kiến trúc hệ thống & Hạ tầng Docker
 
-Hệ thống được đóng gói hoàn chỉnh bằng **Docker Compose** với 4 container hoạt động độc lập và liên kết qua mạng nội bộ:
+Hệ thống được đóng gói hoàn chỉnh bằng **Docker Compose** với 5 container hoạt động độc lập và liên kết qua mạng nội bộ:
 
 ```
                                   [ Người dùng / Trình duyệt ]
@@ -65,6 +65,7 @@ Hệ thống được đóng gói hoàn chỉnh bằng **Docker Compose** với 
 | **`smartbus_frontend`** | `nginx:alpine` + React 19 / Vite | **`3000`** | Web Client SPA, Nginx Reverse Proxy điều hướng `/api/` về Backend, bắt lỗi bằng React `ErrorBoundary`. |
 | **`smartbus_backend`** | Node.js 20 / TypeScript / Express | **`5000`** | RESTful API, mã hóa mật khẩu `bcrypt`, cấp phát JWT, kết nối MySQL Connection Pool (Zero Mock). |
 | **`smartbus_mysql`** | `mysql:8.0` | **`3308`** | CSDL quan hệ chính thức, bảng mã tiếng Việt `utf8mb4_unicode_ci`, lưu trữ người dùng, tuyến, trạm, vé, sự cố. |
+| **`smartbus_redis`** | `redis:7-alpine` | Nội bộ Docker | Redis dùng chuẩn bị cho cơ chế khóa ghế; bật AOF và lưu dữ liệu vào volume `redis_data`. Backend tự động thử kết nối lại với exponential backoff tối đa 30 giây. |
 | **`smartbus_phpmyadmin`** | `phpmyadmin:latest` | **`8080`** | Giao diện quản trị trực quan cơ sở dữ liệu trên trình duyệt (User: `root` / Pass: `root_pass`). |
 
 ---
@@ -146,6 +147,8 @@ docker compose up -d --build
 
 *(Lưu ý: Cổng MySQL trên máy Host được cấu hình là `3308` để tránh xung đột với các dịch vụ MySQL cài sẵn trên Windows).*
 
+Redis chỉ được expose trong mạng nội bộ Docker; backend kết nối qua `REDIS_URL=redis://redis:6379`. Khi chạy backend ngoài Docker, cấu hình `REDIS_URL=redis://localhost:6379` trong `backend/.env`. API health check trả thêm trường `redis` (`CONNECTED` hoặc `RECONNECTING`); Redis client tự thử lại khi mất kết nối.
+
 ---
 
 ## 📂 5. Cấu trúc thư mục mã nguồn
@@ -156,6 +159,9 @@ Project_Smart_Bus_Ticketing_System_ictu/
 │   ├── src/
 │   │   ├── config/
 │   │   │   └── database.ts            # MySQL Connection Pool (charset utf8mb4)
+│   │   ├── redis/
+│   │   │   ├── redis.module.ts        # Redis module dùng chung
+│   │   │   └── redis.service.ts       # Redis client và tự động reconnect
 │   │   ├── controllers/
 │   │   │   ├── auth.controller.ts     # Xử lý Đăng nhập / Đăng ký RBAC
 │   │   │   ├── routes.controller.ts   # CRUD Tuyến xe

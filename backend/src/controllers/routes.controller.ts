@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { query } from '../config/database';
 
@@ -79,10 +80,7 @@ export const createRoute = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    const existing = await query<any[]>(
-      'SELECT id FROM routes WHERE code = ? LIMIT 1',
-      [code.trim().toUpperCase()]
-    );
+    const existing = await query<any[]>('SELECT id FROM routes WHERE code = ? LIMIT 1', [code.trim().toUpperCase()]);
 
     if (existing.length > 0) {
       res.status(409).json({
@@ -93,7 +91,7 @@ export const createRoute = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    const routeId = require('crypto').randomUUID();
+    const routeId = randomUUID();
     await query(
       `INSERT INTO routes (id, code, name, description, distance_km, status)
        VALUES (?, ?, ?, ?, ?, ?)`,
@@ -140,10 +138,7 @@ export const updateRoute = async (req: Request, res: Response): Promise<void> =>
     const { id } = req.params;
     const { code, name, description, distance_km, base_price, status } = req.body;
 
-    const existing = await query<any[]>(
-      'SELECT id FROM routes WHERE id = ? LIMIT 1',
-      [id]
-    );
+    const existing = await query<any[]>('SELECT id FROM routes WHERE id = ? LIMIT 1', [id]);
 
     if (existing.length === 0) {
       res.status(404).json({
@@ -193,10 +188,7 @@ export const deleteRoute = async (req: Request, res: Response): Promise<void> =>
   try {
     const { id } = req.params;
 
-    const existing = await query<any[]>(
-      'SELECT id FROM routes WHERE id = ? LIMIT 1',
-      [id]
-    );
+    const existing = await query<any[]>('SELECT id FROM routes WHERE id = ? LIMIT 1', [id]);
 
     if (existing.length === 0) {
       res.status(404).json({
