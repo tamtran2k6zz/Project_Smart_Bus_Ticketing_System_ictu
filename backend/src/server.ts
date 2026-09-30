@@ -9,18 +9,24 @@ import operationsRoutes from './routes/operations.routes';
 import ticketingRoutes from './routes/ticketing.routes';
 import usersRoutes from './routes/users.routes';
 import pool, { query } from './config/database';
+import { RedisService } from './redis/redis.service';
 
 dotenv.config();
+
+const redisService = new RedisService();
+redisService.start();
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 5000;
 
 // Middleware cơ bản
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+app.use(
+  cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -39,6 +45,7 @@ app.get('/api/health', async (_req: Request, res: Response) => {
     res.status(200).json({
       status: 'UP',
       database: 'CONNECTED_MYSQL_8_0',
+      redis: redisService.isReady ? 'CONNECTED' : 'RECONNECTING',
       timestamp: new Date().toISOString(),
       dbTime: result[0]?.db_time,
       service: 'Smart Bus Ticketing Backend API',
@@ -47,6 +54,7 @@ app.get('/api/health', async (_req: Request, res: Response) => {
     res.status(503).json({
       status: 'DOWN',
       database: 'DISCONNECTED',
+      redis: redisService.isReady ? 'CONNECTED' : 'RECONNECTING',
       error: err.message,
     });
   }
@@ -104,16 +112,24 @@ const server = app.listen(PORT, '0.0.0.0', async () => {
     console.log('✅ Kết nối trực tiếp cơ sở dữ liệu MySQL thành công!');
     connection.release();
   } catch (err: any) {
-    console.warn('⚠️ Cảnh báo: Chưa kết nối được MySQL ngay lập tức. Đang chờ MySQL khởi động...', err.message);
+    console.warn(
+      '⚠️ Cảnh báo: Chưa kết nối được MySQL ngay lập tức. Đang chờ MySQL khởi động...',
+      err.message
+    );
   }
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM signal received: closing HTTP server');
-  server.close(() => {
-    pool.end();
-    console.log('HTTP server closed and MySQL connection pool drained');
+  server.close(async () => {
+    try {
+      await Promise.all([pool.end(), redisService.onModuleDestroy()]);
+      console.log('HTTP server closed and MySQL/Redis connections drained');
+    } catch (error) {
+      console.error('Error while closing backend connections:', error);
+      process.exitCode = 1;
+    }
   });
 });
 
