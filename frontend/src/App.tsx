@@ -3,7 +3,7 @@ import RouteManagementPage from './pages/admin/RouteManagementPage';
 import SeatSelectionDemoPage from './pages/booking/SeatSelectionDemoPage';
 
 function App() {
-  const isSeatMapDemo = window.location.hash === '#seat-map';
+  const isSeatMapDemo = window.location.hash.startsWith('#seat-map');
 
   if (isSeatMapDemo) {
     return <SeatSelectionDemoPage />;
