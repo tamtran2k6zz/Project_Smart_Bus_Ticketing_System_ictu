@@ -24,7 +24,7 @@ app.use(
   cors({
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'ngrok-skip-browser-warning', 'x-requested-with'],
   })
 );
 
@@ -36,6 +36,178 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
   const timestamp = new Date().toISOString();
   console.log(`[${timestamp}] ${req.method} ${req.originalUrl}`);
   next();
+});
+
+// Root Endpoint: Trang chủ điều hướng thông minh & Kết nối giữa Frontend và Backend
+app.get('/', (req: Request, res: Response) => {
+  if (req.accepts('html')) {
+    const host = req.hostname || 'localhost';
+    const frontendUrl = `http://${host}:3000`;
+    return res.status(200).send(`<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmartBus — Backend API & System Hub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Be Vietnam Pro', -apple-system, sans-serif;
+      background: linear-gradient(135deg, #0a0f1d 0%, #0d1527 100%);
+      color: #f1f5f9;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .hub-card {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+      border-radius: 24px;
+      padding: 44px 36px;
+      max-width: 580px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.7);
+    }
+    .hub-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 16px;
+      background: rgba(34, 197, 94, 0.12);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      border-radius: 9999px;
+      color: #4ade80;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 24px;
+    }
+    .hub-badge .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 12px #22c55e;
+    }
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.5px;
+    }
+    p {
+      color: #94a3b8;
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 30px;
+    }
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .btn-primary {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 16px 24px;
+      background: linear-gradient(135deg, #0284c7 0%, #4f46e5 100%);
+      color: #ffffff;
+      text-decoration: none;
+      font-weight: 600;
+      border-radius: 14px;
+      font-size: 15px;
+      transition: all 0.25s ease;
+      box-shadow: 0 10px 25px -5px rgba(2, 132, 199, 0.5);
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 15px 30px -5px rgba(2, 132, 199, 0.7);
+    }
+    .btn-secondary {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 20px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #cbd5e1;
+      text-decoration: none;
+      font-weight: 500;
+      border-radius: 12px;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+    .endpoints-box {
+      margin-top: 28px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 12px;
+      color: #64748b;
+    }
+  </style>
+</head>
+<body>
+  <div class="hub-card">
+    <div class="hub-badge"><span class="dot"></span> Backend & MySQL 8.0 Sẵn Sàng</div>
+    <h1>SmartBus ICTU System Hub</h1>
+    <p>Bạn đang truy cập vào cổng <strong>5000</strong> (Server Backend API). Server đang chạy tốt và đã kết nối cơ sở dữ liệu MySQL 8.0 thành công!</p>
+    
+    <div class="btn-group">
+      <a href="${frontendUrl}" class="btn-primary">
+        🌐 Mở Giao Diện Web Đặt Vé (Cổng 3000) ➔
+      </a>
+      <a href="http://${host}:8080" target="_blank" class="btn-secondary">
+        🗄️ Quản lý Database phpMyAdmin (Cổng 8080)
+      </a>
+      <a href="/api/health" class="btn-secondary">
+        ⚡ Kiểm tra trạng thái máy chủ (/api/health)
+      </a>
+      <a href="/api/stops" class="btn-secondary">
+        🚌 API Dữ liệu trạm xe buýt (/api/stops)
+      </a>
+    </div>
+
+    <div class="endpoints-box">
+      Hệ Thống Bán Vé & Điều Hành Xe Buýt Thông Minh — Team 5 (TTCS2026)
+    </div>
+  </div>
+</body>
+</html>`);
+  }
+
+  res.status(200).json({
+    status: 'UP',
+    service: 'Smart Bus Ticketing System Backend API',
+    database: 'CONNECTED_MYSQL_8_0',
+    frontendUrl: 'http://localhost:3000',
+    endpoints: {
+      health: '/api/health',
+      stops: '/api/stops',
+      routes: '/api/routes',
+      trips: '/api/trips',
+      operations: '/api/operations',
+      ticketing: '/api/ticketing',
+      users: '/api/users',
+    },
+  });
 });
 
 // Health check endpoint kết nối trực tiếp MySQL
