@@ -797,3 +797,13 @@ button {
     font-size: 11px;
   }
 }
+.seat-occupied {
+  border-color: #cbd5e1;
+  background: #e2e8f0;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.seat-occupied .seat-status-dot {
+  background: #64748b;
+}
