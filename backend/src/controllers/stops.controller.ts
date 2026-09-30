@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { query } from '../config/database';
 
@@ -51,10 +52,7 @@ export const createStop = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    const existing = await query<any[]>(
-      'SELECT id FROM bus_stops WHERE code = ? LIMIT 1',
-      [code.trim().toUpperCase()]
-    );
+    const existing = await query<any[]>('SELECT id FROM bus_stops WHERE code = ? LIMIT 1', [code.trim().toUpperCase()]);
 
     if (existing.length > 0) {
       res.status(409).json({
@@ -65,7 +63,7 @@ export const createStop = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    const stopId = require('crypto').randomUUID();
+    const stopId = randomUUID();
     const isActive = status === 'INACTIVE' ? 0 : 1;
 
     await query(
@@ -112,10 +110,7 @@ export const updateStop = async (req: Request, res: Response): Promise<void> => 
     const { id } = req.params;
     const { code, name, address, latitude, longitude, status } = req.body;
 
-    const existing = await query<any[]>(
-      'SELECT id FROM bus_stops WHERE id = ? LIMIT 1',
-      [id]
-    );
+    const existing = await query<any[]>('SELECT id FROM bus_stops WHERE id = ? LIMIT 1', [id]);
 
     if (existing.length === 0) {
       res.status(404).json({
@@ -168,10 +163,7 @@ export const deleteStop = async (req: Request, res: Response): Promise<void> => 
   try {
     const { id } = req.params;
 
-    const existing = await query<any[]>(
-      'SELECT id FROM bus_stops WHERE id = ? LIMIT 1',
-      [id]
-    );
+    const existing = await query<any[]>('SELECT id FROM bus_stops WHERE id = ? LIMIT 1', [id]);
 
     if (existing.length === 0) {
       res.status(404).json({
@@ -183,10 +175,7 @@ export const deleteStop = async (req: Request, res: Response): Promise<void> => 
     }
 
     // Kiểm tra xem trạm có đang được gán vào tuyến nào không
-    const routeStopCheck = await query<any[]>(
-      'SELECT route_id FROM route_stops WHERE stop_id = ? LIMIT 1',
-      [id]
-    );
+    const routeStopCheck = await query<any[]>('SELECT route_id FROM route_stops WHERE stop_id = ? LIMIT 1', [id]);
 
     if (routeStopCheck.length > 0) {
       res.status(400).json({
