@@ -1,4 +1,4 @@
-import { PrismaClient, UserRole, DiscountType, DiscountStatus, UserStatus, RouteStatus, FareType, TicketType, TripStatus, BookingStatus, TicketStatus, PaymentMethod, PaymentStatus, MonthlyPassType, PassStatus, VoucherStatus, IncidentType, IncidentSeverity, FeedbackStatus, NotificationType } from '@prisma/client';
+import { PrismaClient, UserRole, DiscountType, DiscountStatus, UserStatus, RouteStatus, FareType, TicketType, TripStatus, BookingStatus, TicketStatus, PaymentMethod, PaymentStatus, MonthlyPassType, PassStatus, VoucherStatus, IncidentType, IncidentSeverity, FeedbackStatus, NotificationType,TripSeatStatus, } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -16,6 +16,7 @@ async function main() {
   await prisma.booking.deleteMany();
   await prisma.monthlyPass.deleteMany();
   await prisma.voucher.deleteMany();
+  await prisma.tripSeat.deleteMany();
   await prisma.trip.deleteMany();
   await prisma.seat.deleteMany();
   await prisma.bus.deleteMany();
@@ -371,6 +372,43 @@ async function main() {
       dispatchNotes: 'Chuyến xe kết nối giảng đường ICTU và trung tâm Thái Nguyên',
     },
   });
+    // Create TripSeat for all scheduled trips
+  const trips = await prisma.trip.findMany({
+    select: {
+      id: true,
+      busId: true,
+    },
+  });
+
+  const seats = await prisma.seat.findMany({
+    select: {
+      id: true,
+      busId: true,
+    },
+  });
+
+  const tripSeatData = [];
+
+  for (const trip of trips) {
+    const busSeats = seats.filter((seat) => seat.busId === trip.busId);
+
+    for (const seat of busSeats) {
+      tripSeatData.push({
+        tripId: trip.id,
+        seatId: seat.id,
+        status: TripSeatStatus.AVAILABLE,
+      });
+    }
+  }
+
+  if (tripSeatData.length > 0) {
+    await prisma.tripSeat.createMany({
+      data: tripSeatData,
+      skipDuplicates: true,
+    });
+  }
+
+  console.log(`Created ${tripSeatData.length} trip seats.`);
 
   console.log('✅ Created 4 active trips for today.');
 

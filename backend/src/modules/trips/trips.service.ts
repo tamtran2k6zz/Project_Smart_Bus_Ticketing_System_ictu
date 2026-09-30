@@ -20,7 +20,6 @@ export class TripsService {
     if (origin_stop_id === destination_stop_id) {
       throw new BadRequestException('destination_stop_id must not be identical to origin_stop_id');
     }
-
     // 2. Verify existence of both bus stops
     const [originStop, destinationStop] = await Promise.all([
       this.prisma.busStop.findUnique({
@@ -196,6 +195,34 @@ export class TripsService {
         total_pages: totalPages,
       },
     };
+  }
+
+  /** Get all seats and their status for a specific trip. */
+  async getSeatsByTrip(tripId: string) {
+    const trip = await this.prisma.trip.findUnique({
+      where: { id: tripId },
+    });
+
+    if (!trip) {
+      throw new NotFoundException(`Trip not found with ID: ${tripId}`);
+    }
+
+    const tripSeats = await this.prisma.tripSeat.findMany({
+      where: { tripId },
+      include: { seat: true },
+      orderBy: {
+        seat: { seatNumber: 'asc' },
+      },
+    });
+
+    return tripSeats.map((tripSeat) => ({
+      id: tripSeat.seat.id,
+      seat_number: tripSeat.seat.seatNumber,
+      row_position: tripSeat.seat.rowPosition,
+      deck: tripSeat.seat.deck,
+      is_priority: tripSeat.seat.isPriority,
+      status: tripSeat.status,
+    }));
   }
 
   /**

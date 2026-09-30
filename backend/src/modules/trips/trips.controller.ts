@@ -3,6 +3,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Param,
   Query,
   UsePipes,
   ValidationPipe,
@@ -15,10 +16,6 @@ import { TripsService } from './trips.service';
 export class TripsController {
   constructor(private readonly tripsService: TripsService) {}
 
-  /**
-   * GET /api/v1/trips/search
-   * Search available trips by origin, destination, date, and optional departure time.
-   */
   @Get('search')
   @HttpCode(HttpStatus.OK)
   @UsePipes(
@@ -26,9 +23,17 @@ export class TripsController {
       transform: true,
       whitelist: true,
       forbidNonWhitelisted: true,
-    })
+    }),
   )
-  async searchTrips(@Query() query: SearchTripsDto): Promise<SearchTripsResponseDto> {
+  async searchTrips(
+    @Query() query: SearchTripsDto,
+  ): Promise<SearchTripsResponseDto> {
     return this.tripsService.searchTrips(query);
+  }
+
+  @Get(':tripId/seats')
+  @HttpCode(HttpStatus.OK)
+  async getSeats(@Param('tripId') tripId: string) {
+    return this.tripsService.getSeatsByTrip(tripId);
   }
 }
