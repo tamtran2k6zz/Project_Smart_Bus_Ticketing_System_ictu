@@ -273,7 +273,7 @@ describe('PaymentService', () => {
       vnpayService.verifyChecksum.mockReturnValue(true);
       prisma.payment.findUnique.mockResolvedValue({
         ...mockPayment,
-        status: PaymentStatusEnum.SUCCESS, // Already confirmed previously!
+        status: PaymentStatus.SUCCESS, // Already confirmed previously!
       });
 
       const result = await service.handleVNPayIpn(validVNPayQuery);
