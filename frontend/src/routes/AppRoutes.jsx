@@ -17,6 +17,7 @@ import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage';
 import DashboardPage from '../pages/dashboard/DashboardPage';
 import AdminDashboardPage from '../pages/admin/AdminDashboardPage';
 import AdminBookingsPage from '../pages/admin/AdminBookingsPage';
+import AdminRevenueReconciliationPage from '../pages/admin/AdminRevenueReconciliationPage';
 import TicketsPage from '../pages/tickets/TicketsPage';
 import ProfilePage from '../pages/profile/ProfilePage';
 import ForbiddenPage from '../pages/error/ForbiddenPage';
@@ -71,6 +72,8 @@ export const AppRoutes = () => {
             <Route path="/admin" element={<AdminDashboardPage />} />
             <Route path="/admin/bookings" element={<AdminBookingsPage />} />
             <Route path="/admin/transactions" element={<AdminBookingsPage />} />
+            <Route path="/admin/reconciliation" element={<AdminRevenueReconciliationPage />} />
+            <Route path="/admin/revenue" element={<AdminRevenueReconciliationPage />} />
           </Route>
         </Route>
       </Route>

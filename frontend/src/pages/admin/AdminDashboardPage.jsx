@@ -14,10 +14,11 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import Button from '../../components/common/Button';
 import AdminBookingsPage from './AdminBookingsPage';
+import AdminRevenueReconciliationPage from './AdminRevenueReconciliationPage';
 
 export const AdminDashboardPage = () => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('bookings'); // 'bookings' | 'overview'
+  const [activeTab, setActiveTab] = useState('bookings'); // 'bookings' | 'reconciliation' | 'overview'
 
   return (
     <div className="space-y-6">
@@ -42,6 +43,23 @@ export const AdminDashboardPage = () => {
 
         <button
           type="button"
+          onClick={() => setActiveTab('reconciliation')}
+          className={`flex items-center gap-2 py-3 px-4 font-semibold text-sm border-b-2 transition-colors whitespace-nowrap ${
+            activeTab === 'reconciliation'
+              ? 'border-emerald-600 text-emerald-600 bg-emerald-50/50 rounded-t-lg'
+              : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
+          }`}
+          data-testid="tab-reconciliation"
+        >
+          <TrendingUp className="w-4 h-4 text-emerald-600" />
+          <span>Đối soát Doanh thu (STT 25)</span>
+          <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-700">
+            DoD Ready
+          </span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveTab('overview')}
           className={`flex items-center gap-2 py-3 px-4 font-semibold text-sm border-b-2 transition-colors whitespace-nowrap ${
             activeTab === 'overview'
@@ -57,6 +75,9 @@ export const AdminDashboardPage = () => {
 
       {/* Tab 1: Bookings & Transactions Management (US 06) */}
       {activeTab === 'bookings' && <AdminBookingsPage />}
+
+      {/* Tab 2: Revenue Reconciliation Management (US 06 STT 25) */}
+      {activeTab === 'reconciliation' && <AdminRevenueReconciliationPage />}
 
       {/* Tab 2: General Operational Overview */}
       {activeTab === 'overview' && (
