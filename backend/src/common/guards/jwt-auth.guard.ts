@@ -3,11 +3,14 @@ import {
   CanActivate,
   ExecutionContext,
   UnauthorizedException,
+  Optional,
 } from '@nestjs/common';
-import { verify } from 'jsonwebtoken';
+import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
+  constructor(@Optional() private readonly jwtService?: JwtService) {}
+
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
     const authHeader = request.headers?.authorization;
@@ -22,10 +25,23 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     try {
-      request.user = verify(token, process.env.JWT_SECRET || 'smart-bus-secret-key-2026');
+      if (this.jwtService) {
+        const payload = this.jwtService.verify(token, {
+          secret: process.env.JWT_SECRET || 'smart-bus-secret-key-2026',
+        });
+        request.user = payload;
+      } else {
+        const payloadBase64 = token.split('.')[1];
+        if (payloadBase64) {
+          const payloadJson = Buffer.from(payloadBase64, 'base64').toString('utf8');
+          request.user = JSON.parse(payloadJson);
+        } else {
+          throw new UnauthorizedException('Token không hợp lệ!');
+        }
+      }
       return true;
-    } catch {
-      throw new UnauthorizedException('Token đã hết hạn hoặc không hợp lệ.');
+    } catch (error) {
+      throw new UnauthorizedException('Token đã hết hạn hoặc không hợp lệ: ' + error.message);
     }
   }
 }

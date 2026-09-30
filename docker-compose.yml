@@ -1,0 +1,87 @@
+services:
+  # =============================================================================
+  # 1. DỊCH VỤ CƠ SỞ DỮ LIỆU MYSQL 8.0
+  # =============================================================================
+  mysql:
+    image: mysql:8.0
+    container_name: smartbus_mysql
+    restart: unless-stopped
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_DATABASE: smartbus_db
+      MYSQL_USER: smartbus_user
+      MYSQL_PASSWORD: smartbus_pass
+      MYSQL_ROOT_PASSWORD: root_pass
+    ports:
+      - "${MYSQL_PORT:-3308}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_pass"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # =============================================================================
+  # 2. DỊCH VỤ QUẢN TRỊ TRỰC QUAN PHPMYADMIN (CỔNG 8080)
+  # =============================================================================
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: smartbus_phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_USER: root
+      PMA_PASSWORD: root_pass
+      UPLOAD_LIMIT: 64M
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # =============================================================================
+  # 3. DỊCH VỤ BACKEND API (NODE.JS / TYPESCRIPT / EXPRESS / CỔNG 5000)
+  # =============================================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: smartbus_backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      PORT: 5000
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: smartbus_user
+      DB_PASSWORD: smartbus_pass
+      DB_NAME: smartbus_db
+      JWT_SECRET: smartbus_jwt_secret_key_sprint1_2026
+      JWT_EXPIRES_IN: 86400
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # =============================================================================
+  # 4. DỊCH VỤ FRONTEND CLIENT (REACT / TYPESCRIPT / VITE / CỔNG 3000)
+  # =============================================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: smartbus_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      VITE_API_URL: http://localhost:5000
+    depends_on:
+      - backend
+
+volumes:
+  mysql_data:
+    driver: local

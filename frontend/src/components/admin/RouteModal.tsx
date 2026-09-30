@@ -36,7 +36,7 @@ function RouteModal({ open, mode, route, onClose, onSave }: RouteModalProps) {
       setCode(route.code);
       setName(route.name);
       setStatus(route.status);
-      setStations([...route.stations]);
+      setStations(Array.isArray(route.stations) ? [...route.stations] : []);
       return;
     }
 
@@ -98,7 +98,7 @@ function RouteModal({ open, mode, route, onClose, onSave }: RouteModalProps) {
       code: code.trim(),
       name: name.trim(),
       status,
-      stations: stations.map((station, index) => ({
+      stations: (Array.isArray(stations) ? stations : []).map((station, index) => ({
         ...station,
         order: index + 1,
       })),

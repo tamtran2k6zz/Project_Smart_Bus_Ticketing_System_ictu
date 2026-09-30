@@ -111,8 +111,9 @@ function StationList({
       return;
     }
 
+    const safeStations = Array.isArray(stations) ? stations : [];
     const reorderedStations = arrayMove(
-      stations,
+      safeStations,
       oldIndex,
       newIndex,
     ).map((station, index) => ({
@@ -124,7 +125,8 @@ function StationList({
   };
 
   const handleRemove = (stationId: string) => {
-    const updatedStations = stations
+    const safeStations = Array.isArray(stations) ? stations : [];
+    const updatedStations = safeStations
       .filter((station) => station.id !== stationId)
       .map((station, index) => ({
         ...station,
@@ -141,11 +143,11 @@ function StationList({
       onDragEnd={handleDragEnd}
     >
       <SortableContext
-        items={stations.map((station) => station.id)}
+        items={(Array.isArray(stations) ? stations : []).map((station) => station.id)}
         strategy={verticalListSortingStrategy}
       >
         <div className="station-list">
-          {stations.map((station) => (
+          {(Array.isArray(stations) ? stations : []).map((station) => (
             <SortableStation
               key={station.id}
               station={station}

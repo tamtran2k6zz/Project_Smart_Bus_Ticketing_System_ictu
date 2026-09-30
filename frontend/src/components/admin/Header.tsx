@@ -1,15 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
-interface HeaderProps {
-  title?: string;
-  subtitle?: string;
-}
-
-function Header({
-  title = 'Quản trị tuyến & trạm',
-  subtitle = 'Quản lý các tuyến xe và thứ tự trạm dừng',
-}: HeaderProps) {
+function Header() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -22,18 +14,42 @@ function Header({
   const displayRole = user?.roles?.includes('ADMIN')
     ? 'Quản trị viên'
     : user?.roles?.includes('MANAGER')
-      ? 'Quản lý vận hành'
-      : 'Nhân viên';
+    ? 'Quản lý vận hành'
+    : 'Nhân viên';
   const initial = displayName.charAt(0).toUpperCase();
 
   return (
     <header className="header">
       <div>
-        <h1>{title}</h1>
-        <p>{subtitle}</p>
+        <h1>Quản trị tuyến & trạm</h1>
+        <p>Hệ thống bán vé & điều hành xe buýt thông minh SmartBus</p>
       </div>
 
-      <div className="admin-profile" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div className="admin-profile" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+        <a
+          href="/landing.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Xem trang giới thiệu Cinematic Liquid-Glass"
+          style={{
+            padding: '6px 14px',
+            fontSize: '12px',
+            borderRadius: '9999px',
+            border: '1px solid rgba(56, 189, 248, 0.3)',
+            background: 'rgba(56, 189, 248, 0.08)',
+            color: '#38bdf8',
+            textDecoration: 'none',
+            fontWeight: 500,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            backdropFilter: 'blur(8px)',
+            transition: 'all 0.2s',
+          }}
+        >
+          🌌 Landing Page ↗
+        </a>
+
         <div className="avatar">{initial}</div>
         <div>
           <strong>{displayName}</strong>
@@ -44,16 +60,17 @@ function Header({
           onClick={handleLogout}
           title="Đăng xuất khỏi hệ thống"
           style={{
-            marginLeft: '10px',
-            padding: '6px 12px',
+            marginLeft: '6px',
+            padding: '7px 16px',
             fontSize: '12px',
-            borderRadius: '6px',
-            border: '1px solid #fee2e2',
-            background: '#fff1f2',
+            borderRadius: '9999px',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+            background: 'rgba(239, 68, 68, 0.1)',
             cursor: 'pointer',
-            color: '#e11d48',
-            fontWeight: 600,
-            transition: 'background 0.2s ease',
+            color: '#fca5a5',
+            fontWeight: 500,
+            transition: 'all 0.2s ease',
+            backdropFilter: 'blur(8px)',
           }}
         >
           Đăng xuất

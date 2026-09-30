@@ -1,337 +1,140 @@
 import React, { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import type { RoleCode } from '../../types/auth';
 import './LoginPage.css';
-
-type AuthMode = 'login' | 'register';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const {
-    login,
-    register,
-    resendSignupConfirmation,
-    resetPassword,
-    isLoading,
-    error,
-    emailConfirmationRequired,
-    clearError,
-  } = useAuth();
+  const { login, isLoading, error, clearError } = useAuth();
 
-  const [mode, setMode] = useState<AuthMode>('login');
-  const [identifier, setIdentifier] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
+  const [identifier, setIdentifier] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [rememberMe, setRememberMe] = useState<boolean>(true);
   const [formError, setFormError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const locationState = location.state as { from?: { pathname?: string } } | null;
   const from = locationState?.from?.pathname;
 
-  const clearMessages = () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     clearError();
     setFormError(null);
-    setNotice(null);
-  };
 
-  const navigateForUser = (roles: RoleCode[]) => {
-    const isAdmin = roles.includes('ADMIN') || roles.includes('MANAGER');
-    const isPassenger = roles.includes('PASSENGER');
-    const canAccessRequestedPath =
-      from &&
-      ((isAdmin && from.startsWith('/admin')) ||
-        (isPassenger && from.startsWith('/passenger')));
-
-    if (canAccessRequestedPath) {
-      navigate(from, { replace: true });
-    } else if (isAdmin) {
-      navigate('/admin/routes', { replace: true });
-    } else if (isPassenger) {
-      navigate('/passenger/booking', { replace: true });
-    } else {
-      navigate('/unauthorized', { replace: true });
-    }
-  };
-
-  const handleLogin = async (event: React.FormEvent) => {
-    event.preventDefault();
-    clearMessages();
-
-    const trimmedIdentifier = identifier.trim();
-    if (!trimmedIdentifier) {
-      setFormError('Vui lòng nhập email hoặc số điện thoại.');
+    if (!identifier.trim()) {
+      setFormError('Vui lòng nhập Email hoặc Số điện thoại.');
       return;
     }
+
     if (!password) {
       setFormError('Vui lòng nhập mật khẩu.');
       return;
     }
 
     try {
-      const user = await login({
-        identifier: trimmedIdentifier,
-        password,
-        rememberMe,
-      });
-      navigateForUser(user.roles);
-    } catch {
-      // AuthContext exposes the authentication error.
-    }
-  };
+      await login({ identifier: identifier.trim(), password, rememberMe });
 
-  const handleRegister = async (event: React.FormEvent) => {
-    event.preventDefault();
-    clearMessages();
-
-    if (fullName.trim().length < 2) {
-      setFormError('Họ và tên phải có ít nhất 2 ký tự.');
-      return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier.trim())) {
-      setFormError('Vui lòng nhập địa chỉ email hợp lệ.');
-      return;
-    }
-    if (phone.trim() && !/^\+?[0-9\s-]{8,15}$/.test(phone.trim())) {
-      setFormError('Số điện thoại không hợp lệ.');
-      return;
-    }
-    if (password.length < 8) {
-      setFormError('Mật khẩu phải có ít nhất 8 ký tự.');
-      return;
-    }
-    if (password !== confirmPassword) {
-      setFormError('Mật khẩu xác nhận không khớp.');
-      return;
-    }
-
-    try {
-      const user = await register({
-        fullName: fullName.trim(),
-        email: identifier.trim(),
-        phone: phone.trim(),
-        password,
-      });
-      if (user) {
-        navigateForUser(user.roles);
+      if (from) {
+        navigate(from, { replace: true });
         return;
       }
 
-      setMode('login');
-      setPassword('');
-      setConfirmPassword('');
-      setNotice('Đăng ký thành công. Vui lòng kiểm tra email để xác minh tài khoản.');
+      // Điều hướng theo vai trò người dùng
+      const storedUser = localStorage.getItem('smartbus_user');
+      if (storedUser) {
+        const parsed = JSON.parse(storedUser);
+        const roles = parsed.roles || [];
+        if (roles.includes('ADMIN') || roles.includes('MANAGER')) {
+          navigate('/admin/routes', { replace: true });
+        } else if (roles.includes('DRIVER')) {
+          navigate('/driver/portal', { replace: true });
+        } else {
+          navigate('/passenger/booking', { replace: true });
+        }
+      } else {
+        navigate('/admin/routes', { replace: true });
+      }
     } catch {
-      // AuthContext exposes the registration error.
-    }
-  };
-
-  const handleResetPassword = async () => {
-    clearMessages();
-    if (!identifier.includes('@')) {
-      setFormError('Nhập email đã đăng ký để nhận liên kết đặt lại mật khẩu.');
-      return;
-    }
-
-    try {
-      await resetPassword(identifier.trim());
-      setNotice('Đã gửi liên kết đặt lại mật khẩu. Vui lòng kiểm tra email.');
-    } catch {
-      // AuthContext exposes the reset error.
-    }
-  };
-
-  const handleResendConfirmation = async () => {
-    clearMessages();
-    const email = identifier.trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setFormError('Vui lòng nhập email đã đăng ký để gửi lại email xác minh.');
-      return;
-    }
-
-    try {
-      await resendSignupConfirmation(email);
-      setNotice('Đã gửi lại email xác minh. Vui lòng kiểm tra hộp thư đến và thư rác.');
-    } catch {
-      // AuthContext exposes the resend error.
+      // Error handled in AuthContext
     }
   };
 
   const setDemoAccount = (role: 'PASSENGER' | 'DRIVER' | 'MANAGER' | 'ADMIN') => {
-    clearMessages();
+    clearError();
+    setFormError(null);
     switch (role) {
       case 'ADMIN':
         setIdentifier('admin@smartbus.ictu.vn');
-        setPassword('Admin@2026');
+        setPassword('Admin@12345');
         break;
       case 'MANAGER':
         setIdentifier('manager@smartbus.ictu.vn');
-        setPassword('Manager@2026');
+        setPassword('Manager@123');
         break;
       case 'DRIVER':
         setIdentifier('0987654321');
-        setPassword('Driver@2026');
+        setPassword('Driver@123');
         break;
       case 'PASSENGER':
-        setIdentifier('0912345678');
-        setPassword('Passenger@2026');
+        setIdentifier('khachhang@gmail.com');
+        setPassword('User@123');
         break;
     }
-  };
-
-  const switchMode = (nextMode: AuthMode) => {
-    clearMessages();
-    setMode(nextMode);
   };
 
   return (
     <div className="login-card">
       <div className="login-header">
-        <h2 className="login-title">
-          {mode === 'login' ? 'Chào mừng trở lại! 👋' : 'Tạo tài khoản SmartBus'}
-        </h2>
+        <h2 className="login-title">Chào mừng trở lại! 👋</h2>
         <p className="login-subtitle">
-          {mode === 'login'
-            ? 'Đăng nhập để tiếp tục sử dụng SmartBus ICTU'
-            : 'Đăng ký tài khoản hành khách để bắt đầu hành trình'}
+          Đăng nhập vào hệ thống điều hành xe buýt thông minh SmartBus ICTU
         </p>
       </div>
 
-      <div className="auth-mode-switch" role="tablist" aria-label="Chọn thao tác tài khoản">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === 'login'}
-          className={mode === 'login' ? 'auth-mode-tab active' : 'auth-mode-tab'}
-          onClick={() => switchMode('login')}
-          disabled={isLoading}
-        >
-          Đăng nhập
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === 'register'}
-          className={mode === 'register' ? 'auth-mode-tab active' : 'auth-mode-tab'}
-          onClick={() => switchMode('register')}
-          disabled={isLoading}
-        >
-          Đăng ký
-        </button>
+      <div className="demo-role-box">
+        <div className="demo-role-label">⚡ Chọn tài khoản mẫu (Sprint 1 Review):</div>
+        <div className="demo-role-buttons">
+          <button type="button" className="demo-btn" onClick={() => setDemoAccount('ADMIN')}>
+            Admin
+          </button>
+          <button type="button" className="demo-btn" onClick={() => setDemoAccount('MANAGER')}>
+            Quản lý
+          </button>
+          <button type="button" className="demo-btn" onClick={() => setDemoAccount('DRIVER')}>
+            Tài xế
+          </button>
+          <button type="button" className="demo-btn" onClick={() => setDemoAccount('PASSENGER')}>
+            Hành khách
+          </button>
+        </div>
       </div>
 
-      {mode === 'login' && (
-        <div className="demo-role-box">
-          <div className="demo-role-label">Tài khoản demo</div>
-          <div className="demo-role-buttons">
-            <button type="button" className="demo-btn" onClick={() => setDemoAccount('ADMIN')}>
-              Admin
-            </button>
-            <button type="button" className="demo-btn" onClick={() => setDemoAccount('MANAGER')}>
-              Quản lý
-            </button>
-            <button type="button" className="demo-btn" onClick={() => setDemoAccount('DRIVER')}>
-              Tài xế
-            </button>
-            <button type="button" className="demo-btn" onClick={() => setDemoAccount('PASSENGER')}>
-              Hành khách
-            </button>
-          </div>
-        </div>
-      )}
-
       {(formError || error) && (
-        <div className="login-error-alert" role="alert">
-          {formError || error}
-        </div>
-      )}
-      {emailConfirmationRequired && mode === 'login' && (
-        <button
-          type="button"
-          className="resend-confirmation-link"
-          onClick={handleResendConfirmation}
-          disabled={isLoading}
-        >
-          {isLoading ? 'Đang gửi...' : 'Gửi lại email xác minh'}
-        </button>
-      )}
-      {notice && (
-        <div className="login-success-alert" role="status">
-          {notice}
+        <div className="login-error-alert">
+          ⚠️ {formError || error}
         </div>
       )}
 
-      <form onSubmit={mode === 'login' ? handleLogin : handleRegister} noValidate>
-        {mode === 'register' && (
-          <div className="form-group">
-            <label className="form-label" htmlFor="full-name">
-              Họ và tên
-            </label>
-            <input
-              id="full-name"
-              type="text"
-              className="form-input"
-              placeholder="Nguyễn Văn A"
-              autoComplete="name"
-              value={fullName}
-              onChange={event => {
-                setFullName(event.target.value);
-                clearMessages();
-              }}
-              disabled={isLoading}
-              required
-            />
-          </div>
-        )}
-
+      <form onSubmit={handleSubmit} noValidate>
         <div className="form-group">
           <label className="form-label" htmlFor="identifier">
-            {mode === 'register' ? 'Email' : 'Email hoặc tài khoản demo'}
+            Email hoặc Số điện thoại
           </label>
-          <input
-            id="identifier"
-            type={mode === 'register' ? 'email' : 'text'}
-            className="form-input"
-            placeholder={
-              mode === 'register'
-                ? 'ban@example.com'
-                : 'Email hoặc tài khoản demo'
-            }
-            autoComplete={mode === 'register' ? 'email' : 'username'}
-            value={identifier}
-            onChange={event => {
-              setIdentifier(event.target.value);
-              clearMessages();
-            }}
-            disabled={isLoading}
-            required
-          />
-        </div>
-
-        {mode === 'register' && (
-          <div className="form-group">
-            <label className="form-label" htmlFor="phone">
-              Số điện thoại <span className="optional-label">(không bắt buộc)</span>
-            </label>
+          <div className="input-wrapper">
             <input
-              id="phone"
-              type="tel"
+              id="identifier"
+              type="text"
               className="form-input"
-              placeholder="0912345678"
-              autoComplete="tel"
-              value={phone}
-              onChange={event => {
-                setPhone(event.target.value);
-                clearMessages();
+              placeholder="VD: admin@smartbus.ictu.vn hoặc 0981234567"
+              value={identifier}
+              onChange={(e) => {
+                setIdentifier(e.target.value);
+                if (formError) setFormError(null);
               }}
               disabled={isLoading}
             />
           </div>
-        )}
+        </div>
 
         <div className="form-group">
           <label className="form-label" htmlFor="password">
@@ -342,91 +145,88 @@ export const LoginPage: React.FC = () => {
               id="password"
               type={showPassword ? 'text' : 'password'}
               className="form-input"
-              placeholder={mode === 'register' ? 'Ít nhất 8 ký tự' : 'Nhập mật khẩu'}
-              autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+              placeholder="Nhập mật khẩu"
               value={password}
-              onChange={event => {
-                setPassword(event.target.value);
-                clearMessages();
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (formError) setFormError(null);
               }}
               disabled={isLoading}
-              required
-              minLength={mode === 'register' ? 8 : undefined}
             />
             <button
               type="button"
               className="input-icon-right"
-              onClick={() => setShowPassword(value => !value)}
-              aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+              onClick={() => setShowPassword(!showPassword)}
             >
               {showPassword ? '🙈' : '👁️'}
             </button>
           </div>
         </div>
 
-        {mode === 'register' ? (
-          <div className="form-group">
-            <label className="form-label" htmlFor="confirm-password">
-              Xác nhận mật khẩu
-            </label>
+        <div className="form-options">
+          <label className="remember-label">
             <input
-              id="confirm-password"
-              type={showPassword ? 'text' : 'password'}
-              className="form-input"
-              placeholder="Nhập lại mật khẩu"
-              autoComplete="new-password"
-              value={confirmPassword}
-              onChange={event => {
-                setConfirmPassword(event.target.value);
-                clearMessages();
-              }}
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
               disabled={isLoading}
-              required
             />
-          </div>
-        ) : (
-          <div className="form-options">
-            <label className="remember-label">
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={event => setRememberMe(event.target.checked)}
-                disabled={isLoading}
-              />
-              <span>Ghi nhớ đăng nhập</span>
-            </label>
-            <button
-              type="button"
-              className="forgot-link"
-              onClick={handleResetPassword}
-              disabled={isLoading}
-            >
-              Quên mật khẩu?
-            </button>
-          </div>
-        )}
+            <span>Ghi nhớ đăng nhập</span>
+          </label>
+          <a href="#forgot" className="forgot-link" onClick={(e) => e.preventDefault()}>
+            Quên mật khẩu?
+          </a>
+        </div>
 
         <button type="submit" className="btn-submit" disabled={isLoading}>
-          {isLoading
-            ? mode === 'login'
-              ? 'Đang xác thực...'
-              : 'Đang tạo tài khoản...'
-            : mode === 'login'
-              ? 'Đăng nhập →'
-              : 'Tạo tài khoản'}
+          {isLoading ? 'Đang xác thực...' : 'Đăng nhập →'}
         </button>
-      </form>
 
-      <p className="auth-mode-footer">
-        {mode === 'login' ? 'Chưa có tài khoản?' : 'Đã có tài khoản?'}{' '}
-        <button
-          type="button"
-          onClick={() => switchMode(mode === 'login' ? 'register' : 'login')}
-          disabled={isLoading}
-        >
-          {mode === 'login' ? 'Đăng ký ngay' : 'Đăng nhập'}
-        </button>
-      </p>
+        <div style={{
+          marginTop: '20px',
+          textAlign: 'center',
+          fontSize: '13.5px',
+          color: 'rgba(255, 255, 255, 0.7)',
+        }}>
+          Chưa có tài khoản?{' '}
+          <Link
+            to="/register"
+            style={{
+              color: '#38bdf8',
+              fontWeight: 600,
+              textDecoration: 'none',
+              marginLeft: '4px',
+            }}
+          >
+            Đăng ký tài khoản mới ➔
+          </Link>
+        </div>
+
+        <div style={{ marginTop: '20px', textAlign: 'center' }}>
+          <a
+            href="/landing.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              fontSize: '12.5px',
+              color: '#38bdf8',
+              textDecoration: 'none',
+              fontWeight: 500,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 14px',
+              borderRadius: '9999px',
+              border: '1px solid rgba(56, 189, 248, 0.25)',
+              background: 'rgba(56, 189, 248, 0.06)',
+              backdropFilter: 'blur(8px)',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            🌌 Mở Cinematic Space-Travel Landing Page (Liquid-Glass UI) ↗
+          </a>
+        </div>
+      </form>
     </div>
   );
 };
