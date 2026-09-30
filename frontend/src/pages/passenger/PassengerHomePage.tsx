@@ -179,7 +179,7 @@ function PassengerHomePage() {
                 required
               >
                 {routes.length === 0 && <option value="">Chưa có tuyến khả dụng</option>}
-                {routes.map(route => (
+                {(Array.isArray(routes) ? routes : []).map(route => (
                   <option key={route.id} value={route.id}>
                     {route.code} · {route.name}
                   </option>
@@ -194,7 +194,7 @@ function PassengerHomePage() {
                 disabled={originStops.length === 0}
                 required
               >
-                {originStops.map(stop => (
+                {(Array.isArray(originStops) ? originStops : []).map(stop => (
                   <option key={stop.id} value={stop.id}>
                     {stop.name}
                   </option>
@@ -209,7 +209,7 @@ function PassengerHomePage() {
                 disabled={destinationStops.length === 0}
                 required
               >
-                {destinationStops.map(stop => (
+                {(Array.isArray(destinationStops) ? destinationStops : []).map(stop => (
                   <option key={stop.id} value={stop.id}>
                     {stop.name}
                   </option>
@@ -262,7 +262,7 @@ function PassengerHomePage() {
               </div>
             ) : (
               <div className="trip-result-list">
-                {trips.map(trip => (
+                {(Array.isArray(trips) ? trips : []).map(trip => (
                   <article className="trip-result-card" key={trip.trip_id}>
                     <div className="trip-result-route">
                       <strong>{trip.route_name}</strong>

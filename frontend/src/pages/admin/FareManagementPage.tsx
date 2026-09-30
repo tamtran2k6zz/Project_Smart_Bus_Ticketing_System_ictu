@@ -120,7 +120,7 @@ function FareManagementPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredFares.map(fare => (
+                  {(Array.isArray(filteredFares) ? filteredFares : []).map(fare => (
                     <tr key={fare.id}>
                       <td>
                         {fare.route?.code} — {fare.route?.name}

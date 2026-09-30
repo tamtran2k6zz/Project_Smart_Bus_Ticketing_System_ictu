@@ -59,7 +59,7 @@ export async function getFares(): Promise<FareConfiguration[]> {
   }
 
   return body.data.flatMap(route => {
-    const stopsById = new Map(route.routeStops.map(({ stop }) => [stop.id, stop]));
+    const stopsById = new Map((Array.isArray(route.routeStops) ? route.routeStops : []).map(({ stop }) => [stop?.id, stop]));
     return (route.fares ?? [])
       .filter(fare => !fare.deletedAt)
       .map(fare => ({

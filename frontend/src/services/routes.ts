@@ -52,15 +52,15 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 
 export async function getRoutes(): Promise<BusRoute[]> {
   const routes = await request<ApiRoute[]>(routesUrl);
-  return routes.map(route => ({
+  return (Array.isArray(routes) ? routes : []).map(route => ({
     id: route.id,
     code: route.code,
     name: route.name,
     status: route.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE',
-    stations: route.routeStops.map(({ stop, stopOrder }) => ({
-      id: stop.id,
-      name: stop.name,
-      address: stop.address,
+    stations: (Array.isArray(route.routeStops) ? route.routeStops : []).map(({ stop, stopOrder }) => ({
+      id: stop?.id,
+      name: stop?.name,
+      address: stop?.address,
       order: stopOrder,
     })),
   }));
@@ -71,7 +71,7 @@ export function saveRoute(route: BusRoute): Promise<BusRoute> {
     code: route.code,
     name: route.name,
     status: route.status,
-    stations: route.stations.map(({ name, address, order }) => ({
+    stations: (Array.isArray(route.stations) ? route.stations : []).map(({ name, address, order }) => ({
       name,
       address,
       order,

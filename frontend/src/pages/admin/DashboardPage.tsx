@@ -36,8 +36,10 @@ function DashboardPage() {
     };
   }, []);
 
-  const activeRoutes = routes.filter(route => route.status === 'ACTIVE').length;
-  const activeStops = stops.filter(stop => stop.isActive).length;
+  const safeRoutes = Array.isArray(routes) ? routes : [];
+  const safeStops = Array.isArray(stops) ? stops : [];
+  const activeRoutes = safeRoutes.filter(route => route.status === 'ACTIVE').length;
+  const activeStops = safeStops.filter(stop => stop.isActive).length;
 
   return (
     <div className="main-content">
@@ -87,7 +89,7 @@ function DashboardPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {routes.slice(0, 5).map(route => (
+                      {safeRoutes.slice(0, 5).map(route => (
                         <tr key={route.id}>
                           <td>{route.code}</td>
                           <td>{route.name}</td>
