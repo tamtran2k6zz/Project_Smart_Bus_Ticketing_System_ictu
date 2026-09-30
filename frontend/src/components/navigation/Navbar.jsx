@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Bus, User, LogOut, Shield, Menu, X, Ticket, LayoutDashboard } from 'lucide-react';
+import { Bus, User, LogOut, Shield, Menu, X, Ticket, LayoutDashboard, CreditCard } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import Button from '../common/Button';
 
@@ -76,15 +76,28 @@ export const Navbar = () => {
                 </Link>
 
                 {user?.role === 'ADMIN' && (
-                  <Link
-                    to="/admin"
-                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
-                      isActive('/admin') ? 'bg-purple-50 text-purple-700 font-semibold' : 'text-purple-600 hover:text-purple-800 hover:bg-purple-50/50'
-                    }`}
-                  >
-                    <Shield className="w-4 h-4" />
-                    Quản trị
-                  </Link>
+                  <>
+                    <Link
+                      to="/admin"
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                        isActive('/admin') ? 'bg-purple-50 text-purple-700 font-semibold' : 'text-purple-600 hover:text-purple-800 hover:bg-purple-50/50'
+                      }`}
+                    >
+                      <Shield className="w-4 h-4" />
+                      Quản trị
+                    </Link>
+                    <Link
+                      to="/admin/bookings"
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                        isActive('/admin/bookings') || isActive('/admin/transactions')
+                          ? 'bg-blue-50 text-blue-700 font-semibold'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                      }`}
+                    >
+                      <CreditCard className="w-4 h-4" />
+                      Vé & Giao dịch
+                    </Link>
+                  </>
                 )}
               </>
             )}
@@ -209,13 +222,22 @@ export const Navbar = () => {
                 Hồ sơ cá nhân
               </Link>
               {user?.role === 'ADMIN' && (
-                <Link
-                  to="/admin"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block px-3 py-2 rounded-lg text-sm font-medium text-purple-700 bg-purple-50"
-                >
-                  Trang quản trị (Admin)
-                </Link>
+                <>
+                  <Link
+                    to="/admin"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block px-3 py-2 rounded-lg text-sm font-medium text-purple-700 bg-purple-50"
+                  >
+                    Trang quản trị (Admin)
+                  </Link>
+                  <Link
+                    to="/admin/bookings"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block px-3 py-2 rounded-lg text-sm font-medium text-blue-700 bg-blue-50"
+                  >
+                    Quản lý Vé & Giao dịch (US 06)
+                  </Link>
+                </>
               )}
 
               <div className="pt-2">

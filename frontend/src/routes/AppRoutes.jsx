@@ -16,6 +16,7 @@ import RegisterPage from '../pages/auth/RegisterPage';
 import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage';
 import DashboardPage from '../pages/dashboard/DashboardPage';
 import AdminDashboardPage from '../pages/admin/AdminDashboardPage';
+import AdminBookingsPage from '../pages/admin/AdminBookingsPage';
 import TicketsPage from '../pages/tickets/TicketsPage';
 import ProfilePage from '../pages/profile/ProfilePage';
 import ForbiddenPage from '../pages/error/ForbiddenPage';
@@ -68,6 +69,8 @@ export const AppRoutes = () => {
           {/* Admin Role-Protected Route */}
           <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
             <Route path="/admin" element={<AdminDashboardPage />} />
+            <Route path="/admin/bookings" element={<AdminBookingsPage />} />
+            <Route path="/admin/transactions" element={<AdminBookingsPage />} />
           </Route>
         </Route>
       </Route>
