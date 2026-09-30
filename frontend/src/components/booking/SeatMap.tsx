@@ -1,51 +1,58 @@
 import { useMemo, useState } from 'react';
+import type { SeatApi } from '../../types/seat';
 
-type Floor = 1 | 2;
-
-export type SeatStatus = 'available' | 'held' | 'sold';
-
-export interface Seat {
-  id: string;
-  floor: Floor;
-  row: number;
-  column: number;
-  status: SeatStatus;
-}
+type Floor = 'DECK_1' | 'DECK_2';
 
 interface SeatMapProps {
-  seats: Seat[];
+  seats: SeatApi[];
   onSelectionChange?: (selectedSeatIds: string[]) => void;
 }
 
-const getStatusLabel = (status: SeatStatus) => {
-  switch (status) {
-    case 'available':
-      return 'Còn trống';
-    case 'held':
-      return 'Đang giữ';
-    case 'sold':
-      return 'Đã bán';
-  }
-};
-
 function SeatMap({ seats, onSelectionChange }: SeatMapProps) {
-  const [selectedFloor, setSelectedFloor] = useState<Floor>(1);
+  const [selectedFloor, setSelectedFloor] = useState<Floor>('DECK_1');
   const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
 
-  const floorSeats = useMemo(
-    () => seats.filter((seat) => seat.floor === selectedFloor),
-    [seats, selectedFloor],
-  );
+  const floorSeats = useMemo(() => {
+    return seats
+      .filter((seat) => seat.deck === selectedFloor)
+      .sort((a, b) =>
+        a.seatNumber.localeCompare(b.seatNumber, undefined, {
+          numeric: true,
+          sensitivity: 'base',
+        }),
+      );
+  }, [seats, selectedFloor]);
 
-  const handleSeatClick = (seat: Seat) => {
-    if (seat.status !== 'available') {
+  /**
+   * Backend hiện trả seatNumber + deck + rowPosition,
+   * chưa trả row/column cụ thể.
+   *
+   * Tạm thời FE sắp 4 ghế / hàng:
+   * [1] [2]   [3] [4]
+   *
+   * Sau này nếu backend trả layout chính xác thì
+   * chỉ cần thay phần mapping này.
+   */
+  const getSeatPosition = (index: number) => {
+    const row = Math.floor(index / 4) + 1;
+
+    const columnMap = [1, 2, 4, 5];
+
+    return {
+      row,
+      column: columnMap[index % 4],
+    };
+  };
+
+  const handleSeatClick = (seat: SeatApi) => {
+    if (!seat.isAvailable) {
       return;
     }
 
     setSelectedSeats((current) => {
-      const alreadySelected = current.includes(seat.id);
+      const isSelected = current.includes(seat.id);
 
-      const next = alreadySelected
+      const next = isSelected
         ? current.filter((id) => id !== seat.id)
         : [...current, seat.id];
 
@@ -55,16 +62,24 @@ function SeatMap({ seats, onSelectionChange }: SeatMapProps) {
     });
   };
 
-  const getSeatClassName = (seat: Seat) => {
+  const getSeatClassName = (seat: SeatApi) => {
     const isSelected = selectedSeats.includes(seat.id);
 
     return [
       'seat',
-      `seat-${seat.status}`,
+      seat.isAvailable ? 'seat-available' : 'seat-occupied',
       isSelected ? 'seat-selected' : '',
     ]
       .filter(Boolean)
       .join(' ');
+  };
+
+  const getSeatStatusLabel = (seat: SeatApi) => {
+    if (selectedSeats.includes(seat.id)) {
+      return 'Đang chọn';
+    }
+
+    return seat.isAvailable ? 'Còn trống' : 'Đã có người đặt';
   };
 
   return (
@@ -72,22 +87,32 @@ function SeatMap({ seats, onSelectionChange }: SeatMapProps) {
       <div className="seat-map-header">
         <div>
           <h2>Sơ đồ ghế xe</h2>
-          <p>Chọn vị trí ghế trên xe</p>
+          <p>
+            Chọn vị trí ghế trên xe
+          </p>
         </div>
 
         <div className="floor-switcher">
           <button
             type="button"
-            className={selectedFloor === 1 ? 'floor-button active' : 'floor-button'}
-            onClick={() => setSelectedFloor(1)}
+            className={
+              selectedFloor === 'DECK_1'
+                ? 'floor-button active'
+                : 'floor-button'
+            }
+            onClick={() => setSelectedFloor('DECK_1')}
           >
             Tầng 1
           </button>
 
           <button
             type="button"
-            className={selectedFloor === 2 ? 'floor-button active' : 'floor-button'}
-            onClick={() => setSelectedFloor(2)}
+            className={
+              selectedFloor === 'DECK_2'
+                ? 'floor-button active'
+                : 'floor-button'
+            }
+            onClick={() => setSelectedFloor('DECK_2')}
           >
             Tầng 2
           </button>
@@ -106,35 +131,46 @@ function SeatMap({ seats, onSelectionChange }: SeatMapProps) {
         </div>
 
         <div className="legend-item">
-          <span className="legend-seat legend-held" />
-          <span>Đang giữ</span>
-        </div>
-
-        <div className="legend-item">
-          <span className="legend-seat legend-sold" />
-          <span>Đã bán</span>
+          <span className="legend-seat legend-occupied" />
+          <span>Đã có người đặt</span>
         </div>
       </div>
 
       <div className="bus-layout">
         <div className="bus-front">ĐẦU XE</div>
 
-        <div className="seat-grid">
-          {floorSeats.map((seat) => (
-            <button
-              key={seat.id}
-              type="button"
-              className={getSeatClassName(seat)}
-              style={{ gridRow: seat.row, gridColumn: seat.column }}
-              onClick={() => handleSeatClick(seat)}
-              disabled={seat.status !== 'available'}
-              title={`${seat.id} - ${getStatusLabel(seat.status)}`}
-            >
-              <span className="seat-number">{seat.id}</span>
-              <span className="seat-status-dot" />
-            </button>
-          ))}
-        </div>
+        {floorSeats.length === 0 ? (
+          <div className="empty-seats">
+            Chưa có dữ liệu ghế cho tầng này.
+          </div>
+        ) : (
+          <div className="seat-grid">
+            {floorSeats.map((seat, index) => {
+              const { row, column } = getSeatPosition(index);
+
+              return (
+                <button
+                  key={seat.id}
+                  type="button"
+                  className={getSeatClassName(seat)}
+                  style={{
+                    gridRow: row,
+                    gridColumn: column,
+                  }}
+                  onClick={() => handleSeatClick(seat)}
+                  disabled={!seat.isAvailable}
+                  title={`${seat.seatNumber} - ${getSeatStatusLabel(seat)}`}
+                >
+                  <span className="seat-number">
+                    {seat.seatNumber}
+                  </span>
+
+                  <span className="seat-status-dot" />
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="selected-seat-box">
