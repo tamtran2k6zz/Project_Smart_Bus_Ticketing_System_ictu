@@ -1,11 +1,15 @@
 import React from 'react';
 import { Outlet, Link } from 'react-router-dom';
 import Navbar from '../components/navigation/Navbar';
+import OfflineBanner from '../components/common/OfflineBanner';
 import { Bus, Mail, Phone, MapPin, Heart } from 'lucide-react';
 
 export const AppLayout = () => {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800">
+      {/* Network Offline / Reconnection Banner */}
+      <OfflineBanner />
+
       {/* Top Navbar */}
       <Navbar />
 

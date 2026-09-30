@@ -1,14 +1,17 @@
 import React from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { NetworkStatusProvider } from './contexts/NetworkStatusContext';
 import AppRoutes from './routes/AppRoutes';
 
 export const App = () => {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
+      <NetworkStatusProvider>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </NetworkStatusProvider>
     </BrowserRouter>
   );
 };

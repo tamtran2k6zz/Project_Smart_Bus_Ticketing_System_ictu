@@ -166,6 +166,17 @@ export const AdminBookingsPage = () => {
     loadData();
   }, [loadData]);
 
+  // Auto re-sync when network is reconnected
+  useEffect(() => {
+    const handleReconnected = () => {
+      loadData();
+    };
+    window.addEventListener('app:network-reconnected', handleReconnected);
+    return () => {
+      window.removeEventListener('app:network-reconnected', handleReconnected);
+    };
+  }, [loadData]);
+
   // Format currency VND
   const formatVND = amount => {
     return new Intl.NumberFormat('vi-VN', {
