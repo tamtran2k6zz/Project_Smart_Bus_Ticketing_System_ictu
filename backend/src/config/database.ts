@@ -3,26 +3,27 @@ import * as dotenv from 'dotenv';
 
 dotenv.config();
 
-let host = process.env.DB_HOST || '127.0.0.1';
-let port = Number(process.env.DB_PORT) || 3306;
-let user = process.env.DB_USER || 'smartbus_user';
-let password = process.env.DB_PASSWORD || 'smartbus_pass';
-let database = process.env.DB_NAME || 'smartbus_db';
+let host = process.env.DB_HOST || process.env.MYSQLHOST || '127.0.0.1';
+let port = Number(process.env.DB_PORT || process.env.MYSQLPORT) || 3306;
+let user = process.env.DB_USER || process.env.MYSQLUSER || 'smartbus_user';
+let password = process.env.DB_PASSWORD || process.env.MYSQLPASSWORD || 'smartbus_pass';
+let database = process.env.DB_NAME || process.env.MYSQLDATABASE || 'smartbus_db';
 
-if (process.env.DATABASE_URL) {
+const rawDbUrl = process.env.DATABASE_URL || process.env.MYSQL_URL;
+if (rawDbUrl) {
   try {
-    const url = new URL(process.env.DATABASE_URL);
+    const url = new URL(rawDbUrl);
     host = url.hostname || host;
     port = Number(url.port) || port;
     user = url.username ? decodeURIComponent(url.username) : user;
     password = url.password ? decodeURIComponent(url.password) : password;
     database = url.pathname ? url.pathname.replace(/^\//, '') : database;
   } catch (err: any) {
-    console.warn('Không thể parse DATABASE_URL, dùng cấu hình fallback:', err.message);
+    console.warn('Không thể parse DATABASE_URL/MYSQL_URL, dùng cấu hình fallback:', err.message);
   }
 }
 
-// Nếu có biến môi trường trực tiếp từ Docker Compose (DB_HOST, etc.), ưu tiên sử dụng
+// Nếu có biến môi trường trực tiếp từ Docker Compose hoặc Railway (DB_HOST, etc.), ưu tiên sử dụng
 if (process.env.DB_HOST) host = process.env.DB_HOST;
 if (process.env.DB_PORT) port = Number(process.env.DB_PORT);
 if (process.env.DB_USER) user = process.env.DB_USER;
