@@ -7,6 +7,7 @@ import stopsRoutes from './routes/stops.routes';
 import tripsRoutes from './routes/trips.routes';
 import operationsRoutes from './routes/operations.routes';
 import ticketingRoutes from './routes/ticketing.routes';
+import seatsRoutes from './routes/seats.routes';
 import usersRoutes from './routes/users.routes';
 import pool, { query } from './config/database';
 import { RedisService } from './redis/redis.service';
@@ -203,6 +204,8 @@ app.get('/', (req: Request, res: Response) => {
       stops: '/api/stops',
       routes: '/api/routes',
       trips: '/api/trips',
+      seats: '/api/seats',
+      tripSeats: '/api/trips/1/seats',
       operations: '/api/operations',
       ticketing: '/api/ticketing',
       users: '/api/users',
@@ -241,6 +244,8 @@ app.use('/api/stops', stopsRoutes);
 app.use('/api/v1/stops', stopsRoutes);
 app.use('/api/trips', tripsRoutes);
 app.use('/api/v1/trips', tripsRoutes);
+app.use('/api/seats', seatsRoutes);
+app.use('/api/v1/seats', seatsRoutes);
 app.use('/api/operations', operationsRoutes);
 app.use('/api/v1/operations', operationsRoutes);
 app.use('/api/ticketing', ticketingRoutes);

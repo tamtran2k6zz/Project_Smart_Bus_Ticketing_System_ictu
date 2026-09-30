@@ -245,20 +245,51 @@ model Bus {
 }
 
 model Seat {
-  id          String   @id @default(uuid()) @db.VarChar(36)
-  busId       String   @map("bus_id") @db.VarChar(36)
-  seatNumber  String   @map("seat_number") @db.VarChar(10)
-  rowPosition String   @default("WINDOW") @map("row_position") @db.VarChar(20)
-  deck        String   @default("DECK_1") @db.VarChar(20)
-  isPriority  Boolean  @default(false) @map("is_priority")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id          String     @id @default(uuid()) @db.VarChar(36)
+  busId       String     @map("bus_id") @db.VarChar(36)
+  seatNumber  String     @map("seat_number") @db.VarChar(10)
+  seatType    String     @default("STANDARD") @map("seat_type") @db.VarChar(20)
+  rowPosition String     @default("WINDOW") @map("row_position") @db.VarChar(20)
+  deck        String     @default("DECK_1") @db.VarChar(20)
+  isPriority  Boolean    @default(false) @map("is_priority")
+  status      String     @default("ACTIVE") @map("status") @db.VarChar(20)
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
 
-  bus     Bus      @relation(fields: [busId], references: [id], onDelete: Cascade)
-  tickets Ticket[]
+  bus       Bus        @relation(fields: [busId], references: [id], onDelete: Cascade)
+  tickets   Ticket[]
+  tripSeats TripSeat[]
 
   @@unique([busId, seatNumber], name: "uq_bus_seat_number")
   @@map("seats")
+}
+
+enum TripSeatStatus {
+  AVAILABLE
+  LOCKED
+  BOOKED
+  CHECKED_IN
+}
+
+model TripSeat {
+  id             Int            @id @default(autoincrement())
+  tripId         Int            @map("trip_id")
+  seatId         String?        @map("seat_id") @db.VarChar(36)
+  seatNumber     String         @map("seat_number") @db.VarChar(10)
+  status         TripSeatStatus @default(AVAILABLE)
+  lockedAt       DateTime?      @map("locked_at")
+  lockedByUserId Int?           @map("locked_by_user_id")
+  lockExpiresAt  DateTime?      @map("lock_expires_at")
+  ticketId       String?        @map("ticket_id") @db.VarChar(36)
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  seat Seat? @relation(fields: [seatId], references: [id], onDelete: SetNull)
+
+  @@unique([tripId, seatNumber], name: "uq_trip_seat_number")
+  @@index([tripId, status], name: "idx_trip_seats_trip_status")
+  @@index([lockExpiresAt], name: "idx_trip_seats_lock_expires")
+  @@map("trip_seats")
 }
 
 model Trip {

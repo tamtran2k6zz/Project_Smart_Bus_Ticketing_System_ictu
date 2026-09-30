@@ -1,67 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { query } from '../config/database';
+import { getSeatsByTrip } from '../controllers/seats.controller';
 
 const router = Router();
 
-// 1. Lấy sơ đồ ghế chuyến xe (US 02)
-router.get('/trips/:tripId/seats', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { tripId } = req.params;
-
-    // Lấy thông tin chuyến xe
-    const tripRows = await query<any[]>('SELECT id, total_seats, booked_seats FROM trips WHERE id = ? LIMIT 1', [tripId]);
-    const totalSeats = tripRows.length > 0 ? (tripRows[0].total_seats || 40) : 40;
-
-    // Lấy các vé đã đặt trên chuyến này từ MySQL
-    const bookedTicketRows = await query<any[]>(
-      'SELECT seat_number FROM tickets WHERE trip_id = ? AND status IN ("BOOKED", "CHECKED_IN")',
-      [tripId]
-    );
-    const bookedSeatSet = new Set<string>(bookedTicketRows.map((t) => t.seat_number).filter(Boolean));
-
-    // Sinh danh sách 40 ghế (A01 - A20, B01 - B20)
-    const seats: any[] = [];
-    const half = Math.ceil(totalSeats / 2);
-
-    for (let i = 1; i <= half; i++) {
-      const numStr = i < 10 ? `0${i}` : `${i}`;
-      const seatA = `A${numStr}`;
-      seats.push({
-        id: `seat-${seatA}`,
-        seatNumber: seatA,
-        rowPosition: i <= 2 ? 'FRONT' : i >= half - 1 ? 'BACK' : 'MIDDLE',
-        isPriority: i <= 2,
-        isAvailable: !bookedSeatSet.has(seatA),
-      });
-    }
-
-    for (let i = 1; i <= totalSeats - half; i++) {
-      const numStr = i < 10 ? `0${i}` : `${i}`;
-      const seatB = `B${numStr}`;
-      seats.push({
-        id: `seat-${seatB}`,
-        seatNumber: seatB,
-        rowPosition: i <= 2 ? 'FRONT' : i >= half - 1 ? 'BACK' : 'MIDDLE',
-        isPriority: i <= 2,
-        isAvailable: !bookedSeatSet.has(seatB),
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      data: {
-        tripId,
-        totalSeats,
-        bookedCount: bookedSeatSet.size,
-        availableCount: totalSeats - bookedSeatSet.size,
-        seats,
-      },
-    });
-  } catch (err: any) {
-    console.error('Lỗi lấy sơ đồ ghế:', err);
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
+// 1. Lấy sơ đồ ghế chuyến xe (US 02) từ bảng trip_seats
+router.get('/trips/:tripId/seats', getSeatsByTrip);
 
 // 2. Đặt vé và sinh mã QR trong MySQL (US 02, 03, 04, 06)
 router.post('/bookings', async (req: Request, res: Response): Promise<void> => {
@@ -101,6 +45,14 @@ router.post('/bookings', async (req: Request, res: Response): Promise<void> => {
 
     // Cập nhật số ghế đã đặt trên chuyến
     await query('UPDATE trips SET booked_seats = booked_seats + 1 WHERE id = ?', [tripId]);
+
+    // Đồng bộ trạng thái ghế trong bảng trip_seats
+    await query(
+      `UPDATE trip_seats
+       SET status = 'BOOKED', ticket_id = ?, locked_at = NULL, lock_expires_at = NULL
+       WHERE trip_id = ? AND seat_number = ?`,
+      [ticketId, tripId, seatNumber]
+    );
 
     const bookingPayload = {
       booking: {
@@ -185,6 +137,10 @@ router.post('/verify', async (req: Request, res: Response): Promise<void> => {
     // Cập nhật trạng thái đã soát vé
     if (!isAlreadyCheckedIn) {
       await query('UPDATE tickets SET status = "CHECKED_IN" WHERE id = ?', [ticket.id]);
+      await query(
+        'UPDATE trip_seats SET status = "CHECKED_IN" WHERE trip_id = ? AND seat_number = ?',
+        [ticket.trip_id, ticket.seat_number]
+      );
     }
 
     res.status(200).json({
