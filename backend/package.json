@@ -76,6 +76,11 @@
       "ts"
     ],
     "rootDir": "src",
+    "moduleNameMapper": {
+      "^src/(.*)$": "<rootDir>/$1",
+      "^database/(.*)$": "<rootDir>/database/$1",
+      "^modules/(.*)$": "<rootDir>/modules/$1"
+    },
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"

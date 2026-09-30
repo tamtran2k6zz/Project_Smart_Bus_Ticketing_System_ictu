@@ -3,10 +3,10 @@ import { PaymentController } from './payment.controller';
 import { PaymentService } from './payment.service';
 import {
   CreatePaymentDto,
-  PaymentMethodEnum,
   VNPayIpnDto,
   MoMoIpnDto,
 } from './dto/payment.dto';
+import { PaymentMethod, PaymentStatus } from '@prisma/client';
 import { Request, Response } from 'express';
 
 describe('PaymentController', () => {
@@ -16,7 +16,7 @@ describe('PaymentController', () => {
   const mockPaymentResponse = {
     payment_id: 'pay-001',
     booking_id: 'book-001',
-    payment_method: PaymentMethodEnum.VNPAY,
+    payment_method: PaymentMethod.VNPAY,
     amount: 150000,
     currency: 'VND',
     payment_url: 'https://sandbox.vnpayment.vn/test',
@@ -61,7 +61,7 @@ describe('PaymentController', () => {
     it('Khởi tạo thanh toán thành công và trả về URL', async () => {
       const dto: CreatePaymentDto = {
         booking_id: 'b1111111-1111-1111-1111-111111111111',
-        payment_method: PaymentMethodEnum.VNPAY,
+        payment_method: PaymentMethod.VNPAY,
         bank_code: 'NCB',
       };
 

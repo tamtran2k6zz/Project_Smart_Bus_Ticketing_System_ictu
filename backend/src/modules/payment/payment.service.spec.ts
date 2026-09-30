@@ -8,11 +8,10 @@ import { ConfigService } from '@nestjs/config';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import {
   CreatePaymentDto,
-  PaymentMethodEnum,
-  PaymentStatusEnum,
   VNPayIpnDto,
   MoMoIpnDto,
 } from './dto/payment.dto';
+import { PaymentMethod, PaymentStatus } from '@prisma/client';
 
 describe('PaymentService', () => {
   let service: PaymentService;
@@ -37,11 +36,11 @@ describe('PaymentService', () => {
   const mockPayment = {
     id: 'p1111111-1111-1111-1111-111111111111',
     bookingId: mockBooking.id,
-    paymentMethod: PaymentMethodEnum.VNPAY,
+    paymentMethod: PaymentMethod.VNPAY,
     transactionNo: null,
     amount: 150000,
     currency: 'VND',
-    status: PaymentStatusEnum.PENDING,
+    status: PaymentStatus.PENDING,
     paymentUrl: null,
     rawResponse: null,
     createdAt: new Date(),
@@ -118,7 +117,7 @@ describe('PaymentService', () => {
       prisma.payment.create.mockResolvedValue({
         ...mockPayment,
         id: 'pay-vnpay-01',
-        paymentMethod: PaymentMethodEnum.VNPAY,
+        paymentMethod: PaymentMethod.VNPAY,
       });
       prisma.payment.update.mockResolvedValue({
         ...mockPayment,
@@ -127,7 +126,7 @@ describe('PaymentService', () => {
 
       const dto: CreatePaymentDto = {
         booking_id: mockBooking.id,
-        payment_method: PaymentMethodEnum.VNPAY,
+        payment_method: PaymentMethod.VNPAY,
         bank_code: 'NCB',
       };
 
@@ -138,7 +137,7 @@ describe('PaymentService', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             bookingId: mockBooking.id,
-            paymentMethod: PaymentMethodEnum.VNPAY,
+            paymentMethod: PaymentMethod.VNPAY,
             status: 'PENDING',
           }),
         }),
@@ -160,7 +159,7 @@ describe('PaymentService', () => {
       prisma.payment.create.mockResolvedValue({
         ...mockPayment,
         id: 'pay-momo-01',
-        paymentMethod: PaymentMethodEnum.MOMO,
+        paymentMethod: PaymentMethod.MOMO,
       });
       prisma.payment.update.mockResolvedValue({
         ...mockPayment,
@@ -169,7 +168,7 @@ describe('PaymentService', () => {
 
       const dto: CreatePaymentDto = {
         booking_id: mockBooking.id,
-        payment_method: PaymentMethodEnum.MOMO,
+        payment_method: PaymentMethod.MOMO,
       };
 
       const result = await service.createPaymentUrl(dto);
@@ -181,7 +180,7 @@ describe('PaymentService', () => {
           amount: 150000,
         }),
       );
-      expect(result.payment_method).toBe(PaymentMethodEnum.MOMO);
+      expect(result.payment_method).toBe(PaymentMethod.MOMO);
       expect(result.payment_url).toContain('momo.vn');
     });
 
@@ -190,7 +189,7 @@ describe('PaymentService', () => {
 
       const dto: CreatePaymentDto = {
         booking_id: 'non-existing-id',
-        payment_method: PaymentMethodEnum.VNPAY,
+        payment_method: PaymentMethod.VNPAY,
       };
 
       await expect(service.createPaymentUrl(dto)).rejects.toThrow(NotFoundException);
@@ -205,7 +204,7 @@ describe('PaymentService', () => {
 
       const dto: CreatePaymentDto = {
         booking_id: mockBooking.id,
-        payment_method: PaymentMethodEnum.VNPAY,
+        payment_method: PaymentMethod.VNPAY,
       };
 
       await expect(service.createPaymentUrl(dto)).rejects.toThrow(BadRequestException);
@@ -220,7 +219,7 @@ describe('PaymentService', () => {
 
       const dto: CreatePaymentDto = {
         booking_id: mockBooking.id,
-        payment_method: PaymentMethodEnum.VNPAY,
+        payment_method: PaymentMethod.VNPAY,
       };
 
       await expect(service.createPaymentUrl(dto)).rejects.toThrow(BadRequestException);
@@ -362,7 +361,7 @@ describe('PaymentService', () => {
       momoService.verifyChecksum.mockReturnValue(true);
       prisma.payment.findUnique.mockResolvedValue({
         ...mockPayment,
-        status: PaymentStatusEnum.SUCCESS, // Already processed
+        status: PaymentStatus.SUCCESS, // Already processed
       });
 
       const result = await service.handleMoMoIpn(validMoMoPayload);
