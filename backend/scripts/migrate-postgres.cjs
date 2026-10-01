@@ -23,6 +23,13 @@ async function main() {
       if(existing){if(existing.checksum!==checksum)throw new Error('Applied migration changed: '+name);continue;}
       await db.query(sql);
       await db.query('INSERT INTO smartbus_private.migrations(name,checksum) VALUES($1,$2)',[name,checksum]);
+      try {
+        const version = name.split('_')[0];
+        await db.query(
+          'INSERT INTO supabase_migrations.schema_migrations (version, name) VALUES ($1, $2) ON CONFLICT (version) DO NOTHING',
+          [version, name.replace(/\.sql$/, '')]
+        );
+      } catch (_) {}
       console.log('Applied '+name);
     }
     await db.query('COMMIT');

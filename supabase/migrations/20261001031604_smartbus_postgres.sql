@@ -3,9 +3,13 @@
 DO $$
 DECLARE _tbl_name text; _row_count bigint;
 BEGIN
+  -- If legacy tables are already archived or modern schema exists, nothing to archive
+  IF to_regclass('smartbus_legacy_20261001.routes') IS NOT NULL OR to_regclass('public.roles') IS NOT NULL THEN
+    RETURN;
+  END IF;
+
   IF to_regclass('public.routes') IS NOT NULL THEN
-    IF to_regclass('public.roles') IS NOT NULL OR
-       (SELECT count(*) FROM pg_tables WHERE schemaname='public') <> 7 OR
+    IF (SELECT count(*) FROM pg_tables WHERE schemaname='public') <> 7 OR
        NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND information_schema.columns.table_name='routes' AND column_name='id' AND data_type='uuid') THEN
       RAISE EXCEPTION 'Unrecognized existing schema. Review before migration.';
     END IF;
