@@ -32,6 +32,7 @@ export const PassengerPortalPage: React.FC = () => {
   const [selectedTripId, setSelectedTripId] = useState<string>('');
   const [seats, setSeats] = useState<SeatInfo[]>([]);
   const [selectedSeat, setSelectedSeat] = useState<string>('');
+  const [paymentMethod, setPaymentMethod] = useState<'VNPAY' | 'MOMO'>('VNPAY');
   const [voucherCode, setVoucherCode] = useState<string>('');
   const [bookingResult, setBookingResult] = useState<any>(null);
   const [isBooking, setIsBooking] = useState<boolean>(false);
@@ -145,6 +146,31 @@ export const PassengerPortalPage: React.FC = () => {
     fetchOtherData();
   }, [fetchTrips, fetchOtherData]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const orderId = params.get('paymentOrder');
+    if (!orderId) return;
+    const loadPayment = async () => {
+      try {
+        const token = localStorage.getItem('smartbus_access_token');
+        const response = await apiFetch(getApiUrl(`/api/v1/ticketing/payments/${orderId}`), {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || 'Không thể tải trạng thái thanh toán.');
+        setBookingResult(result.data);
+        setBookingMsg(result.data.paymentStatus === 'SUCCESS'
+          ? 'Thanh toán thành công, vé đã được xác nhận.'
+          : `Trạng thái thanh toán: ${result.data.paymentStatus}.`);
+      } catch (error) {
+        setBookingMsg(error instanceof Error ? error.message : 'Không thể tải trạng thái thanh toán.');
+      } finally {
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    };
+    void loadPayment();
+  }, []);
+
   // Xử lý đặt vé
   const handleBook = async () => {
     if (!selectedSeat) {
@@ -166,6 +192,7 @@ export const PassengerPortalPage: React.FC = () => {
           tripId: selectedTripId,
           userId: user?.id,
           seatNumber: selectedSeat,
+          paymentMethod,
           voucherCode: voucherCode.trim() || undefined,
           customerEmail: user?.email || 'khachhang@gmail.com',
         }),
@@ -177,7 +204,11 @@ export const PassengerPortalPage: React.FC = () => {
       }
 
       setBookingResult(json.data || json);
-      setBookingMsg('🎉 Giữ chỗ thành công trong 10 phút! Mã vé QR đã lưu trong cơ sở dữ liệu.');
+      if (json.paymentUrl || json.data?.paymentUrl) {
+        window.location.assign(json.paymentUrl || json.data.paymentUrl);
+        return;
+      }
+      setBookingMsg('🎉 Đặt vé thành công!');
 
       // Refresh seats
       const seatsRes = await apiFetch(getApiUrl(`/api/v1/ticketing/trips/${selectedTripId}/seats`));
@@ -192,6 +223,26 @@ export const PassengerPortalPage: React.FC = () => {
       alert(err.message);
     } finally {
       setIsBooking(false);
+    }
+  };
+
+  const handleCancelTicket = async () => {
+    const ticketId = bookingResult?.ticket?.id || bookingResult?.ticketId;
+    if (!ticketId) return;
+    try {
+      const response = await apiFetch(getApiUrl(`/api/v1/ticketing/tickets/${ticketId}/cancel`), {
+        method: 'POST',
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Không thể hủy vé.');
+      setBookingMsg(result.message);
+      setBookingResult((current: any) => ({
+        ...current,
+        ticket: { ...current.ticket, status: 'CANCELLED' },
+        paymentStatus: current.paymentStatus === 'SUCCESS' ? 'REFUNDED' : current.paymentStatus,
+      }));
+    } catch (error) {
+      setBookingMsg(error instanceof Error ? error.message : 'Không thể hủy vé.');
     }
   };
 
@@ -395,6 +446,20 @@ export const PassengerPortalPage: React.FC = () => {
                     style={{ width: '100%', borderRadius: '12px', height: '46px' }}
                   />
                 </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'rgba(255, 255, 255, 0.75)', marginBottom: '8px' }}>
+                    Cổng thanh toán:
+                  </label>
+                  <select
+                    className="filter-select"
+                    value={paymentMethod}
+                    onChange={(event) => setPaymentMethod(event.target.value as 'VNPAY' | 'MOMO')}
+                    style={{ width: '100%', borderRadius: '12px', height: '46px' }}
+                  >
+                    <option value="VNPAY">VNPay</option>
+                    <option value="MOMO">MoMo</option>
+                  </select>
+                </div>
               </div>
 
               {/* Sơ đồ ghế */}
@@ -501,6 +566,9 @@ export const PassengerPortalPage: React.FC = () => {
                   : new Date(Date.now() + 10 * 60000).toLocaleTimeString('vi-VN');
                 const qrVal = bookingResult.qrCode || `SMARTBUS-QR-${tCode}`;
                 const qrImg = bookingResult.qrCodeUrl || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrVal)}`;
+                const ticketStatus = bookingResult.ticket?.status || bookingResult.status;
+                const paymentStatus = bookingResult.paymentStatus || bookingResult.payment?.status;
+                const isPaid = ticketStatus === 'BOOKED' || paymentStatus === 'SUCCESS';
 
                 return (
                   <div
@@ -520,14 +588,15 @@ export const PassengerPortalPage: React.FC = () => {
                       <div style={{ fontSize: '14px', lineHeight: 2, color: 'rgba(255, 255, 255, 0.9)' }}>
                         <p style={{ margin: 0 }}><strong>Mã vé:</strong> <span style={{ color: '#38bdf8', fontWeight: 700, fontSize: '15px' }}>{tCode}</span></p>
                         <p style={{ margin: 0 }}><strong>Số ghế:</strong> <span style={{ color: '#34d399', fontWeight: 600 }}>{sNumber}</span></p>
-                        <p style={{ margin: 0 }}><strong>Thanh toán:</strong> {Number(payAmount).toLocaleString('vi-VN')} VNĐ (Đã áp dụng trợ giá)</p>
-                        <p style={{ margin: 0 }}><strong>Thời hạn giữ chỗ:</strong> {expTime}</p>
+                        <p style={{ margin: 0 }}><strong>Số tiền:</strong> {Number(payAmount).toLocaleString('vi-VN')} VNĐ</p>
+                        <p style={{ margin: 0 }}><strong>Trạng thái thanh toán:</strong> {paymentStatus || (isPaid ? 'SUCCESS' : 'PENDING')}</p>
+                        {!isPaid && <p style={{ margin: 0 }}><strong>Giữ chỗ đến:</strong> {expTime}</p>}
                         <div style={{ marginTop: '10px', fontSize: '12.5px', color: '#34d399', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span>✓</span> Vé đã được ghi nhận trên hệ thống vận hành xe buýt
+                          <span>{isPaid ? '✓' : '…'}</span> {isPaid ? 'Vé đã được xác nhận' : 'Vé chỉ được xác nhận sau khi cổng thanh toán báo thành công'}
                         </div>
                       </div>
 
-                      <div
+                      {isPaid && <div
                         style={{
                           padding: '16px 20px',
                           background: 'rgba(255, 255, 255, 0.05)',
@@ -568,7 +637,12 @@ export const PassengerPortalPage: React.FC = () => {
                         >
                           {qrVal}
                         </div>
-                      </div>
+                      </div>}
+                      {ticketStatus === 'BOOKED' && (
+                        <button type="button" onClick={handleCancelTicket} className="primary-button" style={{ marginTop: '20px', background: '#b91c1c' }}>
+                          Hủy vé / yêu cầu hoàn tiền
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

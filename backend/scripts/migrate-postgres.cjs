@@ -15,22 +15,38 @@ async function main() {
     await db.query('CREATE SCHEMA IF NOT EXISTS smartbus_private');
     await db.query('REVOKE ALL ON SCHEMA smartbus_private FROM PUBLIC');
     await db.query('CREATE TABLE IF NOT EXISTS smartbus_private.migrations(name text PRIMARY KEY, checksum text NOT NULL, applied_at timestamptz NOT NULL DEFAULT NOW())');
+    const {rows:[historyTable]}=await db.query(
+      "SELECT to_regclass('supabase_migrations.schema_migrations') AS table_name"
+    );
     const dir=path.resolve(__dirname,'../../supabase/migrations');
     for(const name of fs.readdirSync(dir).filter(f=>f.endsWith('.sql')).sort()) {
       const sql=fs.readFileSync(path.join(dir,name),'utf8');
       const checksum=createHash('sha256').update(sql).digest('hex');
       const {rows:[existing]}=await db.query('SELECT checksum FROM smartbus_private.migrations WHERE name=$1',[name]);
-      if(existing){if(existing.checksum!==checksum)throw new Error('Applied migration changed: '+name);continue;}
-      await db.query(sql);
-      await db.query('INSERT INTO smartbus_private.migrations(name,checksum) VALUES($1,$2)',[name,checksum]);
-      try {
-        const version = name.split('_')[0];
+      if(existing && existing.checksum!==checksum)throw new Error('Applied migration changed: '+name);
+      const version=name.split('_')[0];
+      const supabaseName=name.replace(/\.sql$/,'');
+      let applied=false;
+      if(historyTable.table_name) {
+        const {rows:[supabaseMigration]}=await db.query(
+          'SELECT version FROM supabase_migrations.schema_migrations WHERE version=$1',
+          [version]
+        );
+        applied=Boolean(supabaseMigration);
+      }
+      if(!existing && !applied) {
+        await db.query(sql);
+        await db.query('INSERT INTO smartbus_private.migrations(name,checksum) VALUES($1,$2)',[name,checksum]);
+        console.log('Applied '+name);
+      } else if(!existing) {
+        await db.query('INSERT INTO smartbus_private.migrations(name,checksum) VALUES($1,$2)',[name,checksum]);
+      }
+      if(historyTable.table_name) {
         await db.query(
           'INSERT INTO supabase_migrations.schema_migrations (version, name) VALUES ($1, $2) ON CONFLICT (version) DO NOTHING',
-          [version, name.replace(/\.sql$/, '')]
+          [version,supabaseName]
         );
-      } catch (_) {}
-      console.log('Applied '+name);
+      }
     }
     await db.query('COMMIT');
     console.log('Verified PostgreSQL connection and committed migrations.');
