@@ -5,22 +5,24 @@ import {
   CreatePaymentDto,
   VNPayIpnDto,
   MoMoIpnDto,
+  PaymentMethodEnum,
 } from './dto/payment.dto';
 import { PaymentMethod, PaymentStatus } from '@prisma/client';
 import { Request, Response } from 'express';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 describe('PaymentController', () => {
   let controller: PaymentController;
   let service: PaymentService;
 
   const mockPaymentResponse = {
-    payment_id: 'pay-001',
-    booking_id: 'book-001',
-    payment_method: PaymentMethod.VNPAY,
-    amount: 150000,
-    currency: 'VND',
-    payment_url: 'https://sandbox.vnpayment.vn/test',
-    expires_at: new Date(),
+    statusCode: 201,
+    message: 'Tạo đường dẫn thanh toán thành công',
+    data: {
+      payment_url: 'https://sandbox.vnpayment.vn/test',
+      qr_code_url: undefined,
+      expires_at: new Date().toISOString(),
+    },
   };
 
   const mockPaymentService = {
@@ -31,7 +33,7 @@ describe('PaymentController', () => {
       requestId: 'req-001',
       orderId: 'pay-001',
       resultCode: 0,
-      message: 'Confirm Success',
+      message: 'Success',
       responseTime: Date.now(),
       extraData: '',
     }),
@@ -47,7 +49,11 @@ describe('PaymentController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PaymentController],
       providers: [{ provide: PaymentService, useValue: mockPaymentService }],
-    }).compile();
+    })
+      // Bỏ qua JWT Guard trong unit test controller (chỉ test logic handler).
+      .overrideGuard(JwtAuthGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<PaymentController>(PaymentController);
     service = module.get<PaymentService>(PaymentService);
@@ -61,7 +67,8 @@ describe('PaymentController', () => {
     it('Khởi tạo thanh toán thành công và trả về URL', async () => {
       const dto: CreatePaymentDto = {
         booking_id: 'b1111111-1111-1111-1111-111111111111',
-        payment_method: PaymentMethod.VNPAY,
+        payment_method: PaymentMethodEnum.VNPAY,
+        return_url: 'http://localhost:5173/booking/return',
         bank_code: 'NCB',
       };
 
@@ -92,6 +99,23 @@ describe('PaymentController', () => {
       const result = await controller.handleVNPayIpn(query);
 
       expect(service.handleVNPayIpn).toHaveBeenCalledWith(query);
+      expect(result.RspCode).toBe('00');
+    });
+
+    it('Nhận POST body webhook từ VNPay và trả về RspCode 00', async () => {
+      const body: VNPayIpnDto = {
+        vnp_TmnCode: 'TEST',
+        vnp_Amount: '15000000',
+        vnp_OrderInfo: 'Test',
+        vnp_TransactionNo: '12345',
+        vnp_ResponseCode: '00',
+        vnp_TxnRef: 'pay-001',
+        vnp_SecureHash: 'hash',
+      };
+
+      const result = await controller.handleVNPayIpnPost(body);
+
+      expect(service.handleVNPayIpn).toHaveBeenCalledWith(body);
       expect(result.RspCode).toBe('00');
     });
   });

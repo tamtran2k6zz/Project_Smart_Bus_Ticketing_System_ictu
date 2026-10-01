@@ -5,11 +5,12 @@ import { RedisService } from '../../database/redis.service';
 import { VNPayService } from './services/vnpay.service';
 import { MoMoService } from './services/momo.service';
 import { ConfigService } from '@nestjs/config';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { NotFoundException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import {
   CreatePaymentDto,
   VNPayIpnDto,
   MoMoIpnDto,
+  PaymentMethodEnum,
 } from './dto/payment.dto';
 import { PaymentMethod, PaymentStatus } from '@prisma/client';
 
@@ -78,7 +79,17 @@ describe('PaymentService', () => {
     };
 
     const mockMoMoService = {
-      createPaymentUrl: jest.fn().mockResolvedValue('https://test-payment.momo.vn/v2/gateway/pay?s=123'),
+      createPaymentUrl: jest.fn().mockResolvedValue({
+        partnerCode: 'MOMO',
+        orderId: 'pay-momo-01',
+        requestId: 'req-001',
+        amount: 150000,
+        responseTime: Date.now(),
+        message: 'Thành công',
+        resultCode: 0,
+        payUrl: 'https://test-payment.momo.vn/v2/gateway/pay?s=123',
+        qrCodeUrl: 'https://test-payment.momo.vn/v2/gateway/pay/qr?s=123',
+      }),
       verifyChecksum: jest.fn().mockReturnValue(true),
     };
 
@@ -126,7 +137,8 @@ describe('PaymentService', () => {
 
       const dto: CreatePaymentDto = {
         booking_id: mockBooking.id,
-        payment_method: PaymentMethod.VNPAY,
+        payment_method: PaymentMethodEnum.VNPAY,
+        return_url: 'http://localhost:5173/booking/return',
         bank_code: 'NCB',
       };
 
@@ -149,9 +161,12 @@ describe('PaymentService', () => {
           bankCode: 'NCB',
         }),
       );
-      expect(result).toHaveProperty('payment_url');
-      expect(result.booking_id).toBe(mockBooking.id);
-      expect(result.amount).toBe(150000);
+      expect(result.statusCode).toBe(201);
+      expect(result.message).toContain('thành công');
+      expect(result.data).toHaveProperty('payment_url');
+      expect(result.data.expires_at).toBe(
+        new Date(mockBooking.expiresAt).toISOString(),
+      );
     });
 
     it('Tạo URL thanh toán MoMo thành công với signature hợp lệ', async () => {
@@ -168,7 +183,8 @@ describe('PaymentService', () => {
 
       const dto: CreatePaymentDto = {
         booking_id: mockBooking.id,
-        payment_method: PaymentMethod.MOMO,
+        payment_method: PaymentMethodEnum.MOMO,
+        return_url: 'http://localhost:5173/booking/return',
       };
 
       const result = await service.createPaymentUrl(dto);
@@ -180,8 +196,9 @@ describe('PaymentService', () => {
           amount: 150000,
         }),
       );
-      expect(result.payment_method).toBe(PaymentMethod.MOMO);
-      expect(result.payment_url).toContain('momo.vn');
+      expect(result.statusCode).toBe(201);
+      expect(result.data.payment_url).toContain('momo.vn');
+      expect(result.data.qr_code_url).toBeDefined();
     });
 
     it('Báo lỗi khi booking_id không tồn tại (NotFoundException)', async () => {
@@ -189,7 +206,8 @@ describe('PaymentService', () => {
 
       const dto: CreatePaymentDto = {
         booking_id: 'non-existing-id',
-        payment_method: PaymentMethod.VNPAY,
+        payment_method: PaymentMethodEnum.VNPAY,
+        return_url: 'http://localhost:5173/booking/return',
       };
 
       await expect(service.createPaymentUrl(dto)).rejects.toThrow(NotFoundException);
@@ -204,7 +222,8 @@ describe('PaymentService', () => {
 
       const dto: CreatePaymentDto = {
         booking_id: mockBooking.id,
-        payment_method: PaymentMethod.VNPAY,
+        payment_method: PaymentMethodEnum.VNPAY,
+        return_url: 'http://localhost:5173/booking/return',
       };
 
       await expect(service.createPaymentUrl(dto)).rejects.toThrow(BadRequestException);
@@ -219,7 +238,8 @@ describe('PaymentService', () => {
 
       const dto: CreatePaymentDto = {
         booking_id: mockBooking.id,
-        payment_method: PaymentMethod.VNPAY,
+        payment_method: PaymentMethodEnum.VNPAY,
+        return_url: 'http://localhost:5173/booking/return',
       };
 
       await expect(service.createPaymentUrl(dto)).rejects.toThrow(BadRequestException);
@@ -228,6 +248,66 @@ describe('PaymentService', () => {
         data: { status: 'EXPIRED' },
       });
       expect(prisma.payment.create).not.toHaveBeenCalled();
+    });
+
+    it('Ném lỗi InternalServerErrorException khi gọi API MoMo thất bại', async () => {
+      prisma.booking.findUnique.mockResolvedValue(mockBooking);
+      prisma.payment.create.mockResolvedValue({
+        ...mockPayment,
+        id: 'pay-momo-fail',
+        paymentMethod: PaymentMethod.MOMO,
+      });
+      momoService.createPaymentUrl.mockRejectedValueOnce(
+        new InternalServerErrorException('Không thể kết nối tới cổng thanh toán MoMo'),
+      );
+
+      const dto: CreatePaymentDto = {
+        booking_id: mockBooking.id,
+        payment_method: PaymentMethodEnum.MOMO,
+        return_url: 'http://localhost:5173/booking/return',
+      };
+
+      await expect(service.createPaymentUrl(dto)).rejects.toThrow(
+        InternalServerErrorException,
+      );
+      expect(prisma.payment.update).not.toHaveBeenCalled();
+    });
+
+    it('Ném lỗi InternalServerErrorException khi tạo chữ ký VNPay thất bại', async () => {
+      prisma.booking.findUnique.mockResolvedValue(mockBooking);
+      prisma.payment.create.mockResolvedValue({
+        ...mockPayment,
+        id: 'pay-vnpay-fail',
+        paymentMethod: PaymentMethod.VNPAY,
+      });
+      vnpayService.createPaymentUrl.mockImplementationOnce(() => {
+        throw new Error('VNPay signing error');
+      });
+
+      const dto: CreatePaymentDto = {
+        booking_id: mockBooking.id,
+        payment_method: PaymentMethodEnum.VNPAY,
+        return_url: 'http://localhost:5173/booking/return',
+      };
+
+      await expect(service.createPaymentUrl(dto)).rejects.toThrow(
+        InternalServerErrorException,
+      );
+    });
+
+    it('Ném lỗi BadRequestException khi payment_method không được hỗ trợ', async () => {
+      prisma.booking.findUnique.mockResolvedValue(mockBooking);
+      prisma.payment.create.mockResolvedValue({ ...mockPayment });
+
+      const dto = {
+        booking_id: mockBooking.id,
+        payment_method: 'ZALOPAY',
+        return_url: 'http://localhost:5173/booking/return',
+      } as unknown as CreatePaymentDto;
+
+      await expect(service.createPaymentUrl(dto)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -269,18 +349,31 @@ describe('PaymentService', () => {
       expect(redisService.releaseLock).toHaveBeenCalled();
     });
 
-    it('Xử lý Idempotent IPN: Gửi IPN lặp lại 2 lần cho đơn đã xử lý -> trả về RspCode 02', async () => {
+    it('Xử lý Idempotent IPN: Gửi IPN lặp lại cho đơn đã SUCCESS -> trả về RspCode 00 và không ghi đè DB', async () => {
       vnpayService.verifyChecksum.mockReturnValue(true);
       prisma.payment.findUnique.mockResolvedValue({
         ...mockPayment,
-        status: PaymentStatus.SUCCESS, // Already confirmed previously!
+        status: PaymentStatus.SUCCESS, // Đã xác nhận thành công trước đó
+      });
+
+      const result = await service.handleVNPayIpn(validVNPayQuery);
+
+      expect(result).toEqual({ RspCode: '00', Message: 'Confirm Success' });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(redisService.releaseLock).toHaveBeenCalled();
+    });
+
+    it('Idempotent IPN với đơn ở trạng thái khác PENDING/SUCCESS (FAILED) -> trả về RspCode 02', async () => {
+      vnpayService.verifyChecksum.mockReturnValue(true);
+      prisma.payment.findUnique.mockResolvedValue({
+        ...mockPayment,
+        status: PaymentStatus.FAILED,
       });
 
       const result = await service.handleVNPayIpn(validVNPayQuery);
 
       expect(result).toEqual({ RspCode: '02', Message: 'Order already confirmed' });
       expect(prisma.$transaction).not.toHaveBeenCalled();
-      expect(redisService.releaseLock).toHaveBeenCalled();
     });
 
     it('Trả về RspCode 01 nếu không tìm thấy Payment theo TxnRef', async () => {
@@ -302,7 +395,7 @@ describe('PaymentService', () => {
 
       const result = await service.handleVNPayIpn(validVNPayQuery);
 
-      expect(result).toEqual({ RspCode: '04', Message: 'Invalid amount' });
+      expect(result).toEqual({ RspCode: '04', Message: 'Amount invalid' });
     });
 
     it('Xử lý IPN khi giao dịch thất bại (ResponseCode != 00): Cập nhật FAILED và CANCELLED booking', async () => {
@@ -345,6 +438,25 @@ describe('PaymentService', () => {
       expect(prisma.payment.findUnique).not.toHaveBeenCalled();
     });
 
+    it('Trả về lỗi 404 (NotFoundException) nếu không tìm thấy đơn hàng MoMo', async () => {
+      momoService.verifyChecksum.mockReturnValue(true);
+      prisma.payment.findUnique.mockResolvedValue(null);
+
+      await expect(service.handleMoMoIpn(validMoMoPayload)).rejects.toThrow(NotFoundException);
+      expect(redisService.releaseLock).toHaveBeenCalled();
+    });
+
+    it('Ném lỗi BadRequestException khi số tiền MoMo không khớp dữ liệu DB', async () => {
+      momoService.verifyChecksum.mockReturnValue(true);
+      prisma.payment.findUnique.mockResolvedValue({
+        ...mockPayment,
+        amount: 200000, // Khác 150000 của payload
+      });
+
+      await expect(service.handleMoMoIpn(validMoMoPayload)).rejects.toThrow(BadRequestException);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
     it('Xử lý MoMo IPN thành công và cập nhật đúng trạng thái Booking/Payment', async () => {
       momoService.verifyChecksum.mockReturnValue(true);
       prisma.payment.findUnique.mockResolvedValue(mockPayment);
@@ -352,7 +464,7 @@ describe('PaymentService', () => {
       const result = await service.handleMoMoIpn(validMoMoPayload);
 
       expect(result.resultCode).toBe(0);
-      expect(result.message).toBe('Confirm Success');
+      expect(result.message).toBe('Success');
       expect(prisma.$transaction).toHaveBeenCalled();
       expect(redisService.releaseLock).toHaveBeenCalled();
     });

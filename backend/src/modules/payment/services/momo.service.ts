@@ -1,4 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  InternalServerErrorException,
+  HttpException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import axios from 'axios';
@@ -10,6 +16,7 @@ export interface MoMoCreatePaymentParams {
   orderInfo: string;
   requestId?: string;
   extraData?: string;
+  redirectUrl?: string;
 }
 
 export interface MoMoPaymentResponse {
@@ -63,10 +70,13 @@ export class MoMoService {
   /**
    * Create MoMo payment URL by signing request and dispatching to MoMo Gateway
    */
-  async createPaymentUrl(params: MoMoCreatePaymentParams): Promise<string> {
+  async createPaymentUrl(
+    params: MoMoCreatePaymentParams,
+  ): Promise<MoMoPaymentResponse> {
     const requestId = params.requestId || `${params.orderId}_${Date.now()}`;
     const extraData = params.extraData || '';
     const requestType = 'captureWallet';
+    const redirectUrl = params.redirectUrl || this.redirectUrl;
 
     // MoMo raw signature parameter ordering (strictly defined by MoMo API specification)
     const rawSignature =
@@ -77,7 +87,7 @@ export class MoMoService {
       `&orderId=${params.orderId}` +
       `&orderInfo=${params.orderInfo}` +
       `&partnerCode=${this.partnerCode}` +
-      `&redirectUrl=${this.redirectUrl}` +
+      `&redirectUrl=${redirectUrl}` +
       `&requestId=${requestId}` +
       `&requestType=${requestType}`;
 
@@ -91,7 +101,7 @@ export class MoMoService {
       amount: params.amount,
       orderId: params.orderId,
       orderInfo: params.orderInfo,
-      redirectUrl: this.redirectUrl,
+      redirectUrl,
       ipnUrl: this.ipnUrl,
       lang: 'vi',
       extraData,
@@ -102,20 +112,37 @@ export class MoMoService {
     this.logger.log(`Requesting MoMo payment URL for order ${params.orderId}`);
 
     try {
-      const response = await axios.post<MoMoPaymentResponse>(this.endpoint, requestBody, {
-        headers: { 'Content-Type': 'application/json' },
-        timeout: 10000,
-      });
+      const response = await axios.post<MoMoPaymentResponse>(
+        this.endpoint,
+        requestBody,
+        {
+          headers: { 'Content-Type': 'application/json' },
+          timeout: 10000,
+        },
+      );
 
-      if (response.data && response.data.payUrl) {
-        return response.data.payUrl;
+      const data = response.data;
+
+      if (!data || data.resultCode !== 0 || !data.payUrl) {
+        this.logger.error(
+          `MoMo Gateway rejected request for order ${params.orderId}: ${data?.message}`,
+        );
+        throw new BadRequestException(
+          data?.message || 'Cổng thanh toán MoMo từ chối yêu cầu thanh toán',
+        );
       }
 
-      throw new Error(response.data?.message || 'Failed to obtain payUrl from MoMo');
+      return data;
     } catch (error) {
-      this.logger.warn(`MoMo Gateway API call error: ${error.message}. Providing fallback Sandbox URL for testing.`);
-      // In sandbox/unit test environments where external call fails or is mocked:
-      return `${this.endpoint}?orderId=${params.orderId}&requestId=${requestId}&signature=${signature}`;
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      this.logger.error(
+        `MoMo Gateway API call failed for order ${params.orderId}: ${error.message}`,
+      );
+      throw new InternalServerErrorException(
+        'Không thể kết nối tới cổng thanh toán MoMo',
+      );
     }
   }
 

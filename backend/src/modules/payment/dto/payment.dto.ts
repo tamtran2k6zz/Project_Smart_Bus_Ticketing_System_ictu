@@ -1,4 +1,12 @@
-import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, IsNumber } from 'class-validator';
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  IsNumber,
+  IsUrl,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export enum PaymentMethodEnum {
@@ -14,27 +22,38 @@ export enum PaymentStatusEnum {
 }
 
 export class CreatePaymentDto {
-  @IsNotEmpty({ message: 'booking_id is required' })
-  @IsUUID('4', { message: 'booking_id must be a valid UUID v4' })
+  @IsNotEmpty({ message: 'booking_id là bắt buộc' })
+  @IsUUID('4', { message: 'booking_id phải là UUID v4 hợp lệ' })
   booking_id: string;
 
-  @IsNotEmpty({ message: 'payment_method is required' })
-  @IsEnum(PaymentMethodEnum, { message: 'payment_method must be either VNPAY or MOMO' })
+  @IsNotEmpty({ message: 'payment_method là bắt buộc' })
+  @IsEnum(PaymentMethodEnum, {
+    message: 'payment_method phải là VNPAY hoặc MOMO',
+  })
   payment_method: PaymentMethodEnum;
 
+  @IsNotEmpty({ message: 'return_url là bắt buộc' })
+  @IsUrl(
+    { require_tld: false, require_protocol: true },
+    { message: 'return_url phải là một URL hợp lệ' },
+  )
+  return_url: string;
+
   @IsOptional()
-  @IsString({ message: 'bank_code must be a string' })
+  @IsString({ message: 'bank_code phải là chuỗi' })
   bank_code?: string;
 }
 
-export class CreatePaymentResponseDto {
-  payment_id: string;
-  booking_id: string;
-  payment_method: PaymentMethodEnum;
-  amount: number;
-  currency: string;
+export class CreatePaymentResponseDataDto {
   payment_url: string;
-  expires_at: Date;
+  qr_code_url?: string;
+  expires_at: string;
+}
+
+export class CreatePaymentResponseDto {
+  statusCode: number;
+  message: string;
+  data: CreatePaymentResponseDataDto;
 }
 
 export class VNPayIpnDto {

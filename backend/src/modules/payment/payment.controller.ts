@@ -10,9 +10,11 @@ import {
   HttpStatus,
   ValidationPipe,
   UsePipes,
+  UseGuards,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { PaymentService } from './payment.service';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import {
   CreatePaymentDto,
   CreatePaymentResponseDto,
@@ -27,12 +29,20 @@ export class PaymentController {
   constructor(private readonly paymentService: PaymentService) {}
 
   /**
-   * Endpoint 1: Khởi tạo URL thanh toán
+   * Endpoint 1: Khởi tạo URL thanh toán (VNPay / MoMo Sandbox)
    * POST /api/v1/payments/create-url
+   * Header: Authorization: Bearer <JWT>
    */
   @Post('create-url')
   @HttpCode(HttpStatus.CREATED)
-  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  @UseGuards(JwtAuthGuard)
+  @UsePipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  )
   async createPaymentUrl(
     @Body() dto: CreatePaymentDto,
     @Req() req: Request,
@@ -46,13 +56,28 @@ export class PaymentController {
   }
 
   /**
-   * Endpoint 2A: Webhook / IPN từ VNPay (VNPay gọi qua GET method)
+   * Endpoint 2A: Webhook / IPN từ VNPay (VNPay gọi qua GET method - mặc định)
    * GET /api/v1/payments/vnpay-ipn
+   *
+   * Lưu ý: KHÔNG dùng ValidationPipe/whitelist cho IPN VNPay vì chữ ký
+   * được tính trên TOÀN BỘ tham số `vnp_*` mà VNPay gửi tới.
    */
   @Get('vnpay-ipn')
   @HttpCode(HttpStatus.OK)
   async handleVNPayIpn(@Query() query: VNPayIpnDto): Promise<VNPayIpnResponseDto> {
     return this.paymentService.handleVNPayIpn(query);
+  }
+
+  /**
+   * Endpoint 2A (POST): Webhook / IPN từ VNPay (một số kênh/tài liệu VNPay gọi qua POST)
+   * POST /api/v1/payments/vnpay-ipn
+   */
+  @Post('vnpay-ipn')
+  @HttpCode(HttpStatus.OK)
+  async handleVNPayIpnPost(
+    @Body() body: VNPayIpnDto,
+  ): Promise<VNPayIpnResponseDto> {
+    return this.paymentService.handleVNPayIpn(body);
   }
 
   /**

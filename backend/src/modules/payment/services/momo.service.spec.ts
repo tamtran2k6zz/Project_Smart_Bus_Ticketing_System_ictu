@@ -3,6 +3,10 @@ import { MoMoService } from './momo.service';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import axios from 'axios';
+import {
+  BadRequestException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { MoMoIpnDto } from '../dto/payment.dto';
 
 jest.mock('axios');
@@ -47,6 +51,7 @@ describe('MoMoService', () => {
   describe('createPaymentUrl', () => {
     it('Gửi POST request đến MoMo Gateway và trả về payUrl thành công', async () => {
       const mockPayUrl = 'https://test-payment.momo.vn/v2/gateway/pay?s=mockedToken';
+      const mockQrCodeUrl = 'https://test-payment.momo.vn/v2/gateway/pay/qr?s=mockedToken';
       mockedAxios.post.mockResolvedValueOnce({
         data: {
           partnerCode: mockPartnerCode,
@@ -57,39 +62,56 @@ describe('MoMoService', () => {
           message: 'Thành công',
           resultCode: 0,
           payUrl: mockPayUrl,
+          qrCodeUrl: mockQrCodeUrl,
         },
       });
 
-      const url = await service.createPaymentUrl({
+      const response = await service.createPaymentUrl({
         orderId: 'ORD-MOMO-01',
         amount: 150000,
         orderInfo: 'Thanh toan ve xe MoMo',
+        redirectUrl: 'http://localhost:5173/booking/return',
       });
 
-      expect(url).toBe(mockPayUrl);
+      expect(response.payUrl).toBe(mockPayUrl);
+      expect(response.qrCodeUrl).toBe(mockQrCodeUrl);
       expect(mockedAxios.post).toHaveBeenCalledWith(
         mockEndpoint,
         expect.objectContaining({
           partnerCode: mockPartnerCode,
           orderId: 'ORD-MOMO-01',
           amount: 150000,
+          redirectUrl: 'http://localhost:5173/booking/return',
           signature: expect.any(String),
         }),
         expect.any(Object),
       );
     });
 
-    it('Fallback về sandbox URL khi axios gặp lỗi mạng', async () => {
-      mockedAxios.post.mockRejectedValueOnce(new Error('Network error'));
-
-      const url = await service.createPaymentUrl({
-        orderId: 'ORD-MOMO-02',
-        amount: 150000,
-        orderInfo: 'Thanh toan ve xe MoMo',
+    it('Ném lỗi BadRequestException khi MoMo trả về resultCode != 0', async () => {
+      mockedAxios.post.mockResolvedValueOnce({
+        data: { resultCode: 1006, message: 'Giao dịch bị từ chối' },
       });
 
-      expect(url).toContain(mockEndpoint);
-      expect(url).toContain('ORD-MOMO-02');
+      await expect(
+        service.createPaymentUrl({
+          orderId: 'ORD-MOMO-03',
+          amount: 150000,
+          orderInfo: 'Thanh toan ve xe MoMo',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('Ném lỗi InternalServerErrorException khi axios gặp lỗi mạng', async () => {
+      mockedAxios.post.mockRejectedValueOnce(new Error('Network error'));
+
+      await expect(
+        service.createPaymentUrl({
+          orderId: 'ORD-MOMO-02',
+          amount: 150000,
+          orderInfo: 'Thanh toan ve xe MoMo',
+        }),
+      ).rejects.toThrow(InternalServerErrorException);
     });
   });
 

@@ -8,6 +8,7 @@ export interface VNPayCreatePaymentParams {
   orderInfo: string;
   ipAddr?: string;
   bankCode?: string;
+  returnUrl?: string;
 }
 
 @Injectable()
@@ -88,7 +89,7 @@ export class VNPayService {
       vnp_OrderInfo: params.orderInfo,
       vnp_OrderType: 'other',
       vnp_Amount: Math.round(params.amount * 100).toString(),
-      vnp_ReturnUrl: this.returnUrl,
+      vnp_ReturnUrl: params.returnUrl || this.returnUrl,
       vnp_IpAddr: params.ipAddr || '127.0.0.1',
       vnp_CreateDate: createDate,
       vnp_ExpireDate: expireDate,

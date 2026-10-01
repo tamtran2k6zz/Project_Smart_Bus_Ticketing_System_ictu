@@ -2,7 +2,9 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
-  ConflictException,
+  InternalServerErrorException,
+  HttpException,
+  HttpStatus,
   Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -39,90 +41,135 @@ export class PaymentService {
   }
 
   /**
-   * Endpoint 1: Create payment URL (VNPay or MoMo)
+   * Endpoint 1: Create payment URL (VNPay or MoMo Sandbox)
+   *
+   * Luồng nghiệp vụ:
+   *  1. Kiểm tra booking tồn tại và đang ở trạng thái PENDING.
+   *  2. Kiểm tra thời gian giữ chỗ (mặc định 10 phút) còn hiệu lực.
+   *  3. Tạo bản ghi payment (PENDING) trong MySQL.
+   *  4. Ký số và sinh URL thanh toán (VNPay HMAC-SHA512 / MoMo HMAC-SHA256).
+   *  5. Lưu payment_url và trả về response chuẩn.
    */
   async createPaymentUrl(
     dto: CreatePaymentDto,
     clientIp?: string,
   ): Promise<CreatePaymentResponseDto> {
-    // 1. Kiểm tra booking_id có tồn tại
-    const booking = await this.prisma.booking.findUnique({
-      where: { id: dto.booking_id },
-    });
+    try {
+      // 1. Kiểm tra booking_id có tồn tại trong MySQL
+      const booking = await this.prisma.booking.findUnique({
+        where: { id: dto.booking_id },
+      });
 
-    if (!booking) {
-      this.logger.warn(`Booking not found: ${dto.booking_id}`);
-      throw new NotFoundException(`Booking with ID ${dto.booking_id} not found`);
-    }
+      if (!booking) {
+        this.logger.warn(`createPaymentUrl: Booking not found -> ${dto.booking_id}`);
+        throw new NotFoundException(
+          `Không tìm thấy đơn đặt vé với mã ${dto.booking_id}`,
+        );
+      }
 
-    // Kiểm tra trạng thái PENDING
-    if (booking.status !== 'PENDING') {
-      this.logger.warn(`Booking ${booking.id} is in status ${booking.status}, cannot pay`);
-      throw new BadRequestException(
-        `Booking is not in PENDING status (current: ${booking.status})`,
+      // 2. Booking phải đang ở trạng thái PENDING (chờ thanh toán)
+      if (booking.status !== 'PENDING') {
+        this.logger.warn(
+          `createPaymentUrl: Booking ${booking.id} không ở trạng thái PENDING (hiện tại: ${booking.status})`,
+        );
+        throw new BadRequestException(
+          `Đơn đặt vé không ở trạng thái chờ thanh toán (hiện tại: ${booking.status})`,
+        );
+      }
+
+      // 3. Kiểm tra thời hạn giữ chỗ (mặc định 10 phút) đã hết chưa
+      const now = new Date();
+      if (now > new Date(booking.expiresAt)) {
+        this.logger.warn(
+          `createPaymentUrl: Booking ${booking.id} đã hết hạn giữ chỗ (${booking.expiresAt})`,
+        );
+        // Tự động chuyển sang EXPIRED nếu đã hết hạn giữ chỗ
+        await this.prisma.booking.update({
+          where: { id: booking.id },
+          data: { status: 'EXPIRED' },
+        });
+        throw new BadRequestException('Đơn đặt vé đã hết hạn thanh toán');
+      }
+
+      const amount = Number(booking.totalAmount);
+      const orderInfo = `Thanh toan ve xe bus - Don hang ${booking.id}`;
+
+      // 4. Tạo bản ghi payment mới với status = PENDING
+      //    transactionNo: mã giao dịch nội bộ tham chiếu gửi sang cổng thanh toán
+      const payment = await this.prisma.payment.create({
+        data: {
+          bookingId: booking.id,
+          paymentMethod: dto.payment_method,
+          transactionNo: `${dto.payment_method}-${Date.now()}-${booking.id.slice(0, 8)}`,
+          amount,
+          currency: 'VND',
+          status: PaymentStatusEnum.PENDING,
+        },
+      });
+
+      // 5. Sinh URL thanh toán theo từng cổng
+      let paymentUrl: string;
+      let qrCodeUrl: string | undefined;
+      let rawResponse: Record<string, any> | undefined;
+
+      if (dto.payment_method === PaymentMethodEnum.VNPAY) {
+        // VNPay: sắp xếp tham số alphabet + ký HMAC-SHA512 -> trả về URL redirect
+        paymentUrl = this.vnpayService.createPaymentUrl({
+          orderId: payment.id,
+          amount,
+          orderInfo,
+          ipAddr: clientIp,
+          bankCode: dto.bank_code,
+          returnUrl: dto.return_url,
+        });
+      } else if (dto.payment_method === PaymentMethodEnum.MOMO) {
+        // MoMo: ký HMAC-SHA256 theo chuẩn v2 + gọi API Sandbox qua Axios
+        const momoResponse = await this.momoService.createPaymentUrl({
+          orderId: payment.id,
+          amount,
+          orderInfo,
+          redirectUrl: dto.return_url,
+        });
+        paymentUrl = momoResponse.payUrl;
+        qrCodeUrl = momoResponse.qrCodeUrl;
+        rawResponse = momoResponse as unknown as Record<string, any>;
+      } else {
+        throw new BadRequestException(
+          `Phương thức thanh toán không được hỗ trợ: ${dto.payment_method}`,
+        );
+      }
+
+      // 6. Lưu payment_url (và raw response nếu có) vào database
+      await this.prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          paymentUrl,
+          ...(rawResponse ? { rawResponse } : {}),
+        },
+      });
+
+      // 7. Trả về response chuẩn
+      return {
+        statusCode: HttpStatus.CREATED,
+        message: 'Tạo đường dẫn thanh toán thành công',
+        data: {
+          payment_url: paymentUrl,
+          ...(qrCodeUrl ? { qr_code_url: qrCodeUrl } : {}),
+          expires_at: new Date(booking.expiresAt).toISOString(),
+        },
+      };
+    } catch (error) {
+      // Các HttpException đã chuẩn (400/404) thì ném lại nguyên trạng
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      this.logger.error(
+        `createPaymentUrl failed for booking ${dto.booking_id}: ${error.message}`,
+      );
+      throw new InternalServerErrorException(
+        'Đã xảy ra lỗi trong quá trình tạo đường dẫn thanh toán',
       );
     }
-
-    // Kiểm tra thời hạn giữ chỗ (10 phút)
-    const now = new Date();
-    if (now > new Date(booking.expiresAt)) {
-      this.logger.warn(`Booking ${booking.id} hold time expired at ${booking.expiresAt}`);
-      // Tự động hủy nếu đã hết hạn
-      await this.prisma.booking.update({
-        where: { id: booking.id },
-        data: { status: 'EXPIRED' },
-      });
-      throw new BadRequestException('Booking hold time (10 minutes) has expired');
-    }
-
-    // 2. Tạo bản ghi payment với trạng thái PENDING
-    const payment = await this.prisma.payment.create({
-      data: {
-        bookingId: booking.id,
-        paymentMethod: dto.payment_method,
-        amount: booking.totalAmount,
-        currency: 'VND',
-        status: 'PENDING',
-      },
-    });
-
-    // 3. Tạo chữ ký số và URL thanh toán
-    let paymentUrl: string;
-    const orderInfo = `Thanh toan ve xe bus - Don hang ${booking.id}`;
-
-    if (dto.payment_method === PaymentMethodEnum.VNPAY) {
-      paymentUrl = this.vnpayService.createPaymentUrl({
-        orderId: payment.id,
-        amount: Number(payment.amount),
-        orderInfo,
-        ipAddr: clientIp,
-        bankCode: dto.bank_code,
-      });
-    } else if (dto.payment_method === PaymentMethodEnum.MOMO) {
-      paymentUrl = await this.momoService.createPaymentUrl({
-        orderId: payment.id,
-        amount: Number(payment.amount),
-        orderInfo,
-      });
-    } else {
-      throw new BadRequestException(`Unsupported payment method: ${dto.payment_method}`);
-    }
-
-    // Lưu payment_url vào database
-    await this.prisma.payment.update({
-      where: { id: payment.id },
-      data: { paymentUrl },
-    });
-
-    return {
-      payment_id: payment.id,
-      booking_id: booking.id,
-      payment_method: dto.payment_method,
-      amount: Number(payment.amount),
-      currency: payment.currency,
-      payment_url: paymentUrl,
-      expires_at: booking.expiresAt,
-    };
   }
 
   /**
@@ -161,18 +208,25 @@ export class PaymentService {
         return { RspCode: '01', Message: 'Order not found' };
       }
 
-      // Kiểm tra số tiền khớp
+      // Kiểm tra số tiền khớp (VNPay gửi amount đã nhân với 100)
       const receivedAmount = Number(query.vnp_Amount) / 100;
       if (Math.round(receivedAmount) !== Math.round(Number(payment.amount))) {
         this.logger.error(
           `VNPay IPN amount mismatch. Expected: ${payment.amount}, Received: ${receivedAmount}`,
         );
-        return { RspCode: '04', Message: 'Invalid amount' };
+        return { RspCode: '04', Message: 'Amount invalid' };
       }
 
-      // Idempotency: Kiểm tra trạng thái đơn hàng. Nếu đã khác PENDING -> đã xử lý rồi!
-      if (payment.status !== 'PENDING') {
-        this.logger.log(`VNPay IPN Idempotent hit: Payment ${paymentId} already in status ${payment.status}`);
+      // Idempotency: Nếu đơn đã xử lý THÀNH CÔNG trước đó -> trả kết quả thành công luôn,
+      // KHÔNG cập nhật lại DB (tránh xử lý trùng khi VNPay retry IPN)
+      if (payment.status === PaymentStatusEnum.SUCCESS) {
+        this.logger.log(`VNPay IPN Idempotent hit: Payment ${paymentId} already SUCCESS`);
+        return { RspCode: '00', Message: 'Confirm Success' };
+      }
+
+      // Các trạng thái đã xử lý khác (FAILED/REFUNDED): coi như đã xác nhận trước đó
+      if (payment.status !== PaymentStatusEnum.PENDING) {
+        this.logger.log(`VNPay IPN: Payment ${paymentId} không ở trạng thái PENDING (${payment.status})`);
         return { RspCode: '02', Message: 'Order already confirmed' };
       }
 
@@ -246,10 +300,7 @@ export class PaymentService {
     const isValidSignature = this.momoService.verifyChecksum(body);
     if (!isValidSignature) {
       this.logger.error(`Invalid MoMo signature for orderId: ${body.orderId}`);
-      throw new BadRequestException({
-        resultCode: 99,
-        message: 'Invalid signature',
-      });
+      throw new BadRequestException('Invalid signature');
     }
 
     const paymentId = body.orderId;
@@ -280,20 +331,21 @@ export class PaymentService {
 
       if (!payment) {
         this.logger.warn(`MoMo IPN: Payment not found for ID ${paymentId}`);
-        return {
-          partnerCode: body.partnerCode,
-          requestId: body.requestId,
-          orderId: body.orderId,
-          resultCode: 1,
-          message: 'Order not found',
-          responseTime: Date.now(),
-          extraData: body.extraData || '',
-        };
+        throw new NotFoundException(`Order not found: ${paymentId}`);
       }
 
-      // Idempotency: Nếu đã xử lý rồi -> Trả về kết quả thành công cho MoMo
-      if (payment.status !== 'PENDING') {
-        this.logger.log(`MoMo IPN Idempotent hit: Payment ${paymentId} already in status ${payment.status}`);
+      // Kiểm tra số tiền khớp với dữ liệu trong DB
+      if (Math.round(Number(body.amount)) !== Math.round(Number(payment.amount))) {
+        this.logger.error(
+          `MoMo IPN amount mismatch. Expected: ${payment.amount}, Received: ${body.amount}`,
+        );
+        throw new BadRequestException('Amount invalid');
+      }
+
+      // Idempotency: Nếu đơn đã xử lý THÀNH CÔNG trước đó -> trả kết quả thành công,
+      // KHÔNG cập nhật lại DB (tránh xử lý trùng khi MoMo retry IPN)
+      if (payment.status === PaymentStatusEnum.SUCCESS) {
+        this.logger.log(`MoMo IPN Idempotent hit: Payment ${paymentId} already SUCCESS`);
         return {
           partnerCode: body.partnerCode,
           requestId: body.requestId,
@@ -356,7 +408,7 @@ export class PaymentService {
         requestId: body.requestId,
         orderId: body.orderId,
         resultCode: 0,
-        message: 'Confirm Success',
+        message: 'Success',
         responseTime: Date.now(),
         extraData: body.extraData || '',
       };
