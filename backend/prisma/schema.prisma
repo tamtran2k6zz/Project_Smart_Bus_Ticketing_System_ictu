@@ -66,3 +66,132 @@ model Payment {
   @@map("payments")
 }
 
+enum TicketStatus {
+  RESERVED
+  BOOKED
+  CHECKED_IN
+  CANCELLED
+}
+
+model User {
+  id             Int      @id @default(autoincrement())
+  fullName       String   @map("full_name") @db.VarChar(100)
+  email          String   @unique @db.VarChar(100)
+  phoneNumber    String?  @map("phone_number") @db.VarChar(20)
+  passwordHash   String   @map("password_hash") @db.VarChar(255)
+  roleId         Int      @map("role_id")
+  role           String   @default("PASSENGER") @db.VarChar(20)
+  status         String   @default("ACTIVE") @db.VarChar(20)
+  discountType   String   @default("NONE") @map("discount_type") @db.VarChar(20)
+  discountStatus String   @default("NOT_REGISTERED") @map("discount_status") @db.VarChar(20)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tripsAsDriver  Trip[]   @relation("TripDriver")
+  tickets        Ticket[]
+
+  @@map("users")
+}
+
+model Route {
+  id                   Int         @id @default(autoincrement())
+  code                 String      @unique @db.VarChar(20)
+  name                 String      @db.VarChar(150)
+  description          String?     @db.Text
+  distanceKm           Decimal     @default(0.00) @map("distance_km") @db.Decimal(6, 2)
+  basePrice            Decimal     @default(10000.00) @map("base_price") @db.Decimal(10, 2)
+  estimatedDurationMin Int         @default(0) @map("estimated_duration_min")
+  status               String      @default("ACTIVE") @db.VarChar(20)
+  createdAt            DateTime    @default(now()) @map("created_at")
+
+  trips                Trip[]
+  routeStops           RouteStop[]
+
+  @@map("routes")
+}
+
+model Bus {
+  id               String   @id @db.VarChar(36)
+  plateNumber      String   @unique @map("plate_number") @db.VarChar(20)
+  busType          String   @default("STANDARD") @map("bus_type") @db.VarChar(50)
+  totalSeats       Int      @default(40) @map("total_seats")
+  standingCapacity Int      @default(15) @map("standing_capacity")
+  status           String   @default("READY") @db.VarChar(50)
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  trips            Trip[]
+
+  @@map("buses")
+}
+
+model BusStop {
+  id         Int      @id @default(autoincrement())
+  code       String   @unique @db.VarChar(20)
+  name       String   @db.VarChar(150)
+  address    String   @db.VarChar(255)
+  latitude   Decimal? @db.Decimal(10, 7)
+  longitude  Decimal? @db.Decimal(10, 7)
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  routeStops RouteStop[]
+
+  @@map("bus_stops")
+}
+
+model RouteStop {
+  id                  Int      @id @default(autoincrement())
+  routeId             Int      @map("route_id")
+  stopId              Int      @map("stop_id")
+  stopOrder           Int      @map("stop_order")
+  distanceFromStartKm Decimal  @default(0.00) @map("distance_from_start_km") @db.Decimal(6, 2)
+  estimatedMinutes    Int      @default(0) @map("estimated_minutes")
+
+  route               Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  busStop             BusStop  @relation(fields: [stopId], references: [id])
+
+  @@unique([routeId, stopOrder])
+  @@index([routeId, stopOrder])
+  @@map("route_stops")
+}
+
+model Trip {
+  id            Int      @id @default(autoincrement())
+  routeId       Int      @map("route_id")
+  busId         String?  @map("bus_id") @db.VarChar(36)
+  busPlate      String   @map("bus_plate") @db.VarChar(20)
+  driverId      Int?     @map("driver_id")
+  departureTime DateTime @map("departure_time")
+  arrivalTime   DateTime @map("arrival_time")
+  totalSeats    Int      @default(40) @map("total_seats")
+  bookedSeats   Int      @default(0) @map("booked_seats")
+  basePrice     Decimal  @default(10000.00) @map("base_price") @db.Decimal(10, 2)
+  status        String   @default("SCHEDULED") @db.VarChar(20)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  route         Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  bus           Bus?     @relation(fields: [busId], references: [id])
+  driver        User?    @relation("TripDriver", fields: [driverId], references: [id])
+  tickets       Ticket[]
+
+  @@index([routeId, departureTime])
+  @@map("trips")
+}
+
+model Ticket {
+  id         String       @id @db.VarChar(36)
+  ticketCode String       @unique @map("ticket_code") @db.VarChar(50)
+  tripId     Int          @map("trip_id")
+  status     TicketStatus @default(BOOKED)
+  seatNumber String?      @map("seat_number") @db.VarChar(10)
+  userId     Int?         @map("user_id")
+  fareAmount Decimal      @default(10000.00) @map("fare_amount") @db.Decimal(10, 2)
+  createdAt  DateTime     @default(now()) @map("created_at")
+
+  trip       Trip         @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  user       User?        @relation(fields: [userId], references: [id])
+
+  @@index([tripId])
+  @@index([userId])
+  @@map("tickets")
+}
+
