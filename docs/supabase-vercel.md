@@ -31,6 +31,11 @@ Use `backend/.env.example` as a template. Do not overwrite the old MySQL connect
 | `MYSQL_SOURCE_URL` | Existing MySQL database for one-time import | Local only |
 | `MYSQL_SOURCE_TIMEZONE` | Timezone of old MySQL DATETIME values; defaults to `Asia/Ho_Chi_Minh` | Local only |
 | `CORS_ORIGIN` | Comma-separated origins for a separately hosted frontend | Unnecessary on same-origin Vercel |
+| `REDIS_URL` | Shared Redis-compatible service for cross-instance 10-minute seat locks | Optional; Docker Compose supplies local Redis |
+| `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET` | VNPay merchant credentials for signed payment and refund requests | Required to enable VNPay |
+| `MOMO_PARTNER_CODE`, `MOMO_ACCESS_KEY`, `MOMO_SECRET_KEY` | MoMo merchant credentials for signed payment and refund requests | Required to enable MoMo |
+| `VNPAY_RETURN_URL`, `MOMO_IPN_URL`, `PAYMENT_RESULT_URL` | Public callback/result URLs used by the gateways | Required for sandbox/live gateway tests |
+| `PAYMENT_CRON_SECRET` or `CRON_SECRET` | Bearer token protecting the expired-reservation cron endpoint | Required in Production |
 
 No Supabase service key, publishable key, or `VITE_SUPABASE_*` variable is needed for this architecture. Never put database credentials or JWT secrets in `VITE_*` variables. Rotate the old repository's demo JWT secret; this requires users to sign in again.
 
@@ -44,9 +49,11 @@ npm run db:migrate
 
 This runner applies `supabase/migrations/*.sql` in one transaction, uses an advisory lock, and records checksums in `smartbus_private.migrations`. Re-running unchanged migrations is safe. It fails on pre-existing application tables rather than dropping them. Inspect an occupied target and plan reconciliation before running it there.
 
-Use this runner consistently; do not also apply the same files with `supabase db push`, because the two migration-history tables are different. The CLI generated the initial migration filename; this project's runner owns application of it.
+Use this runner consistently. It stores checksums in `smartbus_private.migrations` and synchronizes version records with `supabase_migrations.schema_migrations` when that Supabase CLI history table exists. A migration already recorded in Supabase history is registered locally without being replayed. Avoid applying the same migration independently through multiple tools, and never edit an already-applied migration file.
 
-All 13 application tables have RLS enabled and deny `anon`/`authenticated` access. The backend connects using the database owner account through the pooler and enforces JWT roles and user ownership. The custom JWT is not a Supabase Auth JWT. Do not expose these tables through a browser Supabase client.
+All 14 application tables have RLS enabled and deny `anon`/`authenticated` access. The backend connects using the database owner account through the pooler and enforces JWT roles and user ownership. The custom JWT is not a Supabase Auth JWT. Do not expose these tables through a browser Supabase client.
+
+The later payment migration adds the payment transaction ledger and reservation expiry fields. Apply it using the same migration runner before enabling gateway payments. The active Express booking API retains database row-locking and adds Redis `SET NX` locks when `REDIS_URL` is configured. A shared Redis service is needed for those cross-instance locks on Vercel; PostgreSQL seat locking remains the concurrency guard if Redis is not configured.
 
 ## 4. Import existing data or bootstrap an empty project
 
@@ -96,9 +103,9 @@ npm --prefix backend run test:postgres
 npm --prefix frontend run build
 ```
 
-The embedded PostgreSQL suite verifies schema execution, parameterized SQL, registration/login, authorization, route/stop/trip operations, lock ownership/expiry, duplicate-sale constraints, QR verification, feedback, and Data API role denial. Its single-session adapter serializes test transactions; test real concurrent connections separately on the deployed database.
+The embedded PostgreSQL suite verifies schema execution, parameterized SQL, registration/login, authorization, route/stop/trip operations, lock ownership/expiry, duplicate-sale constraints, QR verification, feedback, and Data API role denial. It also exercises a signed MoMo callback, ticket cancellation/refund, and expiry cleanup against a local fake gateway. Its single-session adapter serializes test transactions; test real concurrent connections and provider sandbox responses separately.
 
-On Vercel verify `/api/health` reports `CONNECTED_POSTGRESQL`, then test login, route search, booking, and driver verification. Two concurrent attempts for one seat must produce exactly one ticket. Check imported table counts and timezone-sensitive trip searches. Run Supabase Database Advisors and resolve findings before reopening writes.
+On Vercel verify `/api/health` reports `CONNECTED_POSTGRESQL`, then test login, route search, booking, and driver verification. Configure gateway sandbox credentials and publicly reachable HTTPS callback URLs before attempting a payment or refund; register the VNPay IPN URL with the merchant. The scheduled `/api/v1/ticketing/release-expired` endpoint runs every minute and requires `CRON_SECRET` or `PAYMENT_CRON_SECRET`. Two concurrent attempts for one seat must produce exactly one ticket. Check imported table counts and timezone-sensitive trip searches. Run Supabase Database Advisors and resolve findings before reopening writes.
 
 ## Rollback
 
