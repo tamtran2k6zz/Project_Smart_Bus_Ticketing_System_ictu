@@ -1,15 +1,18 @@
+import { authenticateJWT } from '../middlewares/auth';
+import { authorizeRoles } from '../middlewares/rbac';
 import { Router, Request, Response } from 'express';
 import { query } from '../config/database';
 
 const router = Router();
+router.use(authenticateJWT, authorizeRoles('ADMIN','MANAGER'));
 
 // 1. Danh sách người dùng (US 17, US 22)
 router.get('/', async (_req: Request, res: Response): Promise<void> => {
   try {
     const users = await query<any[]>(
-      `SELECT id, full_name AS fullName, email, phone_number AS phoneNumber,
-              role, status, discount_type AS discountType, discount_status AS discountStatus,
-              created_at AS createdAt
+      `SELECT id, full_name AS "fullName", email, phone_number AS "phoneNumber",
+              role, status, discount_type AS "discountType", discount_status AS "discountStatus",
+              created_at AS "createdAt"
        FROM users
        ORDER BY id ASC`
     );
@@ -45,7 +48,7 @@ router.patch('/:id/discount-approval', async (req: Request, res: Response): Prom
     }
 
     await query(
-      'UPDATE users SET discount_status = ?, updated_at = NOW() WHERE id = ?',
+      'UPDATE users SET discount_status = $1, updated_at = NOW() WHERE id = $2',
       [status, id]
     );
 

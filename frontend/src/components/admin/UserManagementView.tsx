@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getApiUrl } from '../../api/client';
+import { getApiUrl, apiFetch } from '../../api/client';
 
 interface UserData {
   id: string;
@@ -23,7 +23,7 @@ export const UserManagementView: React.FC = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('smartbus_access_token');
-      const res = await fetch(getApiUrl('/api/v1/users'), {
+      const res = await apiFetch(getApiUrl('/api/v1/users'), {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       const json = await res.json();
@@ -43,7 +43,7 @@ export const UserManagementView: React.FC = () => {
   const handleApproveDiscount = async (userId: string, newStatus: 'APPROVED' | 'REJECTED') => {
     try {
       const token = localStorage.getItem('smartbus_access_token');
-      const res = await fetch(getApiUrl(`/api/v1/users/${userId}/discount-approval`), {
+      const res = await apiFetch(getApiUrl(`/api/v1/users/${userId}/discount-approval`), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -53,13 +53,13 @@ export const UserManagementView: React.FC = () => {
       });
 
       if (!res.ok) {
-        throw new Error('Cập nhật trạng thái duyệt thất bại trong MySQL!');
+        throw new Error('Cập nhật trạng thái duyệt thất bại trong cơ sở dữ liệu!');
       }
 
       setActionMessage(
         newStatus === 'APPROVED'
-          ? '✅ Đã duyệt giá vé ưu đãi HSSV thành công vào MySQL!'
-          : '❌ Đã từ chối hồ sơ ưu đãi trong MySQL!',
+          ? '✅ Đã duyệt giá vé ưu đãi HSSV thành công vào cơ sở dữ liệu!'
+          : '❌ Đã từ chối hồ sơ ưu đãi trong cơ sở dữ liệu!',
       );
 
       await fetchUsers();
@@ -77,7 +77,7 @@ export const UserManagementView: React.FC = () => {
             Phân quyền & Duyệt đối tượng ưu đãi HSSV (US 17, US 22)
           </h3>
           <p style={{ fontSize: '13.5px', color: 'rgba(255, 255, 255, 0.55)', margin: 0 }}>
-            Danh sách tài khoản và hồ sơ xét duyệt ưu đãi trực tiếp từ bảng <code style={{ color: '#38bdf8' }}>users</code> trong MySQL
+            Danh sách tài khoản và hồ sơ xét duyệt ưu đãi trực tiếp từ bảng <code style={{ color: '#38bdf8' }}>users</code> trong cơ sở dữ liệu
           </p>
         </div>
         <button
@@ -108,7 +108,7 @@ export const UserManagementView: React.FC = () => {
 
       {loading ? (
         <div style={{ padding: '36px', textAlign: 'center', color: 'rgba(255, 255, 255, 0.5)' }}>
-          Đang nạp dữ liệu người dùng từ MySQL...
+          Đang nạp dữ liệu người dùng từ cơ sở dữ liệu...
         </div>
       ) : (
         <div className="table-wrapper">

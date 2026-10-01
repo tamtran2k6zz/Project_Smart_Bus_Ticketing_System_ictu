@@ -1,5 +1,5 @@
 import type { BusRoute, Station } from '../types/route';
-import { getApiUrl } from '../api/client';
+import { getApiUrl, apiFetch } from '../api/client';
 
 const routesUrl = '/api/v1/routes';
 
@@ -32,7 +32,7 @@ interface SaveRouteInput {
 }
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(getApiUrl(url), {
+  const response = await apiFetch(getApiUrl(url), {
     ...init,
     headers: {
       'Content-Type': 'application/json',

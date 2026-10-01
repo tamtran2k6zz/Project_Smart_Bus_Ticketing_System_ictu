@@ -1,108 +1,43 @@
 services:
-  # =============================================================================
-  # 1. DỊCH VỤ CƠ SỞ DỮ LIỆU MYSQL 8.0
-  # =============================================================================
-  mysql:
-    image: mysql:8.0
-    container_name: smartbus_mysql
+  postgres:
+    image: postgres:17-alpine
     restart: unless-stopped
-    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     environment:
-      MYSQL_DATABASE: smartbus_db
-      MYSQL_USER: smartbus_user
-      MYSQL_PASSWORD: smartbus_pass
-      MYSQL_ROOT_PASSWORD: root_pass
+      POSTGRES_DB: smartbus_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     ports:
-      - "${MYSQL_PORT:-3308}:3306"
+      - "127.0.0.1:5433:5432"
     volumes:
-      - mysql_data:/var/lib/mysql
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_data:/var/lib/postgresql/data
+      - ./supabase/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_pass"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d smartbus_db"]
       interval: 5s
       timeout: 5s
       retries: 10
-
-  # =============================================================================
-  # 2. DỊCH VỤ QUẢN TRỊ TRỰC QUAN PHPMYADMIN (CỔNG 8080)
-  # =============================================================================
-  phpmyadmin:
-    image: phpmyadmin/phpmyadmin:latest
-    container_name: smartbus_phpmyadmin
-    restart: unless-stopped
-    ports:
-      - "8080:80"
-    environment:
-      PMA_HOST: mysql
-      PMA_PORT: 3306
-      PMA_USER: root
-      PMA_PASSWORD: root_pass
-      UPLOAD_LIMIT: 64M
-    depends_on:
-      mysql:
-        condition: service_healthy
-
-  # =============================================================================
-  # 3. DỊCH VỤ REDIS DÙNG CHO KHÓA GHẾ
-  # =============================================================================
-  redis:
-    image: redis:7-alpine
-    container_name: smartbus_redis
-    restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
-  # =============================================================================
-  # 4. DỊCH VỤ BACKEND API (NODE.JS / TYPESCRIPT / EXPRESS / CỔNG 5000)
-  # =============================================================================
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: smartbus_backend
+    build: ./backend
     restart: unless-stopped
     ports:
       - "5000:5000"
     environment:
-      PORT: 5000
-      DB_HOST: mysql
-      DB_PORT: 3306
-      DB_USER: smartbus_user
-      DB_PASSWORD: smartbus_pass
-      DB_NAME: smartbus_db
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: smartbus_jwt_secret_key_sprint1_2026
-      JWT_EXPIRES_IN: 86400
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      PGDATABASE: smartbus_db
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      CORS_ORIGIN: http://localhost:3000,http://localhost:5173
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
-
-  # =============================================================================
-  # 5. DỊCH VỤ FRONTEND CLIENT (REACT / TYPESCRIPT / VITE / CỔNG 3000)
-  # =============================================================================
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: smartbus_frontend
+    build: ./frontend
     restart: unless-stopped
     ports:
       - "3000:3000"
-    environment:
-      VITE_API_URL: http://localhost:5000
     depends_on:
       - backend
-
 volumes:
-  mysql_data:
-    driver: local
-  redis_data:
-    driver: local
+  postgres_data:

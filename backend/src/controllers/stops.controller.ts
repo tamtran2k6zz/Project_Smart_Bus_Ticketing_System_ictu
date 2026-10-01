@@ -7,7 +7,7 @@ export const getStops = async (req: Request, res: Response): Promise<void> => {
   try {
     const stops = await query<any[]>(
       `SELECT id, code, name, address, latitude, longitude, 
-              (CASE WHEN is_active = 1 THEN 'ACTIVE' ELSE 'INACTIVE' END) AS status, 
+              (CASE WHEN is_active = TRUE THEN 'ACTIVE' ELSE 'INACTIVE' END) AS status, 
               created_at 
        FROM bus_stops 
        WHERE deleted_at IS NULL 
@@ -52,7 +52,7 @@ export const createStop = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    const existing = await query<any[]>('SELECT id FROM bus_stops WHERE code = ? LIMIT 1', [code.trim().toUpperCase()]);
+    const existing = await query<any[]>('SELECT id FROM bus_stops WHERE code = $1 LIMIT 1', [code.trim().toUpperCase()]);
 
     if (existing.length > 0) {
       res.status(409).json({
@@ -64,11 +64,11 @@ export const createStop = async (req: Request, res: Response): Promise<void> => 
     }
 
     const stopId = randomUUID();
-    const isActive = status === 'INACTIVE' ? 0 : 1;
+    const isActive = status !== 'INACTIVE';
 
     await query(
       `INSERT INTO bus_stops (id, code, name, address, latitude, longitude, is_active)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
         stopId,
         code.trim().toUpperCase(),
@@ -83,7 +83,7 @@ export const createStop = async (req: Request, res: Response): Promise<void> => 
     res.status(201).json({
       statusCode: 201,
       success: true,
-      message: 'Thêm mới trạm dừng thành công vào CSDL MySQL!',
+      message: 'Thêm mới trạm dừng thành công vào CSDL PostgreSQL!',
       data: {
         id: stopId,
         code: code.trim().toUpperCase(),
@@ -110,7 +110,7 @@ export const updateStop = async (req: Request, res: Response): Promise<void> => 
     const { id } = req.params;
     const { code, name, address, latitude, longitude, status } = req.body;
 
-    const existing = await query<any[]>('SELECT id FROM bus_stops WHERE id = ? LIMIT 1', [id]);
+    const existing = await query<any[]>('SELECT id FROM bus_stops WHERE id = $1 LIMIT 1', [id]);
 
     if (existing.length === 0) {
       res.status(404).json({
@@ -121,17 +121,17 @@ export const updateStop = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    const isActive = status !== undefined ? (status === 'ACTIVE' || status === true ? 1 : 0) : null;
+    const isActive = status !== undefined ? (status === 'ACTIVE' || status === true) : null;
 
     await query(
       `UPDATE bus_stops
-       SET code = COALESCE(?, code),
-           name = COALESCE(?, name),
-           address = COALESCE(?, address),
-           latitude = COALESCE(?, latitude),
-           longitude = COALESCE(?, longitude),
-           is_active = COALESCE(?, is_active)
-       WHERE id = ?`,
+       SET code = COALESCE($1, code),
+           name = COALESCE($2, name),
+           address = COALESCE($3, address),
+           latitude = COALESCE($4, latitude),
+           longitude = COALESCE($5, longitude),
+           is_active = COALESCE($6, is_active)
+       WHERE id = $7`,
       [
         code ? code.trim().toUpperCase() : null,
         name ? name.trim() : null,
@@ -163,7 +163,7 @@ export const deleteStop = async (req: Request, res: Response): Promise<void> => 
   try {
     const { id } = req.params;
 
-    const existing = await query<any[]>('SELECT id FROM bus_stops WHERE id = ? LIMIT 1', [id]);
+    const existing = await query<any[]>('SELECT id FROM bus_stops WHERE id = $1 LIMIT 1', [id]);
 
     if (existing.length === 0) {
       res.status(404).json({
@@ -175,7 +175,7 @@ export const deleteStop = async (req: Request, res: Response): Promise<void> => 
     }
 
     // Kiểm tra xem trạm có đang được gán vào tuyến nào không
-    const routeStopCheck = await query<any[]>('SELECT route_id FROM route_stops WHERE stop_id = ? LIMIT 1', [id]);
+    const routeStopCheck = await query<any[]>('SELECT route_id FROM route_stops WHERE stop_id = $1 LIMIT 1', [id]);
 
     if (routeStopCheck.length > 0) {
       res.status(400).json({
@@ -186,12 +186,12 @@ export const deleteStop = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    await query('UPDATE bus_stops SET deleted_at = NOW(3), is_active = 0 WHERE id = ?', [id]);
+    await query('UPDATE bus_stops SET deleted_at = NOW(), is_active = FALSE WHERE id = $1', [id]);
 
     res.status(200).json({
       statusCode: 200,
       success: true,
-      message: 'Xóa trạm dừng thành công khỏi CSDL MySQL!',
+      message: 'Xóa trạm dừng thành công khỏi CSDL PostgreSQL!',
     });
   } catch (err: any) {
     console.error('Lỗi API deleteStop:', err);

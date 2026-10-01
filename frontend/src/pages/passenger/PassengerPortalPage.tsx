@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import type { BusRoute } from '../../types/route';
-import { getApiUrl } from '../../api/client';
+import { getApiUrl, apiFetch } from '../../api/client';
 
 interface SeatInfo {
   id: string;
@@ -55,11 +55,12 @@ export const PassengerPortalPage: React.FC = () => {
     navigate('/login');
   };
 
-  // Nạp chuyến xe từ MySQL
+  // Nạp chuyến xe từ cơ sở dữ liệu
   const fetchTrips = useCallback(async () => {
     try {
-      const dashRes = await fetch(getApiUrl('/api/v1/operations/dashboard/summary'));
+      const dashRes = await apiFetch(getApiUrl('/api/v1/trips'));
       const dashJson = await dashRes.json();
+      dashJson.tripOccupancy = dashJson.data;
       const rawOccupancy = Array.isArray(dashJson?.tripOccupancy)
         ? dashJson.tripOccupancy
         : Array.isArray(dashJson?.data?.tripOccupancy)
@@ -72,7 +73,7 @@ export const PassengerPortalPage: React.FC = () => {
         routeName: t.routeName,
         plateNumber: t.busPlate,
         departureTime: t.departureTime,
-        basePrice: 10000,
+        basePrice: Number(t.basePrice),
       }));
 
       setTrips(tripList);
@@ -90,7 +91,7 @@ export const PassengerPortalPage: React.FC = () => {
     if (!selectedTripId) return;
     const fetchSeats = async () => {
       try {
-        const res = await fetch(getApiUrl(`/api/v1/ticketing/trips/${selectedTripId}/seats`));
+        const res = await apiFetch(getApiUrl(`/api/v1/ticketing/trips/${selectedTripId}/seats`));
         const json = await res.json();
         const rawSeats = Array.isArray(json?.data?.seats)
           ? json.data.seats
@@ -111,8 +112,8 @@ export const PassengerPortalPage: React.FC = () => {
   const fetchOtherData = useCallback(async () => {
     try {
       const [fbRes, rRes] = await Promise.all([
-        fetch(getApiUrl('/api/v1/operations/feedbacks')),
-        fetch(getApiUrl('/api/v1/routes')),
+        apiFetch(getApiUrl('/api/v1/operations/feedbacks')),
+        apiFetch(getApiUrl('/api/v1/routes')),
       ]);
       const fbJson = await fbRes.json();
       const rJson = await rRes.json();
@@ -155,7 +156,7 @@ export const PassengerPortalPage: React.FC = () => {
     setBookingMsg(null);
     try {
       const token = localStorage.getItem('smartbus_access_token');
-      const res = await fetch(getApiUrl('/api/v1/ticketing/bookings'), {
+      const res = await apiFetch(getApiUrl('/api/v1/ticketing/bookings'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -172,14 +173,14 @@ export const PassengerPortalPage: React.FC = () => {
 
       const json = await res.json();
       if (!res.ok) {
-        throw new Error(json.message || 'Đặt vé thất bại trong MySQL!');
+        throw new Error(json.message || 'Đặt vé thất bại trong cơ sở dữ liệu!');
       }
 
       setBookingResult(json.data || json);
-      setBookingMsg('🎉 Giữ chỗ thành công trong 10 phút! Mã vé QR đã lưu trong MySQL.');
+      setBookingMsg('🎉 Giữ chỗ thành công trong 10 phút! Mã vé QR đã lưu trong cơ sở dữ liệu.');
 
       // Refresh seats
-      const seatsRes = await fetch(getApiUrl(`/api/v1/ticketing/trips/${selectedTripId}/seats`));
+      const seatsRes = await apiFetch(getApiUrl(`/api/v1/ticketing/trips/${selectedTripId}/seats`));
       const seatsJson = await seatsRes.json();
       const rawSeats = Array.isArray(seatsJson?.data?.seats)
         ? seatsJson.data.seats
@@ -206,7 +207,7 @@ export const PassengerPortalPage: React.FC = () => {
       const token = localStorage.getItem('smartbus_access_token');
       const firstTripId = trips[0]?.id || 'trip-1';
 
-      const res = await fetch(getApiUrl('/api/v1/operations/feedbacks'), {
+      const res = await apiFetch(getApiUrl('/api/v1/operations/feedbacks'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -359,7 +360,7 @@ export const PassengerPortalPage: React.FC = () => {
             <div className="liquid-glass" style={{ padding: '32px' }}>
               <h2 style={{ fontSize: '28px', margin: '0 0 6px' }}>Đặt Vé Xe Buýt Trực Tuyến & Giữ Chỗ</h2>
               <p style={{ fontSize: '13.5px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '24px' }}>
-                Chọn chuyến xe xuất bến, chọn vị trí ngồi và nhận vé điện tử QR lưu trữ trực tiếp trong MySQL.
+                Chọn chuyến xe xuất bến, chọn vị trí ngồi và nhận vé điện tử QR lưu trữ trực tiếp trong cơ sở dữ liệu.
               </p>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '24px' }}>
@@ -480,7 +481,7 @@ export const PassengerPortalPage: React.FC = () => {
                     opacity: !selectedSeat || isBooking ? 0.5 : 1,
                   }}
                 >
-                  {isBooking ? 'Đang ghi nhận MySQL...' : `Xác nhận Đặt Ghế ${selectedSeat || ''} & Nhận Vé QR →`}
+                  {isBooking ? 'Đang ghi nhận cơ sở dữ liệu...' : `Xác nhận Đặt Ghế ${selectedSeat || ''} & Nhận Vé QR →`}
                 </button>
                 {bookingMsg && (
                   <span style={{ color: '#34d399', fontSize: '14px', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
@@ -513,7 +514,7 @@ export const PassengerPortalPage: React.FC = () => {
                     }}
                   >
                     <h3 style={{ color: '#38bdf8', fontSize: '22px', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      🎟️ Vé Điện Tử SmartBus Của Bạn (Lưu trong MySQL)
+                      🎟️ Vé Điện Tử SmartBus Của Bạn (Lưu trong cơ sở dữ liệu)
                     </h3>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '28px', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div style={{ fontSize: '14px', lineHeight: 2, color: 'rgba(255, 255, 255, 0.9)' }}>
@@ -628,7 +629,7 @@ export const PassengerPortalPage: React.FC = () => {
               className="primary-button"
               style={{ padding: '11px 24px', borderRadius: '9999px' }}
             >
-              🔄 Xác nhận / Gia hạn hồ sơ HSSV (Lưu MySQL)
+              🔄 Xác nhận / Gia hạn hồ sơ HSSV (Lưu cơ sở dữ liệu)
             </button>
           </div>
         )}
@@ -696,7 +697,7 @@ export const PassengerPortalPage: React.FC = () => {
                 className="primary-button"
                 style={{ alignSelf: 'flex-start', padding: '11px 26px' }}
               >
-                Gửi phản ánh (Lưu MySQL) →
+                Gửi phản ánh (Lưu cơ sở dữ liệu) →
               </button>
             </form>
 

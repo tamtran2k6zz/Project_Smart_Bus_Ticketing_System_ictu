@@ -32,15 +32,15 @@ export const searchTrips = async (req: Request, res: Response): Promise<void> =>
         (dest_rs.estimated_time_minutes - origin_rs.estimated_time_minutes) AS estimated_duration_minutes,
         GREATEST(ROUND(COALESCE(t.base_price, 10000) * (dest_rs.stop_order - origin_rs.stop_order) / 2, -3), 7000) AS calculated_fare
       FROM trips t JOIN routes r ON t.route_id = r.id LEFT JOIN buses b ON t.bus_id = b.id
-      JOIN route_stops origin_rs ON origin_rs.route_id = r.id AND origin_rs.stop_id = ?
-      JOIN route_stops dest_rs ON dest_rs.route_id = r.id AND dest_rs.stop_id = ?
+      JOIN route_stops origin_rs ON origin_rs.route_id = r.id AND origin_rs.stop_id = $1
+      JOIN route_stops dest_rs ON dest_rs.route_id = r.id AND dest_rs.stop_id = $2
       JOIN bus_stops origin_s ON origin_rs.stop_id = origin_s.id JOIN bus_stops dest_s ON dest_rs.stop_id = dest_s.id
       WHERE origin_rs.stop_order < dest_rs.stop_order AND r.status = 'ACTIVE'
     `;
     const params: any[] = [origin_stop_id, destination_stop_id];
 
     if (departure_date) {
-      sql += ' AND DATE(t.departure_time) = DATE(?)';
+      sql += ` AND (t.departure_time AT TIME ZONE 'Asia/Ho_Chi_Minh')::date = $${params.length + 1}::date`;
       params.push(departure_date);
     } else {
       sql += ' AND t.departure_time >= NOW()';
@@ -76,8 +76,8 @@ export const getTrips = async (req: Request, res: Response): Promise<void> => {
       t.status, t.created_at, r.code AS route_code, r.name AS route_name, COALESCE(t.base_price, 10000) AS base_price, u.full_name AS driver_name
       FROM trips t JOIN routes r ON t.route_id = r.id LEFT JOIN buses b ON t.bus_id = b.id LEFT JOIN users u ON t.driver_id = u.id WHERE 1=1`;
     const params: any[] = [];
-    if (route_id) { sql += ' AND t.route_id = ?'; params.push(route_id); }
-    if (date) { sql += ' AND DATE(t.departure_time) = DATE(?)'; params.push(date); }
+    if (route_id) { sql += ` AND t.route_id = $${params.length + 1}`; params.push(route_id); }
+    if (date) { sql += ` AND (t.departure_time AT TIME ZONE 'Asia/Ho_Chi_Minh')::date = $${params.length + 1}::date`; params.push(date); }
     sql += ' ORDER BY t.departure_time DESC LIMIT 100';
 
     const trips = await query<any[]>(sql, params);
@@ -105,13 +105,13 @@ export const createTrip = async (req: Request, res: Response): Promise<void> => 
 
     let busId = req.body.bus_id;
     if (!busId && bus_plate) {
-      const busRows = await query<any[]>('SELECT id FROM buses WHERE plate_number = ? LIMIT 1', [bus_plate.trim().toUpperCase()]);
+      const busRows = await query<any[]>('SELECT id FROM buses WHERE plate_number = $1 LIMIT 1', [bus_plate.trim().toUpperCase()]);
       if (busRows.length > 0) {
         busId = busRows[0].id;
       } else {
         busId = randomUUID();
         await query(
-          'INSERT INTO buses (id, plate_number, bus_type, total_seats, standing_capacity, status) VALUES (?, ?, ?, ?, ?, ?)',
+          'INSERT INTO buses (id, plate_number, bus_type, total_seats, standing_capacity, status) VALUES ($1, $2, $3, $4, $5, $6)',
           [busId, bus_plate.trim().toUpperCase(), 'STANDARD', total_seats || 40, 15, 'READY']
         );
       }
@@ -120,11 +120,11 @@ export const createTrip = async (req: Request, res: Response): Promise<void> => 
     const tripId = randomUUID();
     await query(
       `INSERT INTO trips (id, route_id, bus_id, driver_id, departure_time, arrival_time, base_price, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [tripId, route_id, busId, driver_id, departure_time, arrival_time, base_price, status]
     );
 
-    res.status(201).json({ statusCode: 201, success: true, message: 'Tạo chuyến xe thành công trong CSDL MySQL!', data: {
+    res.status(201).json({ statusCode: 201, success: true, message: 'Tạo chuyến xe thành công trong CSDL PostgreSQL!', data: {
       id: tripId, routeId: route_id, busPlate: bus_plate, departureTime: departure_time, arrivalTime: arrival_time, totalSeats: total_seats, status,
     }});
   } catch (err: any) {

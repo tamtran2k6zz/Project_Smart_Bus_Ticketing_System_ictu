@@ -1,3 +1,4 @@
+-- HISTORICAL MYSQL ONLY. Use supabase/migrations for the deployed PostgreSQL API.
 -- =============================================================================
 -- SMART BUS TICKETING SYSTEM — MIGRATION: SEATS & TRIP_SEATS
 -- Tác giả: La Công Tuấn

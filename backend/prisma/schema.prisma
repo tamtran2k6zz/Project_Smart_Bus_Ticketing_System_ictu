@@ -1,3 +1,5 @@
+// HISTORICAL NEST/MYSQL MODEL. Not used by the deployed Express/PostgreSQL API.
+// Do not apply these migrations to Supabase. See docs/supabase-vercel.md.
 datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")

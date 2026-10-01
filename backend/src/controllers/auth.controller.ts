@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { query } from '../config/database';
 import { AuthenticatedRequest } from '../middlewares/auth';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'smartbus_jwt_secret_key_sprint1_2026';
+import { getJwtSecret } from '../config/auth';
 const getExpiry = (): string | number => {
   const envVal = process.env.JWT_EXPIRES_IN || '86400';
   const num = Number(envVal);
@@ -14,7 +14,7 @@ const getExpiry = (): string | number => {
 // Đăng ký tài khoản mới (US 22)
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { full_name, email, phone_number, password, role = 'PASSENGER' } = req.body;
+    const { full_name, email, phone_number, password } = req.body;
 
     if (!full_name || !email || !password) {
       res.status(400).json({
@@ -25,9 +25,9 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Kiểm tra email trùng lặp trong MySQL
+    // Kiểm tra email trùng lặp trong PostgreSQL
     const existingUsers = await query<any[]>(
-      'SELECT id FROM users WHERE email = ? LIMIT 1',
+      'SELECT id FROM users WHERE email = $1 LIMIT 1',
       [email.trim().toLowerCase()]
     );
 
@@ -40,10 +40,10 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Kiểm tra số điện thoại trùng lặp trong MySQL
+    // Kiểm tra số điện thoại trùng lặp trong PostgreSQL
     if (phone_number) {
       const existingPhone = await query<any[]>(
-        'SELECT id FROM users WHERE phone_number = ? LIMIT 1',
+        'SELECT id FROM users WHERE phone_number = $1 LIMIT 1',
         [phone_number.trim()]
       );
       if (existingPhone.length > 0) {
@@ -60,30 +60,18 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
-    const roleName = (role || 'PASSENGER').toUpperCase();
+    const roleName = 'PASSENGER';
 
-    // Lấy role_id từ roles table
-    let roleId = 4;
-    try {
-      const roleRows = await query<any[]>('SELECT id FROM roles WHERE name = ? LIMIT 1', [roleName]);
-      if (roleRows && roleRows.length > 0) {
-        roleId = roleRows[0].id;
-      } else {
-        roleId = roleName === 'ADMIN' ? 1 : roleName === 'MANAGER' ? 2 : roleName === 'DRIVER' ? 3 : 4;
-      }
-    } catch {
-      roleId = roleName === 'ADMIN' ? 1 : roleName === 'MANAGER' ? 2 : roleName === 'DRIVER' ? 3 : 4;
-    }
-
-    let newUserId: number | string;
-    // Chèn người dùng vào MySQL (id tự tăng)
+    const roleId = 4;
+    let newUserId: string;
+    // Chèn người dùng vào PostgreSQL (id tự tăng)
     try {
       const insertResult: any = await query(
         `INSERT INTO users (full_name, email, phone_number, password_hash, role_id, role, status, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', NOW())`,
+         VALUES ($1, $2, $3, $4, $5, $6, 'ACTIVE', NOW()) RETURNING id`,
         [full_name.trim(), email.trim().toLowerCase(), phone_number ? phone_number.trim() : null, passwordHash, roleId, roleName]
       );
-      newUserId = insertResult.insertId;
+      newUserId = insertResult[0].id;
     } catch (insertErr: any) {
       console.error('Lỗi khi INSERT users:', insertErr.message);
       throw insertErr;
@@ -97,14 +85,14 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       role: roleName,
     };
 
-    const accessToken = jwt.sign(tokenPayload, JWT_SECRET, {
+    const accessToken = jwt.sign(tokenPayload, getJwtSecret(), {
       expiresIn: getExpiry() as any,
     });
 
     res.status(201).json({
       statusCode: 201,
       success: true,
-      message: 'Đăng ký tài khoản thành công vào CSDL MySQL!',
+      message: 'Đăng ký tài khoản thành công vào CSDL PostgreSQL!',
       data: {
         user: {
           id: newUserId,
@@ -147,7 +135,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     const cleanIdentifier = identifier.trim().toLowerCase();
 
-    // Tìm kiếm trực tiếp trong CSDL MySQL theo email hoặc số điện thoại
+    // Tìm kiếm trực tiếp trong CSDL PostgreSQL theo email hoặc số điện thoại
     let users: any[] = [];
     try {
       users = await query<any[]>(
@@ -155,7 +143,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
                 COALESCE(r.name, u.role, 'PASSENGER') AS role_name
          FROM users u
          LEFT JOIN roles r ON u.role_id = r.id
-         WHERE LOWER(u.email) = ? OR u.phone_number = ?
+         WHERE LOWER(u.email) = $1 OR u.phone_number = $2
          LIMIT 1`,
         [cleanIdentifier, identifier.trim()]
       );
@@ -164,7 +152,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         `SELECT u.id, u.full_name, u.email, u.phone_number, u.password_hash, u.status,
                 COALESCE(u.role, 'PASSENGER') AS role_name
          FROM users u
-         WHERE LOWER(u.email) = ? OR u.phone_number = ?
+         WHERE LOWER(u.email) = $1 OR u.phone_number = $2
          LIMIT 1`,
         [cleanIdentifier, identifier.trim()]
       );
@@ -174,7 +162,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       res.status(401).json({
         statusCode: 401,
         success: false,
-        message: 'Tài khoản hoặc mật khẩu không chính xác trong CSDL MySQL!',
+        message: 'Tài khoản hoặc mật khẩu không chính xác trong CSDL PostgreSQL!',
       });
       return;
     }
@@ -197,7 +185,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       res.status(401).json({
         statusCode: 401,
         success: false,
-        message: 'Tài khoản hoặc mật khẩu không chính xác trong CSDL MySQL!',
+        message: 'Tài khoản hoặc mật khẩu không chính xác trong CSDL PostgreSQL!',
       });
       return;
     }
@@ -210,14 +198,14 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       role: user.role_name || user.role || 'PASSENGER',
     };
 
-    const accessToken = jwt.sign(tokenPayload, JWT_SECRET, {
+    const accessToken = jwt.sign(tokenPayload, getJwtSecret(), {
       expiresIn: getExpiry() as any,
     });
 
     res.status(200).json({
       statusCode: 200,
       success: true,
-      message: 'Đăng nhập thành công qua CSDL MySQL!',
+      message: 'Đăng nhập thành công qua CSDL PostgreSQL!',
       data: {
         user: {
           id: user.id,
@@ -239,7 +227,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     res.status(500).json({
       statusCode: 500,
       success: false,
-      message: `Lỗi kết nối cơ sở dữ liệu MySQL: ${err.message}`,
+      message: `Lỗi kết nối cơ sở dữ liệu PostgreSQL: ${err.message}`,
     });
   }
 };
@@ -265,7 +253,7 @@ export const getMe = async (req: AuthenticatedRequest, res: Response): Promise<v
                 COALESCE(r.name, u.role, 'PASSENGER') AS role_name, u.created_at
          FROM users u
          LEFT JOIN roles r ON u.role_id = r.id
-         WHERE u.id = ?
+         WHERE u.id = $1
          LIMIT 1`,
         [userId]
       );
@@ -274,7 +262,7 @@ export const getMe = async (req: AuthenticatedRequest, res: Response): Promise<v
         `SELECT u.id, u.full_name, u.email, u.phone_number, u.status,
                 COALESCE(u.role, 'PASSENGER') AS role_name, u.created_at
          FROM users u
-         WHERE u.id = ?
+         WHERE u.id = $1
          LIMIT 1`,
         [userId]
       );
@@ -284,7 +272,7 @@ export const getMe = async (req: AuthenticatedRequest, res: Response): Promise<v
       res.status(404).json({
         statusCode: 404,
         success: false,
-        message: 'Không tìm thấy thông tin người dùng trong CSDL MySQL!',
+        message: 'Không tìm thấy thông tin người dùng trong CSDL PostgreSQL!',
       });
       return;
     }

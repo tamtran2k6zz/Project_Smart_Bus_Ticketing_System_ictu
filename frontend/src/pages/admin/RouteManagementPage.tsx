@@ -8,7 +8,7 @@ import TicketBookingView from '../../components/admin/TicketBookingView';
 import UserManagementView from '../../components/admin/UserManagementView';
 import OperationsView from '../../components/admin/OperationsView';
 import type { BusRoute } from '../../types/route';
-import { getApiUrl } from '../../api/client';
+import { getApiUrl, apiFetch } from '../../api/client';
 
 function RouteManagementPage() {
   const [activeTab, setActiveTab] = useState<AdminTab>('routes');
@@ -21,18 +21,18 @@ function RouteManagementPage() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [dbError, setDbError] = useState<string | null>(null);
 
-  // Lấy dữ liệu tuyến xe buýt trực tiếp từ cơ sở dữ liệu MySQL thật
-  const fetchRoutesFromMySQL = useCallback(async () => {
+  // Lấy dữ liệu tuyến xe buýt trực tiếp từ cơ sở dữ liệu cơ sở dữ liệu thật
+  const fetchRoutesFromDatabase = useCallback(async () => {
     setIsLoading(true);
     setDbError(null);
     try {
       const token = localStorage.getItem('smartbus_access_token');
-      const res = await fetch(getApiUrl('/api/v1/routes'), {
+      const res = await apiFetch(getApiUrl('/api/v1/routes'), {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
 
       if (!res.ok) {
-        throw new Error(`Lỗi nạp dữ liệu từ MySQL: HTTP ${res.status}`);
+        throw new Error(`Lỗi nạp dữ liệu từ cơ sở dữ liệu: HTTP ${res.status}`);
       }
 
       const json = await res.json();
@@ -57,7 +57,7 @@ function RouteManagementPage() {
 
       setRoutes(mapped);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Không thể kết nối MySQL!';
+      const message = err instanceof Error ? err.message : 'Không thể kết nối cơ sở dữ liệu!';
       setDbError(message);
     } finally {
       setIsLoading(false);
@@ -65,8 +65,8 @@ function RouteManagementPage() {
   }, []);
 
   useEffect(() => {
-    fetchRoutesFromMySQL();
-  }, [fetchRoutesFromMySQL]);
+    fetchRoutesFromDatabase();
+  }, [fetchRoutesFromDatabase]);
 
   const filteredRoutes = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -98,24 +98,24 @@ function RouteManagementPage() {
 
   const handleDelete = async (route: BusRoute) => {
     const confirmed = window.confirm(
-      `Bạn có chắc chắn muốn xóa tuyến ${route.code} (${route.name}) khỏi cơ sở dữ liệu MySQL không?`,
+      `Bạn có chắc chắn muốn xóa tuyến ${route.code} (${route.name}) khỏi cơ sở dữ liệu cơ sở dữ liệu không?`,
     );
 
     if (!confirmed) return;
 
     try {
       const token = localStorage.getItem('smartbus_access_token');
-      const res = await fetch(getApiUrl(`/api/v1/routes/${route.id}`), {
+      const res = await apiFetch(getApiUrl(`/api/v1/routes/${route.id}`), {
         method: 'DELETE',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
 
       if (!res.ok) {
         const body = await res.json().catch(() => null);
-        throw new Error(body?.message || 'Không thể xóa tuyến trong MySQL!');
+        throw new Error(body?.message || 'Không thể xóa tuyến trong cơ sở dữ liệu!');
       }
 
-      await fetchRoutesFromMySQL();
+      await fetchRoutesFromDatabase();
     } catch (err: any) {
       alert(`Lỗi xóa tuyến: ${err.message}`);
     }
@@ -136,8 +136,8 @@ function RouteManagementPage() {
 
     try {
       if (modalMode === 'add') {
-        // Ghi mới tuyến xe vào MySQL qua POST /api/v1/routes
-        const res = await fetch(getApiUrl('/api/v1/routes'), {
+        // Ghi mới tuyến xe vào cơ sở dữ liệu qua POST /api/v1/routes
+        const res = await apiFetch(getApiUrl('/api/v1/routes'), {
           method: 'POST',
           headers,
           body: JSON.stringify({
@@ -152,11 +152,11 @@ function RouteManagementPage() {
 
         if (!res.ok) {
           const body = await res.json().catch(() => null);
-          throw new Error(body?.message || 'Không thể tạo mới tuyến trong MySQL!');
+          throw new Error(body?.message || 'Không thể tạo mới tuyến trong cơ sở dữ liệu!');
         }
       } else {
-        // Cập nhật tuyến xe trong MySQL qua PATCH /api/v1/routes/:id
-        const res = await fetch(getApiUrl(`/api/v1/routes/${route.id}`), {
+        // Cập nhật tuyến xe trong cơ sở dữ liệu qua PATCH /api/v1/routes/:id
+        const res = await apiFetch(getApiUrl(`/api/v1/routes/${route.id}`), {
           method: 'PATCH',
           headers,
           body: JSON.stringify({
@@ -168,15 +168,15 @@ function RouteManagementPage() {
 
         if (!res.ok) {
           const body = await res.json().catch(() => null);
-          throw new Error(body?.message || 'Không thể cập nhật tuyến trong MySQL!');
+          throw new Error(body?.message || 'Không thể cập nhật tuyến trong cơ sở dữ liệu!');
         }
       }
 
       setModalOpen(false);
       setSelectedRoute(null);
-      await fetchRoutesFromMySQL();
+      await fetchRoutesFromDatabase();
     } catch (err: any) {
-      alert(`Thao tác MySQL thất bại: ${err.message}`);
+      alert(`Thao tác cơ sở dữ liệu thất bại: ${err.message}`);
     }
   };
 
@@ -216,12 +216,12 @@ function RouteManagementPage() {
                     boxShadow: dbError ? '0 0 10px #ef4444' : undefined,
                   }}
                 />
-                {dbError ? `Lỗi kết nối CSDL: ${dbError}` : 'Kết nối trực tiếp: MySQL Database (smart_bus_ticketing_db:3307)'}
+                {dbError ? `Lỗi kết nối CSDL: ${dbError}` : 'Kết nối trực tiếp: cơ sở dữ liệu'}
               </span>
             </div>
 
             <button
-              onClick={fetchRoutesFromMySQL}
+              onClick={fetchRoutesFromDatabase}
               className="secondary-button"
               style={{
                 display: 'inline-flex',
@@ -230,7 +230,7 @@ function RouteManagementPage() {
                 cursor: 'pointer',
               }}
             >
-              🔄 Tải lại dữ liệu MySQL
+              🔄 Tải lại dữ liệu cơ sở dữ liệu
             </button>
           </div>
 
@@ -252,7 +252,7 @@ function RouteManagementPage() {
 
               {isLoading && (
                 <div style={{ textAlign: 'center', padding: '24px', color: '#6B7280' }}>
-                  Đang truy vấn dữ liệu từ MySQL...
+                  Đang truy vấn dữ liệu từ cơ sở dữ liệu...
                 </div>
               )}
 

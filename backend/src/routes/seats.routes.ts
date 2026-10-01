@@ -1,3 +1,4 @@
+import { authenticateJwt } from '../middlewares/auth';
 import { Router } from 'express';
 import {
   getSeatsByTrip,
@@ -20,9 +21,9 @@ router.get('/trip/:tripId', getSeatsByTrip);
 router.get('/trips/:tripId', getSeatsByTrip);
 
 // Khóa giữ chỗ ghế tạm thời (10 phút)
-router.post('/lock', lockSeat);
+router.post('/lock', authenticateJwt, lockSeat);
 
 // Mở khóa ghế
-router.post('/unlock', unlockSeat);
+router.post('/unlock', authenticateJwt, unlockSeat);
 
 export default router;

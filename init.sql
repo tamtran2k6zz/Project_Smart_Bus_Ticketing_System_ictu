@@ -1,3 +1,4 @@
+-- HISTORICAL MYSQL ONLY. The current PostgreSQL schema is in supabase/migrations/.
 -- =============================================================================
 -- SMART BUS TICKETING SYSTEM — SPRINT 1 DATABASE INITIALIZATION SCHEMA
 -- Database: smartbus_db | MySQL 8.0 Engine | Full UTF-8 Vietnamese Support

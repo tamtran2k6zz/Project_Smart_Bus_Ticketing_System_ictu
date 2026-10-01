@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, AuthTokens, LoginCredentials, RegisterCredentials, RoleCode } from '../types/auth';
-import { getApiUrl } from '../api/client';
+import { getApiUrl, apiFetch } from '../api/client';
 
 interface AuthContextType {
   user: User | null;
@@ -55,8 +55,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsLoading(true);
     setError(null);
     try {
-      // Kết nối trực tiếp vào MySQL API Backend NestJS - KHÔNG MOCK TEST
-      const res = await fetch(getApiUrl('/api/v1/auth/login'), {
+      // Kết nối trực tiếp vào cơ sở dữ liệu API Backend NestJS - KHÔNG MOCK TEST
+      const res = await apiFetch(getApiUrl('/api/v1/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -71,11 +71,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const errorMsg =
           body?.message ||
           body?.error ||
-          'Đăng nhập thất bại. Tài khoản hoặc mật khẩu không chính xác trong CSDL MySQL!';
+          'Đăng nhập thất bại. Tài khoản hoặc mật khẩu không chính xác trong CSDL cơ sở dữ liệu!';
         throw new Error(errorMsg);
       }
 
-      // Xử lý dữ liệu trả về từ MySQL
+      // Xử lý dữ liệu trả về từ cơ sở dữ liệu
       const apiUser = body?.data?.user || body?.user;
       const apiTokens = body?.data?.tokens || body?.tokens;
 
@@ -113,7 +113,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       localStorage.setItem(TOKEN_KEY, authTokens.accessToken);
       localStorage.setItem(USER_KEY, JSON.stringify(mappedUser));
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Lỗi kết nối cơ sở dữ liệu MySQL!';
+      const msg = err instanceof Error ? err.message : 'Lỗi kết nối cơ sở dữ liệu cơ sở dữ liệu!';
       setError(msg);
       throw new Error(msg);
     } finally {
@@ -125,8 +125,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsLoading(true);
     setError(null);
     try {
-      // Kết nối trực tiếp vào MySQL API Backend - KHÔNG MOCK DATA
-      const res = await fetch(getApiUrl('/api/v1/auth/register'), {
+      // Kết nối trực tiếp vào cơ sở dữ liệu API Backend - KHÔNG MOCK DATA
+      const res = await apiFetch(getApiUrl('/api/v1/auth/register'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -180,7 +180,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       localStorage.setItem(TOKEN_KEY, authTokens.accessToken);
       localStorage.setItem(USER_KEY, JSON.stringify(mappedUser));
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Lỗi kết nối CSDL MySQL khi đăng ký!';
+      const msg = err instanceof Error ? err.message : 'Lỗi kết nối CSDL cơ sở dữ liệu khi đăng ký!';
       setError(msg);
       throw new Error(msg);
     } finally {

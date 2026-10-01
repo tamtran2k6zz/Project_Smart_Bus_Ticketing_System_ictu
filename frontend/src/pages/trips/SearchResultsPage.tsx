@@ -110,7 +110,7 @@ export const SearchResultsPage: React.FC = () => {
       console.error('Lỗi tra cứu chuyến xe:', err);
       const msg =
         err.response?.data?.message ||
-        'Không thể nạp dữ liệu chuyến xe từ MySQL. Vui lòng kiểm tra lại kết nối!';
+        'Không thể nạp dữ liệu chuyến xe từ cơ sở dữ liệu. Vui lòng kiểm tra lại kết nối!';
       setErrorMsg(msg);
       setTrips([]);
     } finally {
@@ -300,7 +300,7 @@ export const SearchResultsPage: React.FC = () => {
             fontSize: '15px',
           }}>
             <div style={{ fontSize: '30px', marginBottom: '12px' }}>🔄</div>
-            Đang truy vấn trực tiếp cơ sở dữ liệu MySQL thật...
+            Đang truy vấn trực tiếp cơ sở dữ liệu cơ sở dữ liệu thật...
           </div>
         )}
 

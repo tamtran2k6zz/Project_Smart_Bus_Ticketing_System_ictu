@@ -14,7 +14,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
         <div className="logo-icon">🚌</div>
         <div>
           <strong>Smart Bus</strong>
-          <span>Admin Panel (MySQL)</span>
+          <span>Admin Panel (cơ sở dữ liệu)</span>
         </div>
       </div>
 
