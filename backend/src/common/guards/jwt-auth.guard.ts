@@ -1,41 +1,40 @@
 import {
+  Injectable,
   CanActivate,
   ExecutionContext,
-  Injectable,
   UnauthorizedException,
+  Optional,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { Request } from 'express';
+import { verify } from 'jsonwebtoken';
 
-/**
- * JwtAuthGuard
- *
- * Guard xác thực JWT Bearer Token cho các API yêu cầu đăng nhập.
- * Header: `Authorization: Bearer <jwt_token>`
- */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(@Optional() private readonly jwtService?: JwtService) {}
 
-  async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest<Request>();
-    const authHeader = request.headers['authorization'];
+  canActivate(context: ExecutionContext): boolean {
+    const request = context.switchToHttp().getRequest();
+    const authHeader = request.headers?.authorization;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedException(
-        'Thiếu Authorization header (định dạng: Bearer <token>)',
-      );
+    if (!authHeader) {
+      throw new UnauthorizedException('Thiếu Authorization Header (Bearer token)!');
     }
 
-    const token = authHeader.slice('Bearer '.length).trim();
+    const [type, token] = authHeader.split(' ');
+    if (type !== 'Bearer' || !token) {
+      throw new UnauthorizedException('Định dạng token không hợp lệ! Vui lòng sử dụng Bearer <token>');
+    }
 
     try {
-      const payload = await this.jwtService.verifyAsync(token);
-      // Gắn payload đã giải mã vào request để các handler phía sau sử dụng.
-      (request as any).user = payload;
+      const secret = process.env.JWT_SECRET || 'smart-bus-secret-key-2026';
+      const payload = this.jwtService
+        ? this.jwtService.verify(token, { secret })
+        : verify(token, secret);
+      request.user = payload;
       return true;
-    } catch {
-      throw new UnauthorizedException('Token không hợp lệ hoặc đã hết hạn');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Token không hợp lệ';
+      throw new UnauthorizedException('Token đã hết hạn hoặc không hợp lệ: ' + message);
     }
   }
 }

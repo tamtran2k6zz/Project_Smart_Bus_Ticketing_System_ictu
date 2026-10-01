@@ -11,6 +11,7 @@ import UnauthorizedPage from '../pages/error/UnauthorizedPage';
 import RouteManagementPage from '../pages/admin/RouteManagementPage';
 import DriverPortalPage from '../pages/driver/DriverPortalPage';
 import PassengerPortalPage from '../pages/passenger/PassengerPortalPage';
+import DriverTripDetailPage from '../pages/driver/DriverTripDetailPage';
 
 export const AppRoutes: React.FC = () => {
   return (
@@ -61,6 +62,7 @@ export const AppRoutes: React.FC = () => {
       >
         <Route index element={<Navigate to="/driver/portal" replace />} />
         <Route path="portal" element={<DriverPortalPage />} />
+        <Route path="trip-detail" element={<DriverTripDetailPage />} />
       </Route>
 
       {/* Phân hệ Hành khách (Passenger Portal): Đặt vé & Sơ đồ ghế */}

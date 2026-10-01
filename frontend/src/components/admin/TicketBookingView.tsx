@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getApiUrl } from '../../api/client';
+import { getApiUrl, apiFetch } from '../../api/client';
 
 interface SeatInfo {
   id: string;
@@ -32,11 +32,11 @@ export const TicketBookingView: React.FC = () => {
   const [verifyCode, setVerifyCode] = useState<string>('');
   const [verifyResult, setVerifyResult] = useState<any>(null);
 
-  // 1. Nạp danh sách chuyến xe từ MySQL
+  // 1. Nạp danh sách chuyến xe từ cơ sở dữ liệu
   useEffect(() => {
     const fetchTrips = async () => {
       try {
-        const dashRes = await fetch(getApiUrl('/api/v1/operations/dashboard/summary'));
+        const dashRes = await apiFetch(getApiUrl('/api/v1/operations/dashboard/summary'));
         const dashJson = await dashRes.json();
         const rawOccupancy = Array.isArray(dashJson?.tripOccupancy)
           ? dashJson.tripOccupancy
@@ -64,14 +64,14 @@ export const TicketBookingView: React.FC = () => {
     fetchTrips();
   }, []);
 
-  // 2. Nạp sơ đồ ghế thực tế từ MySQL cho chuyến đã chọn
+  // 2. Nạp sơ đồ ghế thực tế từ cơ sở dữ liệu cho chuyến đã chọn
   useEffect(() => {
     if (!selectedTripId) return;
 
     const fetchSeats = async () => {
       setIsLoading(true);
       try {
-        const res = await fetch(getApiUrl(`/api/v1/ticketing/trips/${selectedTripId}/seats`));
+        const res = await apiFetch(getApiUrl(`/api/v1/ticketing/trips/${selectedTripId}/seats`));
         const json = await res.json();
         const rawSeats = Array.isArray(json?.data?.seats)
           ? json.data.seats
@@ -90,7 +90,7 @@ export const TicketBookingView: React.FC = () => {
     fetchSeats();
   }, [selectedTripId]);
 
-  // 3. Xử lý đặt vé và lưu vào MySQL (US 2, 3, 4, 6)
+  // 3. Xử lý đặt vé và lưu vào cơ sở dữ liệu (US 2, 3, 4, 6)
   const handleBookTicket = async () => {
     if (!selectedSeat) {
       alert('Vui lòng chọn vị trí ghế trên sơ đồ!');
@@ -104,7 +104,7 @@ export const TicketBookingView: React.FC = () => {
       const userStr = localStorage.getItem('smartbus_user');
       const currentUser = userStr ? JSON.parse(userStr) : null;
 
-      const res = await fetch(getApiUrl('/api/v1/ticketing/bookings'), {
+      const res = await apiFetch(getApiUrl('/api/v1/ticketing/bookings'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -121,14 +121,14 @@ export const TicketBookingView: React.FC = () => {
 
       const json = await res.json();
       if (!res.ok) {
-        throw new Error(json.message || 'Đặt vé thất bại trong MySQL!');
+        throw new Error(json.message || 'Đặt vé thất bại trong cơ sở dữ liệu!');
       }
 
       setBookingResult(json.data || json);
-      setStatusMessage('🎉 Đặt vé và giữ chỗ 10 phút thành công! Mã QR đã được lưu trong MySQL.');
+      setStatusMessage('🎉 Đặt vé và giữ chỗ 10 phút thành công! Mã QR đã được lưu trong cơ sở dữ liệu.');
 
       // Tải lại sơ đồ ghế
-      const seatsRes = await fetch(getApiUrl(`/api/v1/ticketing/trips/${selectedTripId}/seats`));
+      const seatsRes = await apiFetch(getApiUrl(`/api/v1/ticketing/trips/${selectedTripId}/seats`));
       const seatsJson = await seatsRes.json();
       const rawSeats = Array.isArray(seatsJson?.data?.seats)
         ? seatsJson.data.seats
@@ -151,7 +151,7 @@ export const TicketBookingView: React.FC = () => {
     }
 
     try {
-      const res = await fetch(getApiUrl('/api/v1/ticketing/verify'), {
+      const res = await apiFetch(getApiUrl('/api/v1/ticketing/verify'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: verifyCode.trim() }),
@@ -159,7 +159,7 @@ export const TicketBookingView: React.FC = () => {
 
       const json = await res.json();
       if (!res.ok) {
-        throw new Error(json.message || 'Mã vé không hợp lệ trong CSDL MySQL!');
+        throw new Error(json.message || 'Mã vé không hợp lệ trong CSDL cơ sở dữ liệu!');
       }
 
       setVerifyResult(json.data || json);
@@ -176,7 +176,7 @@ export const TicketBookingView: React.FC = () => {
           Đặt vé Trực tuyến & Sơ đồ ghế (US 1, 2, 3, 4)
         </h3>
         <p style={{ fontSize: '13.5px', color: 'rgba(255, 255, 255, 0.55)', marginBottom: '24px' }}>
-          Mọi giao dịch giữ chỗ 10 phút, tạo mã QR và lưu hóa đơn được đồng bộ trực tiếp vào cơ sở dữ liệu MySQL.
+          Mọi giao dịch giữ chỗ 10 phút, tạo mã QR và lưu hóa đơn được đồng bộ trực tiếp vào cơ sở dữ liệu cơ sở dữ liệu.
         </p>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '24px' }}>
@@ -301,7 +301,7 @@ export const TicketBookingView: React.FC = () => {
               opacity: !selectedSeat || isLoading ? 0.5 : 1,
             }}
           >
-            {isLoading ? 'Đang ghi nhận vào MySQL...' : `Xác nhận Đặt Ghế ${selectedSeat || ''} & Nhận mã QR →`}
+            {isLoading ? 'Đang ghi nhận vào cơ sở dữ liệu...' : `Xác nhận Đặt Ghế ${selectedSeat || ''} & Nhận mã QR →`}
           </button>
           {statusMessage && (
             <span style={{ color: '#34d399', fontSize: '14px', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
@@ -334,7 +334,7 @@ export const TicketBookingView: React.FC = () => {
               }}
             >
               <h4 style={{ color: '#38bdf8', fontSize: '20px', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                🎟️ Vé điện tử SmartBus (Lưu trong MySQL)
+                🎟️ Vé điện tử SmartBus (Lưu trong cơ sở dữ liệu)
               </h4>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '28px', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ fontSize: '14px', lineHeight: 2, color: 'rgba(255, 255, 255, 0.9)' }}>
@@ -418,7 +418,7 @@ export const TicketBookingView: React.FC = () => {
           Soát vé bằng mã QR / Mã vé (US 15 - Tài xế & Phụ xe)
         </h3>
         <p style={{ fontSize: '13.5px', color: 'rgba(255, 255, 255, 0.55)', marginBottom: '20px' }}>
-          Quét hoặc dán chuỗi mã QR của hành khách để kiểm tra tính hợp lệ trực tiếp trong cơ sở dữ liệu MySQL.
+          Quét hoặc dán chuỗi mã QR của hành khách để kiểm tra tính hợp lệ trực tiếp trong cơ sở dữ liệu cơ sở dữ liệu.
         </p>
 
         <div style={{ display: 'flex', gap: '12px', maxWidth: '640px', marginBottom: '20px' }}>
