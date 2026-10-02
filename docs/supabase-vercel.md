@@ -20,7 +20,7 @@ Complete each browser authorization. Confirm MCP authentication using `/mcp` in 
 
 In the Supabase project's **Connect** dialog, copy the **Transaction pooler** URL for `DATABASE_URL` and the **Session pooler** URL for `DIRECT_URL`. Keep the provided host and username; do not infer the pooler host from the region. Percent-encode special characters in the database password.
 
-Use `backend/.env.example` as a template. Do not overwrite the old MySQL connection until it has been copied to `MYSQL_SOURCE_URL` for import. Use `sslmode=verify-full`. If the client cannot validate the certificate chain, download the project's CA certificate and set `NODE_EXTRA_CA_CERTS` to its path. Do not turn off certificate validation.
+Use the repository-root `.env.example` as a template. Set `DATABASE_URL` to the Transaction pooler URL and `DIRECT_URL` to the Session pooler URL for local migrations/imports. Do not overwrite the old MySQL connection until it has been copied to `MYSQL_SOURCE_URL` for import. Use `sslmode=verify-full`. If the client cannot validate the certificate chain, download the project's CA certificate and set `NODE_EXTRA_CA_CERTS` to its path. Do not turn off certificate validation.
 
 | Variable | Purpose | Vercel runtime |
 | --- | --- | --- |
@@ -97,6 +97,8 @@ npx vercel deploy --prod
 
 Enter secrets through the CLI prompt or dashboard, not command-line arguments. Updating environment variables requires a new deployment.
 
+Repository `vercel.json` intentionally does not configure Vercel Cron Jobs. The Hobby plan only supports daily schedules, so use the external scheduler below for minute-by-minute reservation cleanup.
+
 ### External reservation cleanup on the free plan
 
 Use [cron-job.org](https://cron-job.org/en/), which supports free execution once per minute and custom HTTP headers.
@@ -105,10 +107,10 @@ Use [cron-job.org](https://cron-job.org/en/), which supports free execution once
 2. Sign in to [the cron-job.org Console](https://console.cron-job.org/) and create a job named `Smart Bus - release expired reservations`.
 3. Use the stable Production domain shown in Vercel (not a deployment-specific Preview URL), with the path `/api/v1/ticketing/release-expired`.
 4. Set the method to **POST**, the schedule to **Every minute**, and the timezone to `Asia/Ho_Chi_Minh`. Leave the request body empty.
-5. Under advanced request settings, add the header `Authorization` with the value `Bearer <PAYMENT_CRON_SECRET>`. Replace the placeholder with the same private value configured on Vercel. Never put this value in the URL, repository, frontend variables, or screenshots.
+5. Under advanced request settings, add the `Authorization` header with value `Bearer <PAYMENT_CRON_SECRET>`. Replace the placeholder with the same private value configured on Vercel. Never put this value in the URL, repository, frontend variables, or screenshots.
 6. Run **Test run** before enabling the job. Expect HTTP `200` with `{"success":true,"affectedRows":0}` (or a positive number when reservations have expired). Enable the job and check its execution history after the next minute.
 
-HTTP `401` means the Bearer token is missing or incorrect. HTTP `503` with `PAYMENT_CRON_SECRET must be configured.` means the Production environment variable is missing. HTTP `500` means cleanup failed; inspect Vercel runtime logs and database connectivity. If Vercel Deployment Protection intercepts the request, target the public Production domain rather than disabling protection for Preview deployments.
+HTTP `401` means the authorization header is missing or incorrect. HTTP `503` with `PAYMENT_CRON_SECRET must be configured.` means the Production environment variable is missing. HTTP `500` means cleanup failed; inspect Vercel runtime logs and database connectivity. If Vercel Deployment Protection intercepts the request, target the public Production domain rather than disabling protection for Preview deployments.
 
 The endpoint supports both POST and GET, accepts either `PAYMENT_CRON_SECRET` or `CRON_SECRET`, and processes up to 100 expired reservations per call. External scheduling replaces Vercel Cron; keep only one active scheduler for this task.
 

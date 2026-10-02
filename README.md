@@ -80,10 +80,7 @@ Hệ thống sử dụng mô hình kiến trúc Serverless Micro-Architecture k�
 ```
 
 ### B. Môi trường Cục bộ (Local — Docker Compose)
-Đối với nhà phát triển muốn chạy độc lập không phụ thuộc Internet:
-* **`postgres`:** `postgres:17-alpine` (Cổng host: `5433`).
-* **`backend`:** Express API Server (Cổng host: `5000`).
-* **`frontend`:** Web SPA chạy qua Nginx Alpine (Cổng host: `3000`).
+Docker Compose chạy frontend, Express API và Redis cục bộ; API kết nối tới PostgreSQL dùng chung trên Supabase qua `DATABASE_URL`. Máy chạy ứng dụng cần Internet và file `.env` riêng. Không khởi chạy PostgreSQL cục bộ; publishable key và Project URL không thay thế connection string của database.
 
 ---
 
@@ -149,7 +146,7 @@ Truy cập ngay liên kết Production: [https://smart-bus-ticketing-system.verc
 
 ---
 
-### Lựa chọn 2: Khởi chạy bằng Docker Compose (1 Lệnh duy nhất)
+### Lựa chọn 2: Khởi chạy bằng Docker Compose
 
 **Yêu cầu:** Máy tính đã cài đặt [Docker Desktop](https://www.docker.com/).
 
@@ -158,17 +155,40 @@ Truy cập ngay liên kết Production: [https://smart-bus-ticketing-system.verc
 git clone https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu.git
 cd Project_Smart_Bus_Ticketing_System_ictu
 
-# 2. Tạo file môi trường gốc từ mẫu
+# 2. Tạo file môi trường riêng từ mẫu (PowerShell: Copy-Item .env.example .env)
 cp .env.example .env
 
-# 3. Khởi chạy toàn bộ hệ thống bằng Docker Compose
+# 3. Mở .env và điền:
+#    - DATABASE_URL: Transaction pooler URL từ Supabase > Connect.
+#    - JWT_SECRET: chuỗi ngẫu nhiên ít nhất 32 ký tự. Có thể tạo bằng PowerShell:
+#    Không dùng publishable key/service-role key thay DATABASE_URL.
+#    Không commit .env; chỉ chia sẻ DATABASE_URL với tester đáng tin cậy.
+
+# 4. Khởi chạy frontend, API và Redis; database dùng chung trên Supabase
 docker compose up -d --build
 ```
 
+Tạo `JWT_SECRET` ngẫu nhiên bằng PowerShell:
+
+```powershell
+$bytes = New-Object byte[] 32
+$rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+$rng.GetBytes($bytes)
+[Convert]::ToBase64String($bytes)
+```
+
+Mỗi backend cần có `JWT_SECRET` riêng tư tối thiểu 32 ký tự để ký token đăng nhập. Nếu cần một token được xác thực bởi nhiều backend, các backend đó phải dùng cùng secret; nếu mỗi tester chỉ dùng backend của máy mình thì có thể tự tạo secret riêng.
+
 **Truy cập dịch vụ sau khi khởi chạy:**
 * 🌐 **Frontend Web App:** [http://localhost:3000](http://localhost:3000)
-* 🔐 **Backend Health Check:** [http://localhost:5000/api/health](http://localhost:5000/api/health)
-* 🗄️ **PostgreSQL Port:** `localhost:5433` (User: `postgres`)
+* 🔐 **Backend Health Check:** [http://localhost:3000/api/health](http://localhost:3000/api/health)
+* 🔌 **Backend API trực tiếp:** [http://localhost:5000/api/health](http://localhost:5000/api/health)
+
+Backend được publish ở cổng `5000` để máy host và callback dịch vụ thanh toán có thể truy cập trực tiếp; frontend vẫn gọi API qua Nginx. Redis chỉ được expose trong mạng Docker. Nếu cổng `3000` đã được dùng, đặt `FRONTEND_PORT=3001` (hoặc cổng trống khác) trong `.env` rồi truy cập `http://localhost:3001`.
+
+Mọi máy dùng chung dữ liệu Supabase. Chỉ cấp `DATABASE_URL` cho người đáng tin cậy; backend dùng tài khoản database có quyền truy cập, vì vậy không commit URL/mật khẩu vào GitHub. Sao chép nguyên Transaction pooler URL từ Supabase và percent-encode ký tự đặc biệt trong mật khẩu. Chạy migration Supabase một lần bởi người quản lý database, không chạy lại từ từng máy clone.
+
+Redis mặc định chạy riêng trên từng máy. Điều này phù hợp để chạy độc lập, nhưng Redis seat-lock không đồng bộ giữa các máy; nếu cần khóa ghế tạm thời dùng chung, cấu hình cùng một Redis URL riêng tư qua `REDIS_URL` trên các máy. Không đưa thông tin Redis bí mật vào repository.
 
 ---
 
@@ -180,7 +200,8 @@ docker compose up -d --build
 # 1. Cài đặt dependencies cho Backend
 cd backend
 npm install
-cp .env.example .env
+cp ../.env.example .env
+# PowerShell: Copy-Item ..\.env.example .env
 # (Điền DATABASE_URL và JWT_SECRET vào backend/.env)
 
 # 2. Chạy migration CSDL
