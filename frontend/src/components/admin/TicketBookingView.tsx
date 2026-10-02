@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getApiUrl, apiFetch } from '../../api/client';
 
 interface SeatInfo {
@@ -7,7 +7,7 @@ interface SeatInfo {
   rowPosition: string;
   isPriority: boolean;
   isAvailable: boolean;
-  status?: string; // Trạng thái ghế từ API: AVAILABLE, LOCKED, BOOKED, CHECKED_IN
+  status?: string;
 }
 
 interface TripItem {
@@ -34,10 +34,88 @@ export const TicketBookingView: React.FC = () => {
   const [verifyResult, setVerifyResult] = useState<any>(null);
 
   // =========================================================
-  // HÀM QUY ĐỊNH MÀU SẮC GHẾ (Xanh, Cam, Xám) THEO TASK 2
+  // TASK 3: Đồng hồ đếm ngược & Popup cảnh báo
+  // =========================================================
+  const [timeLeft, setTimeLeft] = useState<number | null>(null); // giây còn lại
+  const [showWarningPopup, setShowWarningPopup] = useState<boolean>(false); // popup cảnh báo 2 phút
+  const [isExpired, setIsExpired] = useState<boolean>(false); // hết giờ
+  const warningShownRef = useRef<boolean>(false); // chỉ hiện popup 1 lần
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Khởi động đồng hồ đếm ngược khi có kết quả đặt vé
+  useEffect(() => {
+    if (!bookingResult) return;
+
+    // Tính thời gian còn lại dựa trên reservationExpiresAt từ server
+    const expRaw = bookingResult.ticket?.reservationExpiresAt || bookingResult.expiresAt;
+    let initialSeconds = 10 * 60; // mặc định 10 phút
+
+    if (expRaw && !isNaN(new Date(expRaw).getTime())) {
+      const diff = Math.floor((new Date(expRaw).getTime() - Date.now()) / 1000);
+      initialSeconds = diff > 0 ? diff : 0;
+    }
+
+    // Reset trạng thái
+    setTimeLeft(initialSeconds);
+    setIsExpired(initialSeconds <= 0);
+    setShowWarningPopup(false);
+    warningShownRef.current = false;
+
+    // Xoá timer cũ nếu có
+    if (timerRef.current) clearInterval(timerRef.current);
+
+    // Bắt đầu đếm ngược mỗi giây
+    timerRef.current = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev === null || prev <= 0) {
+          clearInterval(timerRef.current!);
+          setIsExpired(true);
+          return 0;
+        }
+
+        const next = prev - 1;
+
+        // Hiện popup cảnh báo khi còn đúng 2 phút (120 giây)
+        if (next <= 120 && !warningShownRef.current) {
+          setShowWarningPopup(true);
+          warningShownRef.current = true;
+        }
+
+        // Hết giờ
+        if (next <= 0) {
+          clearInterval(timerRef.current!);
+          setIsExpired(true);
+          return 0;
+        }
+
+        return next;
+      });
+    }, 1000);
+
+    // Dọn dẹp khi component bị huỷ
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [bookingResult]);
+
+  // Hàm định dạng giây -> MM:SS
+  const formatTime = (seconds: number): string => {
+    const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+    const s = (seconds % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
+
+  // Màu đồng hồ theo mức độ khẩn cấp
+  const getTimerColor = (seconds: number): string => {
+    if (seconds <= 60) return '#ef4444';  // Đỏ: còn 1 phút
+    if (seconds <= 120) return '#f97316'; // Cam: còn 2 phút
+    return '#34d399';                     // Xanh: còn nhiều thời gian
+  };
+
+  // =========================================================
+  // HÀM ĐỔI MÀU CHO GHẾ
   // =========================================================
   const getSeatStyles = (seat: SeatInfo, isSelected: boolean) => {
-    // 1. Đang chọn (bởi bạn) hoặc Đang bị giữ (bởi người khác) -> MÀU CAM
     if (isSelected || seat.status === 'LOCKED') {
       return {
         border: '1px solid #f97316',
@@ -47,8 +125,6 @@ export const TicketBookingView: React.FC = () => {
         cursor: 'pointer'
       };
     }
-    
-    // 2. Trống (AVAILABLE) -> MÀU XANH
     if (seat.status === 'AVAILABLE' || seat.isAvailable) {
       return {
         border: '1px solid #10b981',
@@ -58,8 +134,6 @@ export const TicketBookingView: React.FC = () => {
         cursor: 'pointer'
       };
     }
-
-    // 3. Đã bán (BOOKED, CHECKED_IN) -> MÀU XÁM
     return {
       border: '1px solid rgba(255, 255, 255, 0.2)',
       backgroundColor: 'rgba(255, 255, 255, 0.05)',
@@ -69,7 +143,7 @@ export const TicketBookingView: React.FC = () => {
     };
   };
 
-  // 1. Nạp danh sách chuyến xe từ cơ sở dữ liệu
+  // 1. Nạp danh sách chuyến xe
   useEffect(() => {
     const fetchTrips = async () => {
       try {
@@ -80,7 +154,6 @@ export const TicketBookingView: React.FC = () => {
           : Array.isArray(dashJson?.data?.tripOccupancy)
           ? dashJson.data.tripOccupancy
           : [];
-
         const tripList = rawOccupancy.map((t: any) => ({
           id: t.id,
           code: t.routeCode,
@@ -89,11 +162,8 @@ export const TicketBookingView: React.FC = () => {
           departureTime: t.departureTime,
           basePrice: 10000,
         }));
-
         setTrips(tripList);
-        if (tripList.length > 0) {
-          setSelectedTripId(tripList[0].id);
-        }
+        if (tripList.length > 0) setSelectedTripId(tripList[0].id);
       } catch (err) {
         console.error(err);
       }
@@ -101,17 +171,15 @@ export const TicketBookingView: React.FC = () => {
     fetchTrips();
   }, []);
 
-  // Xóa trắng ghế đang chọn nếu đổi sang chuyến xe khác
+  // Reset ghế đang chọn khi đổi chuyến
   useEffect(() => {
     setSelectedSeat('');
   }, [selectedTripId]);
 
-  // 2. Nạp sơ đồ ghế thực tế từ CSDL & Cập nhật Thời Gian Thực (Polling)
+  // 2. Nạp sơ đồ ghế + Polling thời gian thực mỗi 3 giây
   useEffect(() => {
     if (!selectedTripId) return;
-
-    const fetchSeats = async (showLoading = false) => {
-      if (showLoading) setIsLoading(true);
+    const fetchSeats = async () => {
       try {
         const res = await apiFetch(getApiUrl(`/api/v1/ticketing/trips/${selectedTripId}/seats`));
         const json = await res.json();
@@ -123,36 +191,25 @@ export const TicketBookingView: React.FC = () => {
         setSeats(rawSeats);
       } catch (err) {
         console.error(err);
-      } finally {
-        if (showLoading) setIsLoading(false);
       }
     };
-
-    // Lần đầu tải có hiện xoay vòng Loading
-    fetchSeats(true);
-
-    // Chạy ngầm (polling): tự động gọi lại API sau mỗi 3 giây để cập nhật trạng thái ghế
-    const intervalId = setInterval(() => {
-      fetchSeats(false); // Gọi API ngầm, không hiện Loading để tránh giật màn hình
-    }, 3000);
-
+    fetchSeats();
+    const intervalId = setInterval(() => fetchSeats(), 3000);
     return () => clearInterval(intervalId);
   }, [selectedTripId]);
 
-  // 3. Xử lý đặt vé và lưu vào cơ sở dữ liệu (US 2, 3, 4, 6)
+  // 3. Đặt vé
   const handleBookTicket = async () => {
     if (!selectedSeat) {
       alert('Vui lòng chọn vị trí ghế trên sơ đồ!');
       return;
     }
-
     setIsLoading(true);
     setStatusMessage(null);
     try {
       const token = localStorage.getItem('smartbus_access_token');
       const userStr = localStorage.getItem('smartbus_user');
       const currentUser = userStr ? JSON.parse(userStr) : null;
-
       const res = await apiFetch(getApiUrl('/api/v1/ticketing/bookings'), {
         method: 'POST',
         headers: {
@@ -167,23 +224,14 @@ export const TicketBookingView: React.FC = () => {
           customerEmail: currentUser?.email || 'khachhang@gmail.com',
         }),
       });
-
       const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.message || 'Đặt vé thất bại trong cơ sở dữ liệu!');
-      }
-
+      if (!res.ok) throw new Error(json.message || 'Đặt vé thất bại!');
       setBookingResult(json.data || json);
       setStatusMessage('🎉 Đặt vé và giữ chỗ 10 phút thành công! Mã QR đã được lưu trong cơ sở dữ liệu.');
-
-      // Tải lại sơ đồ ghế ngay lập tức sau khi đặt vé
+      // Tải lại ghế ngay lập tức
       const seatsRes = await apiFetch(getApiUrl(`/api/v1/ticketing/trips/${selectedTripId}/seats`));
       const seatsJson = await seatsRes.json();
-      const rawSeats = Array.isArray(seatsJson?.data?.seats)
-        ? seatsJson.data.seats
-        : Array.isArray(seatsJson?.seats)
-        ? seatsJson.seats
-        : [];
+      const rawSeats = Array.isArray(seatsJson?.data?.seats) ? seatsJson.data.seats : Array.isArray(seatsJson?.seats) ? seatsJson.seats : [];
       setSeats(rawSeats);
     } catch (err: any) {
       alert(err.message);
@@ -192,25 +240,20 @@ export const TicketBookingView: React.FC = () => {
     }
   };
 
-  // 4. Soát vé QR (US 15 - Tài xế / Phụ xe)
+  // 4. Soát vé QR
   const handleVerifyTicket = async () => {
     if (!verifyCode.trim()) {
       alert('Vui lòng nhập mã vé hoặc chuỗi mã QR!');
       return;
     }
-
     try {
       const res = await apiFetch(getApiUrl('/api/v1/ticketing/verify'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: verifyCode.trim() }),
       });
-
       const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.message || 'Mã vé không hợp lệ trong CSDL cơ sở dữ liệu!');
-      }
-
+      if (!res.ok) throw new Error(json.message || 'Mã vé không hợp lệ!');
       setVerifyResult(json.data || json);
     } catch (err: any) {
       alert(err.message);
@@ -219,13 +262,85 @@ export const TicketBookingView: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+
+      {/* =========================================================
+          TASK 3 POPUP: CẢNH BÁO SẮP HẾT THỜI GIAN GIỮ CHỖ
+      ========================================================= */}
+      {showWarningPopup && !isExpired && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            backdropFilter: 'blur(6px)',
+          }}
+        >
+          <div
+            style={{
+              background: 'linear-gradient(135deg, rgba(20, 20, 40, 0.98), rgba(30, 15, 15, 0.98))',
+              border: '1px solid rgba(249, 115, 22, 0.6)',
+              borderRadius: '24px',
+              padding: '40px 48px',
+              maxWidth: '460px',
+              width: '90%',
+              textAlign: 'center',
+              boxShadow: '0 0 60px rgba(249, 115, 22, 0.4)',
+            }}
+          >
+            <div style={{ fontSize: '56px', marginBottom: '16px' }}>⚠️</div>
+            <h2 style={{ color: '#f97316', fontSize: '24px', margin: '0 0 12px', fontWeight: 700 }}>
+              Sắp hết thời gian giữ chỗ!
+            </h2>
+            <p style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '15px', margin: '0 0 20px', lineHeight: 1.6 }}>
+              Bạn còn <strong style={{ color: '#f97316' }}>chưa đến 2 phút</strong> để hoàn tất thanh toán. 
+              Ghế sẽ bị giải phóng tự động nếu quá hạn.
+            </p>
+            {timeLeft !== null && (
+              <div
+                style={{
+                  fontSize: '52px',
+                  fontWeight: 800,
+                  fontFamily: 'monospace',
+                  color: '#ef4444',
+                  marginBottom: '28px',
+                  letterSpacing: '4px',
+                  textShadow: '0 0 20px rgba(239, 68, 68, 0.8)',
+                }}
+              >
+                {formatTime(timeLeft)}
+              </div>
+            )}
+            <button
+              onClick={() => setShowWarningPopup(false)}
+              style={{
+                padding: '12px 32px',
+                borderRadius: '9999px',
+                background: 'linear-gradient(135deg, #f97316, #ef4444)',
+                border: 'none',
+                color: '#ffffff',
+                fontSize: '15px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 4px 20px rgba(249, 115, 22, 0.5)',
+              }}
+            >
+              Tôi hiểu, đóng lại →
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Phân hệ 1: Đặt vé & Sơ đồ ghế */}
       <div className="liquid-glass" style={{ padding: '32px' }}>
         <h3 style={{ fontSize: '26px', margin: '0 0 6px' }}>
           Đặt vé Trực tuyến & Sơ đồ ghế (US 1, 2, 3, 4)
         </h3>
         <p style={{ fontSize: '13.5px', color: 'rgba(255, 255, 255, 0.55)', marginBottom: '24px' }}>
-          Mọi giao dịch giữ chỗ 10 phút, tạo mã QR và lưu hóa đơn được đồng bộ trực tiếp vào cơ sở dữ liệu cơ sở dữ liệu.
+          Mọi giao dịch giữ chỗ 10 phút, tạo mã QR và lưu hóa đơn được đồng bộ trực tiếp vào cơ sở dữ liệu.
         </p>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '24px' }}>
@@ -246,7 +361,6 @@ export const TicketBookingView: React.FC = () => {
               ))}
             </select>
           </div>
-
           <div>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'rgba(255, 255, 255, 0.75)', marginBottom: '8px' }}>
               Mã giảm giá Voucher (US 18 - Gợi ý: BUYT5K, ICTU2026):
@@ -262,7 +376,7 @@ export const TicketBookingView: React.FC = () => {
           </div>
         </div>
 
-        {/* Sơ đồ ghế xe buýt */}
+        {/* Sơ đồ ghế */}
         <div style={{ marginBottom: '24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
             <span style={{ fontSize: '14px', fontWeight: 500, color: 'rgba(255, 255, 255, 0.85)' }}>
@@ -297,19 +411,13 @@ export const TicketBookingView: React.FC = () => {
           >
             {(Array.isArray(seats) ? seats : []).map((s) => {
               const isSelected = selectedSeat === s.seatNumber;
-              
-              // Áp dụng hàm tính màu sắc vào từng ghế
               const seatStyle = getSeatStyles(s, isSelected);
-
               return (
                 <button
                   key={s.id}
                   disabled={s.status !== 'AVAILABLE' && !s.isAvailable && !isSelected}
                   onClick={() => {
-                    // Chỉ cho click chọn khi ghế AVAILABLE
-                    if (s.status === 'AVAILABLE' || s.isAvailable) {
-                      setSelectedSeat(s.seatNumber);
-                    }
+                    if (s.status === 'AVAILABLE' || s.isAvailable) setSelectedSeat(s.seatNumber);
                   }}
                   style={{
                     padding: '14px 6px',
@@ -318,7 +426,7 @@ export const TicketBookingView: React.FC = () => {
                     fontWeight: 600,
                     backdropFilter: 'blur(8px)',
                     transition: 'all 0.18s ease',
-                    ...seatStyle // Truyền màu vào
+                    ...seatStyle,
                   }}
                 >
                   <div style={{ fontSize: '15px' }}>{s.seatNumber}</div>
@@ -352,15 +460,11 @@ export const TicketBookingView: React.FC = () => {
           )}
         </div>
 
-        {/* Kết quả đặt vé & Mã QR hiển thị */}
+        {/* Vé điện tử + Đồng hồ đếm ngược */}
         {bookingResult && (() => {
           const tCode = bookingResult.ticket?.ticketCode || bookingResult.ticketCode || 'TKT-ICTU-8888';
           const sNumber = bookingResult.ticket?.seatNumber || bookingResult.seatNumber || selectedSeat || 'A01';
           const payAmount = bookingResult.payment?.amount || bookingResult.ticket?.fareAmount || bookingResult.fareAmount || 10000;
-          const expRaw = bookingResult.ticket?.reservationExpiresAt || bookingResult.expiresAt;
-          const expTime = (expRaw && !isNaN(new Date(expRaw).getTime()))
-            ? new Date(expRaw).toLocaleTimeString('vi-VN')
-            : new Date(Date.now() + 10 * 60000).toLocaleTimeString('vi-VN');
           const qrVal = bookingResult.qrCode || `SMARTBUS-QR-${tCode}`;
           const qrImg = bookingResult.qrCodeUrl || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrVal)}`;
 
@@ -371,19 +475,92 @@ export const TicketBookingView: React.FC = () => {
                 marginTop: '24px',
                 padding: '24px',
                 borderRadius: '18px',
-                border: '1px solid rgba(56, 189, 248, 0.4)',
-                boxShadow: '0 0 30px rgba(56, 189, 248, 0.2)',
+                border: isExpired
+                  ? '1px solid rgba(239, 68, 68, 0.5)'
+                  : '1px solid rgba(56, 189, 248, 0.4)',
+                boxShadow: isExpired
+                  ? '0 0 30px rgba(239, 68, 68, 0.2)'
+                  : '0 0 30px rgba(56, 189, 248, 0.2)',
               }}
             >
-              <h4 style={{ color: '#38bdf8', fontSize: '20px', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                🎟️ Vé điện tử SmartBus (Lưu trong cơ sở dữ liệu)
-              </h4>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '16px' }}>
+                <h4 style={{ color: '#38bdf8', fontSize: '20px', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  🎟️ Vé điện tử SmartBus (Lưu trong cơ sở dữ liệu)
+                </h4>
+
+                {/* ⏱️ ĐỒNG HỒ ĐẾM NGƯỢC */}
+                {timeLeft !== null && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      padding: '12px 20px',
+                      borderRadius: '16px',
+                      background: isExpired
+                        ? 'rgba(239, 68, 68, 0.1)'
+                        : 'rgba(0, 0, 0, 0.3)',
+                      border: `1px solid ${isExpired ? 'rgba(239, 68, 68, 0.4)' : 'rgba(255,255,255,0.1)'}`,
+                      minWidth: '140px',
+                    }}
+                  >
+                    <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px', fontWeight: 600 }}>
+                      {isExpired ? '❌ Đã hết hạn' : '⏱️ Thời gian giữ chỗ'}
+                    </div>
+                    {isExpired ? (
+                      <div style={{ fontSize: '18px', fontWeight: 700, color: '#ef4444', letterSpacing: '1px' }}>
+                        Hết giờ!
+                      </div>
+                    ) : (
+                      <>
+                        <div
+                          style={{
+                            fontSize: '34px',
+                            fontWeight: 800,
+                            fontFamily: 'monospace',
+                            color: getTimerColor(timeLeft),
+                            letterSpacing: '3px',
+                            textShadow: `0 0 16px ${getTimerColor(timeLeft)}88`,
+                            transition: 'color 0.5s ease',
+                          }}
+                        >
+                          {formatTime(timeLeft)}
+                        </div>
+                        <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', marginTop: '3px' }}>
+                          {timeLeft <= 60 ? '🔴 Thanh toán ngay!' : timeLeft <= 120 ? '🟠 Sắp hết giờ!' : '🟢 Còn nhiều thời gian'}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Cảnh báo hết hạn nằm trong card */}
+              {isExpired && (
+                <div
+                  style={{
+                    padding: '12px 18px',
+                    marginBottom: '16px',
+                    borderRadius: '12px',
+                    background: 'rgba(239, 68, 68, 0.12)',
+                    border: '1px solid rgba(239, 68, 68, 0.35)',
+                    color: '#fca5a5',
+                    fontSize: '13.5px',
+                    fontWeight: 500,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}
+                >
+                  ❌ Thời gian giữ chỗ đã hết! Ghế này có thể đã bị người khác đặt. Vui lòng chọn lại ghế và thực hiện thanh toán.
+                </div>
+              )}
+
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '28px', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ fontSize: '14px', lineHeight: 2, color: 'rgba(255, 255, 255, 0.9)' }}>
                   <p style={{ margin: 0 }}><strong>Mã vé:</strong> <span style={{ color: '#38bdf8', fontWeight: 700, fontSize: '15px' }}>{tCode}</span></p>
                   <p style={{ margin: 0 }}><strong>Số ghế:</strong> <span style={{ color: '#34d399', fontWeight: 600 }}>{sNumber}</span></p>
                   <p style={{ margin: 0 }}><strong>Số tiền thanh toán:</strong> {Number(payAmount).toLocaleString('vi-VN')} VNĐ</p>
-                  <p style={{ margin: 0 }}><strong>Hạn giữ chỗ:</strong> {expTime}</p>
                   <button
                     type="button"
                     onClick={() => {
@@ -414,6 +591,7 @@ export const TicketBookingView: React.FC = () => {
                     border: '1px solid rgba(255, 255, 255, 0.15)',
                     textAlign: 'center',
                     backdropFilter: 'blur(10px)',
+                    opacity: isExpired ? 0.4 : 1,
                   }}
                 >
                   <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '10px', fontWeight: 600 }}>
@@ -423,14 +601,8 @@ export const TicketBookingView: React.FC = () => {
                     <img
                       src={qrImg}
                       alt="Mã QR Soát Vé"
-                      style={{
-                        width: '140px',
-                        height: '140px',
-                        display: 'block',
-                      }}
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
+                      style={{ width: '140px', height: '140px', display: 'block' }}
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
                     />
                   </div>
                   <div
@@ -454,15 +626,14 @@ export const TicketBookingView: React.FC = () => {
         })()}
       </div>
 
-      {/* Phân hệ 2: Soát vé bằng mã QR (US 15 - Tài xế / Phụ xe) */}
+      {/* Phân hệ 2: Soát vé QR */}
       <div className="liquid-glass" style={{ padding: '32px' }}>
         <h3 style={{ fontSize: '26px', margin: '0 0 6px' }}>
           Soát vé bằng mã QR / Mã vé (US 15 - Tài xế & Phụ xe)
         </h3>
         <p style={{ fontSize: '13.5px', color: 'rgba(255, 255, 255, 0.55)', marginBottom: '20px' }}>
-          Quét hoặc dán chuỗi mã QR của hành khách để kiểm tra tính hợp lệ trực tiếp trong cơ sở dữ liệu cơ sở dữ liệu.
+          Quét hoặc dán chuỗi mã QR của hành khách để kiểm tra tính hợp lệ trực tiếp trong cơ sở dữ liệu.
         </p>
-
         <div style={{ display: 'flex', gap: '12px', maxWidth: '640px', marginBottom: '20px' }}>
           <input
             type="text"
@@ -472,40 +643,21 @@ export const TicketBookingView: React.FC = () => {
             onChange={(e) => setVerifyCode(e.target.value)}
             style={{ flex: 1, borderRadius: '9999px', height: '46px' }}
           />
-          <button
-            onClick={handleVerifyTicket}
-            className="primary-button"
-            style={{
-              padding: '0 24px',
-              height: '46px',
-            }}
-          >
+          <button onClick={handleVerifyTicket} className="primary-button" style={{ padding: '0 24px', height: '46px' }}>
             🔍 Soát vé
           </button>
         </div>
-
         {verifyResult && (
           <div
             className="liquid-glass"
             style={{
               padding: '20px 24px',
               borderRadius: '16px',
-              border: verifyResult.isAlreadyCheckedIn
-                ? '1px solid rgba(251, 191, 36, 0.4)'
-                : '1px solid rgba(16, 185, 129, 0.4)',
-              background: verifyResult.isAlreadyCheckedIn
-                ? 'rgba(251, 191, 36, 0.08)'
-                : 'rgba(16, 185, 129, 0.08)',
+              border: verifyResult.isAlreadyCheckedIn ? '1px solid rgba(251, 191, 36, 0.4)' : '1px solid rgba(16, 185, 129, 0.4)',
+              background: verifyResult.isAlreadyCheckedIn ? 'rgba(251, 191, 36, 0.08)' : 'rgba(16, 185, 129, 0.08)',
             }}
           >
-            <div
-              style={{
-                fontWeight: 600,
-                fontSize: '16px',
-                color: verifyResult.isAlreadyCheckedIn ? '#fbbf24' : '#34d399',
-                marginBottom: '10px',
-              }}
-            >
+            <div style={{ fontWeight: 600, fontSize: '16px', color: verifyResult.isAlreadyCheckedIn ? '#fbbf24' : '#34d399', marginBottom: '10px' }}>
               {verifyResult.message}
             </div>
             <div style={{ fontSize: '13.5px', color: 'rgba(255, 255, 255, 0.8)', lineHeight: 1.7 }}>
