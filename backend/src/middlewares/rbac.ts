@@ -29,3 +29,7 @@ export const authorizeRoles = (...allowedRoles: string[]) => {
 };
 
 export const requireRoles = authorizeRoles;
+<<<<<<< HEAD
+=======
+
+>>>>>>> d49875f (fix(merge): restore rbac middleware and auth/routes/stops route files lost in merge 32c7f3e)
