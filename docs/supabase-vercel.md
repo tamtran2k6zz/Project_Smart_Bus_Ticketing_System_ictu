@@ -24,20 +24,88 @@ Use the repository-root `.env.example` as a template. Set `DATABASE_URL` to the 
 
 | Variable | Purpose | Vercel runtime |
 | --- | --- | --- |
-| `DATABASE_URL` | Transaction pooler, port 6543 | Required |
+| `DATABASE_URL` | Transaction pooler, port 6543. Must be `postgresql://` | Required |
+| `DIRECT_URL` | Session pooler/direct connection (port 5432) for migrations and import | Local only |
+| `PORT` | API port, always `5000` in this project | Required |
+| `CORS_ORIGIN` | Comma-separated origins, no spaces | Required |
 | `JWT_SECRET` | Private random secret, at least 32 characters | Required |
+| `LOG_LEVEL` | `debug`, `info` (default), `warn`, `error` | Optional |
 | `DB_POOL_MAX` | Per-function pool size; start at `2` | Recommended |
-| `DIRECT_URL` | Session pooler/direct connection for migrations and import | Local only |
 | `MYSQL_SOURCE_URL` | Existing MySQL database for one-time import | Local only |
 | `MYSQL_SOURCE_TIMEZONE` | Timezone of old MySQL DATETIME values; defaults to `Asia/Ho_Chi_Minh` | Local only |
-| `CORS_ORIGIN` | Comma-separated origins for a separately hosted frontend | Unnecessary on same-origin Vercel |
-| `REDIS_URL` | Shared Redis-compatible service for cross-instance 10-minute seat locks | Optional; Docker Compose supplies local Redis |
+| `REDIS_URL` | Shared Redis for cross-instance 10-minute seat locks. Also accepts `REDIS_HOST`/`REDIS_PORT`/`REDIS_PASSWORD` | Optional; empty means PostgreSQL row locks only |
+| `PAYMENT_PUBLIC_BASE_URL` | Public HTTPS origin the gateways call back into (tunnel or Vercel domain). No trailing slash | Required for real gateway tests |
 | `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET` | VNPay merchant credentials for signed payment and refund requests | Required to enable VNPay |
+| `VNPAY_RETURN_URL`, `VNPAY_IPN_URL` | VNPay callbacks. Defaults derive from `PAYMENT_PUBLIC_BASE_URL` | Required for sandbox/live gateway tests |
 | `MOMO_PARTNER_CODE`, `MOMO_ACCESS_KEY`, `MOMO_SECRET_KEY` | MoMo merchant credentials for signed payment and refund requests | Required to enable MoMo |
-| `VNPAY_RETURN_URL`, `MOMO_IPN_URL`, `PAYMENT_RESULT_URL` | Public callback/result URLs used by the gateways | Required for sandbox/live gateway tests |
+| `MOMO_IPN_URL`, `MOMO_REDIRECT_URL` | MoMo IPN and browser redirect. `MOMO_IPN_URL` must be public | Required for sandbox/live gateway tests |
+| `PAYMENT_RESULT_URL` | Frontend page that displays the payment result | Required |
+| `PAYMENT_CLIENT_IP`, `PAYMENT_REFUND_IP` | IP sent to the gateway; gateways reject `127.0.0.1` | Optional |
 | `PAYMENT_CRON_SECRET` or `CRON_SECRET` | Bearer token shared with the external expired-reservation scheduler | Required in Production |
 
 No Supabase service key, publishable key, or `VITE_SUPABASE_*` variable is needed for this architecture. Never put database credentials or JWT secrets in `VITE_*` variables. Rotate the old repository's demo JWT secret; this requires users to sign in again.
+
+### 2.1 One variable name per setting
+
+All environment variables are read in exactly one file, `backend/src/config/env.ts`. Nothing else
+calls `process.env` for a gateway or database setting. This prevents the historical drift where the
+code read `VNP_*` while `.env` declared `VNPAY_*`.
+
+* Canonical names: `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET`, `VNPAY_PAYMENT_URL`,
+  `VNPAY_RETURN_URL`, `VNPAY_IPN_URL`, `VNPAY_REFUND_URL`, `MOMO_*`, `PAYMENT_*`.
+* Legacy aliases `VNP_TMN_CODE`, `VNP_HASH_SECRET`, `VNP_URL`, `VNP_RETURN_URL`, `VNP_IPN_URL` are
+  still accepted so an old `.env` keeps booting. The canonical name always wins, and each fallback
+  logs `deprecated_env_alias_used` so it can be removed.
+
+At boot the API prints a configuration summary (`database_target`, `redis_target`,
+`payment_callbacks`) and every missing or contradictory setting as `environment_warning` or
+`environment_invalid`. `GET /api/health` returns the same information as JSON.
+
+### 2.2 Seat locks and Redis
+
+`REDIS_URL` is optional. When it is empty, the API logs `seat_lock_disabled` with
+`fallback=postgres-row-lock` and relies on the `SELECT ... FOR UPDATE` locks in
+`backend/src/services/booking.ts`. Redis only adds a cross-instance `SET NX` lock.
+
+The API accepts either `REDIS_URL` or the `REDIS_HOST`/`REDIS_PORT`/`REDIS_PASSWORD` triplet. It
+builds the URL itself, so configuring only the triplet no longer leaves seat locking silently off.
+A Redis that is configured but unreachable is a hard error (`503`) rather than a silent fallback,
+because silently dropping the lock would allow double booking across instances.
+
+### 2.3 Payment callbacks must be public
+
+VNPay and MoMo call back from their own servers, so `localhost` is never reachable. Set
+`PAYMENT_PUBLIC_BASE_URL` to a tunnel or deployed domain:
+
+```powershell
+ngrok http 5000
+# or: cloudflared tunnel --url http://localhost:5000
+```
+
+then copy the public origin into `PAYMENT_PUBLIC_BASE_URL`. When it is unset the API falls back to
+`VERCEL_URL`, then to `http://localhost:PORT`. Callback URLs that still resolve to `localhost`
+produce a startup warning.
+
+Register the exact endpoints below in the merchant portal:
+
+| Channel | Method | Path |
+| --- | --- | --- |
+| VNPay browser return | `GET` | `/api/v1/ticketing/payments/vnpay/return` |
+| VNPay server IPN | `GET` or `POST` | `/api/v1/ticketing/payments/vnpay/ipn` |
+| MoMo IPN | `POST` | `/api/v1/ticketing/payments/momo/ipn` |
+
+The API is mounted under both `/api/ticketing` and `/api/v1/ticketing`. The hyphenated aliases
+`vnpay-return` and `vnpay-ipn` are still routed so an older merchant-portal configuration keeps
+working, but new integrations must use the paths in the table.
+
+### 2.4 `vnp_TxnRef` is the ticket UUID
+
+`vnp_TxnRef` (VNPay) and `orderId` (MoMo) are not free-form codes. `POST /api/v1/ticketing/bookings`
+creates the reservation and returns `data.payment.orderId`, which is the `tickets.id` UUID and also
+`payment_transactions.order_id`. Use that exact value as the transaction reference; values such as
+`ORD-20261002-001` or `TKT-...` match no row and are rejected with `event=vnpay_order_id_invalid`.
+
+There is no separate `bookings` or `payments` table: the ticket id doubles as the order id.
 
 ## 3. Apply the schema
 
@@ -47,9 +115,28 @@ npm ci
 npm run db:migrate
 ```
 
+`supabase/migrations/*.sql` is the single source of truth for the DDL, and `npm run db:migrate` is
+the only supported way to apply it.
+
 This runner applies `supabase/migrations/*.sql` in one transaction, uses an advisory lock, and records checksums in `smartbus_private.migrations`. Re-running unchanged migrations is safe. It fails on pre-existing application tables rather than dropping them. Inspect an occupied target and plan reconciliation before running it there.
 
 Use this runner consistently. It stores checksums in `smartbus_private.migrations` and synchronizes version records with `supabase_migrations.schema_migrations` when that Supabase CLI history table exists. A migration already recorded in Supabase history is registered locally without being replayed. Avoid applying the same migration independently through multiple tools, and never edit an already-applied migration file.
+
+### 3.1 Prisma is documentation only
+
+`backend/prisma/schema.prisma` describes the same PostgreSQL database for tooling and review, and
+`npm run ci:validate` checks that it stays parseable and consistent. It is **not** the migration
+tool:
+
+* `provider = "postgresql"`. The historical `provider = "mysql"` model and its Prisma migration
+  history were removed because they described a database that no longer exists.
+* There is no `prisma/migrations` directory, so `prisma migrate deploy` has nothing to apply. Do not
+  run `prisma migrate` against Supabase: the applied history is `smartbus_private.migrations`.
+* Every model uses `@@map()` to the real Supabase table and every field uses `@map()` to the real
+  column, so the model names cannot drift into a `payments`/`bookings` schema that Supabase lacks.
+  The real tables are `payment_transactions` and `tickets`.
+* The deployed API uses `node-postgres` (`backend/src/config/database.ts`) and does not import
+  `@prisma/client`, so the Prisma client is not required at runtime.
 
 All 14 application tables have RLS enabled and deny `anon`/`authenticated` access. The backend connects using the database owner account through the pooler and enforces JWT roles and user ownership. The custom JWT is not a Supabase Auth JWT. Do not expose these tables through a browser Supabase client.
 

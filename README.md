@@ -250,12 +250,15 @@ Project_Smart_Bus_Ticketing_System_ictu/
 │   ├── scripts/
 │   │   ├── migrate-postgres.cjs       # Trình thực thi Migration PostgreSQL
 │   │   ├── import-mysql.cjs           # Script chuyển đổi dữ liệu MySQL -> PostgreSQL
-│   │   ├── test-postgres.cjs          # Bộ kiểm thử 54 kịch bản API tự động
+│   │   ├── test-postgres.cjs          # Bộ kiểm thử 61 kịch bản API tự động
 │   │   └── create-admin.cjs           # Tiện ích tạo tài khoản quản trị viên
 │   ├── src/
 │   │   ├── config/
-│   │   │   ├── database.ts            # PostgreSQL Pool Client
+│   │   │   ├── database.ts            # PostgreSQL Pool Client (node-postgres)
 │   │   │   └── auth.ts                # Cấu hình mã hóa JWT & Secret
+│   │   │   ├── env.ts                 # Nguồn cấu hình duy nhất + kiểm tra biến môi trường
+│   │   │   ├── logger.ts              # Log có cấu trúc key=value, tự che bí mật
+│   │   │   └── redis.ts               # Redis client & khoá ghế tạm (tuỳ chọn)
 │   │   ├── controllers/
 │   │   │   ├── auth.controller.ts     # Xử lý Đăng ký / Đăng nhập
 │   │   │   ├── routes.controller.ts   # Quản lý Tuyến buýt
@@ -265,8 +268,14 @@ Project_Smart_Bus_Ticketing_System_ictu/
 │   │   ├── middlewares/
 │   │   │   └── auth.ts                # Middleware xác thực JWT & Phân quyền RBAC
 │   │   ├── routes/                    # Định tuyến API Express
-│   │   ├── app.ts                     # Cấu hình Express App, CORS, Error Handler
+│   │   ├── services/
+│   │   │   ├── booking.ts                   # Đặt vé & giữ ghế (khoá dòng PostgreSQL)
+│   │   │   ├── payment-gateway.service.ts   # Ký & kiểm tra chữ ký VNPay / MoMo
+│   │   │   └── payment-refund.service.ts     # Hoàn tiền VNPay / MoMo
+│   │   ├── app.ts                     # Cấu hình Express App, CORS, Health, Error Handler
 │   │   └── server.ts                  # Điểm khởi chạy Local HTTP Server (Port 5000)
+│   ├── prisma/
+│   │   └── schema.prisma              # Mô hình PostgreSQL (tài liệu, KHÔNG chạy migration)
 │   ├── Dockerfile                     # Dockerfile đóng gói Backend Node.js
 │   └── package.json
 ├── frontend/
@@ -319,16 +328,65 @@ Tất cả các API hỗ trợ đồng thời cả hai tiền tố định tuy�
 
 ### 5. Phân hệ Đặt vé & Soát vé QR (`/api/v1/ticketing`)
 * `POST /bookings`: Đặt vé, lưu vào CSDL PostgreSQL, sinh mã vé và QR điện tử.
+  Thêm `"paymentMethod": "VNPAY"` hoặc `"MOMO"` để giữ ghế 10 phút và nhận URL thanh toán.
+  Response trả về `data.payment.orderId` — đây chính là **UUID** dùng làm `vnp_TxnRef`/`orderId`.
 * `POST /verify`: Soát vé điện tử bằng chuỗi mã QR hoặc mã vé, đổi trạng thái `CHECKED_IN`.
 
-### 6. Phân hệ Vận hành & Sự cố (`/api/v1/operations`)
+### 6. Phân hệ Thanh toán trực tuyến (`/api/v1/ticketing`)
+
+> **Lưu ý:** VNPay và MoMo gọi webhook từ máy chủ của họ, nên `localhost` **không** dùng được.
+> Hãy mở tunnel (`ngrok http 5000`) và đặt `PAYMENT_PUBLIC_BASE_URL` trong `.env`.
+
+| Phương thức | Endpoint | Mục đích |
+| :--- | :--- | :--- |
+| `GET` | `/payments/vnpay/return` | Cổng thanh toán chuyển hướng trình duyệt về sau khi thanh toán |
+| `GET` hoặc `POST` | `/payments/vnpay/ipn` | IPN máy chủ → máy chủ (đăng ký trong merchant portal VNPay) |
+| `POST` | `/payments/momo/ipn` | IPN của MoMo |
+| `GET` | `/payments/:orderId` | Tra cứu trạng thái giao dịch (yêu cầu đăng nhập) |
+| `GET`/`POST` | `/release-expired` | Giải phóng ghế quá hạn (bearer token `PAYMENT_CRON_SECRET`) |
+
+Các đường dẫn cũ `vnpay-return` và `vnpay-ipn` vẫn được định tuyến để tương thích, nhưng cấu hình
+mới phải dùng đường dẫn trong bảng. Không có bảng `bookings`/`payments` riêng: `tickets.id` đóng
+vai trò `payment_transactions.order_id`, nên `vnp_TxnRef` phải là UUID trả về từ `POST /bookings`
+(các mã dạng `ORD-20261002-001` sẽ bị từ chối).
+
+### 7. Phân hệ Vận hành & Sự cố (`/api/v1/operations`)
 * `GET /dashboard/summary`: Thống kê tổng hợp số tuyến, số chuyến và tỷ lệ lấp đầy ghế.
 * `GET /incidents` & `POST /incidents`: Gửi và xem danh sách báo cáo sự cố đường sá của tài xế.
 * `GET /feedbacks` & `POST /feedbacks`: Gửi và tổng hợp đánh giá chất lượng từ hành khách.
 
 ---
 
-## 👥 7. Đội ngũ phát triển (Team 5 - N5 Innovators)
+## 📋 7. Cấu hình biến môi trường
+
+Toàn bộ biến môi trường được đọc tại **một nơi duy nhất**: `backend/src/config/env.ts`. Khi khởi
+động, API in ra tóm tắt cấu hình và cảnh báo mọi thiếu sót:
+
+```powershell
+npm --prefix backend run start:express
+```
+
+Nhóm biến chính:
+
+* `DATABASE_URL` — **bắt buộc**, phải là `postgresql://` của Supabase. `DATABASE_URL` dạng
+  `mysql://` khiến backend báo `environment_invalid` ngay khi khởi động.
+* `JWT_SECRET` — bắt buộc, tối thiểu 32 ký tự.
+* `REDIS_URL` — *tuỳ chọn*. Để trống nghĩa là chỉ dùng khoá dòng PostgreSQL (đây là hành vi đúng,
+  không phải lỗi). Cũng chấp nhận bộ ba `REDIS_HOST`/`REDIS_PORT`/`REDIS_PASSWORD`.
+* `PAYMENT_PUBLIC_BASE_URL` — gốc public cho webhook (ngrok/cloudflared hoặc domain Vercel).
+* `VNPAY_*` và `MOMO_*` — thông tin merchant sandbox. Tên chuẩn được ưu tiên; các bí danh cũ
+  `VNP_*` vẫn chạy được nhưng sẽ ghi cảnh báo `deprecated_env_alias_used`.
+
+Log ứng dụng dùng định dạng `key=value` và không bắt đầu bằng dấu `[`, nên có thể dán trực tiếp
+vào PowerShell mà không bị lỗi cú pháp:
+
+```text
+2026-10-02T18:12:51.037Z INFO scope=smartbus.ticketing event=momo_ipn_received order_id=508d68c2-... result_code=0
+```
+
+---
+
+## 👥 8. Đội ngũ phát triển (Team 5 - N5 Innovators)
 
 | STT | Họ và tên | Vai trò trong dự án | Phân hệ phụ trách chính |
 | :---: | :--- | :--- | :--- |
