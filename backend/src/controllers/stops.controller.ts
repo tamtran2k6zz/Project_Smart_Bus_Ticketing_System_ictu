@@ -1,6 +1,9 @@
 import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { query } from '../config/database';
+import { appLogger } from '../config/logger';
+
+const logger = appLogger.child('stops');
 
 // 1. Lấy danh sách tất cả các trạm dừng xe buýt (US 12)
 export const getStops = async (req: Request, res: Response): Promise<void> => {
@@ -29,7 +32,7 @@ export const getStops = async (req: Request, res: Response): Promise<void> => {
       })),
     });
   } catch (err: any) {
-    console.error('Lỗi API getStops:', err);
+    logger.error('stops_list_failed', { table: 'bus_stops', operation: 'select', error: err });
     res.status(500).json({
       statusCode: 500,
       success: false,
@@ -95,7 +98,7 @@ export const createStop = async (req: Request, res: Response): Promise<void> => 
       },
     });
   } catch (err: any) {
-    console.error('Lỗi API createStop:', err);
+    logger.error('stop_create_failed', { table: 'bus_stops', operation: 'insert', code: String(req.body?.code ?? ''), error: err });
     res.status(500).json({
       statusCode: 500,
       success: false,
@@ -149,7 +152,7 @@ export const updateStop = async (req: Request, res: Response): Promise<void> => 
       message: 'Cập nhật trạm dừng thành công trong CSDL!',
     });
   } catch (err: any) {
-    console.error('Lỗi API updateStop:', err);
+    logger.error('stop_update_failed', { table: 'bus_stops', operation: 'update', stop_id: req.params.id ?? '', error: err });
     res.status(500).json({
       statusCode: 500,
       success: false,
@@ -194,7 +197,7 @@ export const deleteStop = async (req: Request, res: Response): Promise<void> => 
       message: 'Xóa trạm dừng thành công khỏi CSDL PostgreSQL!',
     });
   } catch (err: any) {
-    console.error('Lỗi API deleteStop:', err);
+    logger.error('stop_delete_failed', { table: 'bus_stops', operation: 'delete', stop_id: req.params.id ?? '', error: err });
     res.status(500).json({
       statusCode: 500,
       success: false,

@@ -1,11 +1,17 @@
 import app from './app';
 import pool from './config/database';
-import { connectRedis, closeRedis } from './config/redis';
+import { connectRedis, closeRedis, redisStatus } from './config/redis';
+import { collectEnvironmentIssues, logEnvironmentSummary, readEnv } from './config/env';
+import { appLogger } from './config/logger';
 import { releaseExpiredReservations } from './routes/ticketing.routes';
 
-const port = Number(process.env.PORT || 5000);
+const logger = appLogger.child('server');
+const port = Number(readEnv('PORT') || 5000);
+
+logEnvironmentSummary();
+
 const server = app.listen(port, '0.0.0.0', () =>
-  console.log(`SmartBus PostgreSQL API listening on port ${port}`)
+  logger.info('api_started', { port, redis: redisStatus() })
 );
 
 let cleanupRunning = false;
@@ -14,22 +20,42 @@ async function cleanupExpiredReservations(): Promise<void> {
   cleanupRunning = true;
   try {
     const count = await releaseExpiredReservations();
-    if (count) console.log(`[Ticketing] Released ${count} expired reservation(s).`);
+    if (count) {
+      logger.info('expired_reservations_released', {
+        released: count,
+        tables: 'tickets/trip_seats/payment_transactions',
+      });
+    }
   } catch (error) {
-    console.error('[Ticketing] Scheduled reservation cleanup failed:', error);
+    logger.error('reservation_cleanup_failed', {
+      tables: 'tickets/trip_seats/payment_transactions',
+      error,
+    });
   } finally {
     cleanupRunning = false;
   }
 }
 
-void connectRedis().catch(error => console.error('[Redis] Initial connection failed:', error));
+void connectRedis().catch(error =>
+  logger.error('redis_initial_connection_failed', { error })
+);
 void cleanupExpiredReservations();
 const cleanupInterval = setInterval(() => void cleanupExpiredReservations(), 60_000);
 cleanupInterval.unref();
 
 process.on('SIGTERM', () => {
+  logger.info('shutdown_started', {});
   clearInterval(cleanupInterval);
   server.close(() => {
-    void Promise.all([pool.end(), closeRedis()]);
+    void Promise.all([pool.end(), closeRedis()]).then(() =>
+      logger.info('shutdown_completed', {})
+    );
   });
 });
+
+const blockingIssues = collectEnvironmentIssues().filter(issue => issue.level === 'error');
+if (blockingIssues.length) {
+  logger.error('environment_not_ready', {
+    variables: blockingIssues.map(issue => issue.variable).join(','),
+  });
+}

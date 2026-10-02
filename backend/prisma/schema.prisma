@@ -1,44 +1,22 @@
-// HISTORICAL NEST/MYSQL MODEL. Not used by the deployed Express/PostgreSQL API.
-// Do not apply these migrations to Supabase. See docs/supabase-vercel.md.
+// PostgreSQL data model for the deployed Express API.
+//
+// This file mirrors supabase/migrations/*.sql, which remain the single source
+// of truth for the DDL. Apply them with `npm run db:migrate`
+// (backend/scripts/migrate-postgres.cjs). Do NOT run `prisma migrate` against
+// Supabase: this folder intentionally holds no Prisma migration history.
+//
+// Every model maps to a real Supabase table through @@map(), and every field
+// maps to a real column through @map(). Identifiers are text/timestamptz and
+// columns are snake_case, exactly as created by the SQL migrations.
+//
+// Database: Supabase PostgreSQL. Never point this at MySQL.
 datasource db {
-  provider = "mysql"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 generator client {
   provider = "prisma-client-js"
-}
-
-enum UserRole {
-  ADMIN
-  MANAGER
-  DRIVER
-  PASSENGER
-}
-
-enum DiscountType {
-  NONE
-  STUDENT
-  ELDERLY
-  PRIORITY
-}
-
-enum DiscountStatus {
-  NOT_REGISTERED
-  PENDING
-  APPROVED
-  REJECTED
-}
-
-enum UserStatus {
-  ACTIVE
-  LOCKED
-}
-
-enum RouteStatus {
-  DRAFT
-  ACTIVE
-  INACTIVE
 }
 
 enum FareType {
@@ -55,14 +33,8 @@ enum TicketType {
 
 enum TripStatus {
   SCHEDULED
-  RUNNING
+  IN_TRANSIT
   COMPLETED
-  CANCELLED
-}
-
-enum BookingStatus {
-  PENDING
-  CONFIRMED
   CANCELLED
 }
 
@@ -73,456 +45,279 @@ enum TicketStatus {
   CANCELLED
 }
 
-enum PaymentMethod {
-  MOMO
-  VNPAY
-  ZALOPAY
-  BANK_TRANSFER
-  CASH
-}
-
-enum PaymentStatus {
-  PENDING
-  SUCCESS
-  FAILED
-  REFUNDED
-}
-
-enum MonthlyPassType {
-  STUDENT
-  REGULAR
-  ALL_ROUTES
-}
-
-enum PassStatus {
-  ACTIVE
-  EXPIRED
-  LOCKED
-}
-
-enum VoucherStatus {
-  ACTIVE
-  EXPIRED
-  PAUSED
-}
-
-enum IncidentType {
-  TRAFFIC_JAM
-  BREAKDOWN
-  BAD_WEATHER
-  ACCIDENT
-  OTHER
-}
-
-enum IncidentSeverity {
-  LOW
-  MEDIUM
-  HIGH
-}
-
-enum FeedbackStatus {
-  PENDING
-  PROCESSING
-  RESOLVED
-}
-
-enum NotificationType {
-  APPROACHING_STOP
-  SCHEDULE_CHANGE
-  CANCELLED_TRIP
-  PROMOTION
-  SYSTEM
-}
-
-model User {
-  id               String         @id @default(uuid()) @db.VarChar(36)
-  fullName         String         @map("full_name") @db.VarChar(255)
-  email            String         @unique(map: "uq_users_email") @db.VarChar(191)
-  phoneNumber      String?        @unique(map: "uq_users_phone") @map("phone_number") @db.VarChar(50)
-  passwordHash     String         @map("password_hash") @db.VarChar(255)
-  role             UserRole       @default(PASSENGER)
-  discountType     DiscountType   @default(NONE) @map("discount_type")
-  discountStatus   DiscountStatus @default(NOT_REGISTERED) @map("discount_status")
-  discountProofUrl String?        @map("discount_proof_url") @db.VarChar(500)
-  status           UserStatus     @default(ACTIVE)
-  createdAt        DateTime       @default(now()) @map("created_at")
-  updatedAt        DateTime       @updatedAt @map("updated_at")
-
-  driverTrips      Trip[]           @relation("TripDriver")
-  assistantTrips   Trip[]           @relation("TripAssistant")
-  bookings         Booking[]
-  tickets          Ticket[]
-  monthlyPasses    MonthlyPass[]
-  feedbacks        Feedback[]
-  incidentReports  IncidentReport[]
-  notifications    Notification[]
-  activityLogs     ActivityLog[]
-
-  @@map("users")
-}
-
-model Route {
-  id                   String      @id @default(uuid()) @db.VarChar(36)
-  code                 String      @unique(map: "uq_routes_code") @db.VarChar(50)
-  name                 String      @db.VarChar(255)
-  description          String?     @db.Text
-  distanceKm           Float       @default(0.0) @map("distance_km")
-  estimatedDurationMin Int         @default(0) @map("estimated_duration_min")
-  status               RouteStatus @default(DRAFT)
-  deletedAt            DateTime?   @map("deleted_at")
-  createdAt            DateTime    @default(now()) @map("created_at")
-  updatedAt            DateTime    @updatedAt @map("updated_at")
-
-  routeStops    RouteStop[]
-  fares         Fare[]
-  trips         Trip[]
-  monthlyPasses MonthlyPass[]
-
-  @@index([status])
-  @@index([deletedAt])
-  @@map("routes")
-}
-
-model BusStop {
-  id        String    @id @default(uuid()) @db.VarChar(36)
-  code      String    @unique(map: "bus_stops_code_key") @db.VarChar(50)
-  name      String    @db.VarChar(255)
-  address   String    @db.Text
-  latitude  Float
-  longitude Float
-  isActive  Boolean   @default(true) @map("is_active")
-  deletedAt DateTime? @map("deleted_at")
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-
-  routeStops       RouteStop[]
-  fromFares        Fare[]      @relation("FareFromStop")
-  toFares          Fare[]      @relation("FareToStop")
-  departureTickets Ticket[]    @relation("TicketFromStop")
-  arrivalTickets   Ticket[]    @relation("TicketToStop")
-
-  @@index([latitude, longitude])
-  @@index([deletedAt])
-  @@index([isActive])
-  @@map("bus_stops")
-}
-
-model RouteStop {
-  id                        String   @id @default(uuid()) @db.VarChar(36)
-  routeId                   String   @map("route_id") @db.VarChar(36)
-  stopId                    String   @map("stop_id") @db.VarChar(36)
-  stopOrder                 Int      @map("stop_order")
-  distanceFromStartKm       Float    @default(0.0) @map("distance_from_start_km")
-  estimatedMinutesFromStart Int      @default(0) @map("estimated_time_minutes")
-  isTerminal                Boolean  @default(false) @map("is_terminal")
-  createdAt                 DateTime @default(now()) @map("created_at")
-  updatedAt                 DateTime @updatedAt @map("updated_at")
-
-  route Route   @relation(fields: [routeId], references: [id], onDelete: Cascade)
-  stop  BusStop @relation(fields: [stopId], references: [id], onDelete: Cascade)
-
-  @@unique([routeId, stopId], name: "unique_route_stop", map: "uq_route_stops_route_stop")
-  @@unique([routeId, stopOrder], name: "unique_route_order", map: "uq_route_stops_route_order")
-  @@index([stopId, routeId, stopOrder, estimatedMinutesFromStart], name: "idx_route_stops_search_covering")
-  @@index([routeId, stopOrder], name: "idx_route_stops_route_order")
-  @@map("route_stops")
-}
-
-model Bus {
-  id               String   @id @default(uuid()) @db.VarChar(36)
-  plateNumber      String   @unique(map: "uq_buses_plate_number") @map("plate_number") @db.VarChar(20)
-  busType          String   @map("bus_type") @db.VarChar(50)
-  totalSeats       Int      @map("total_seats")
-  standingCapacity Int      @default(15) @map("standing_capacity")
-  currentLatitude  Float?   @map("current_latitude")
-  currentLongitude Float?   @map("current_longitude")
-  status           String   @default("READY") @db.VarChar(50)
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
-
-  trips Trip[]
-  seats Seat[]
-
-  @@map("buses")
-}
-
-model Seat {
-  id          String     @id @default(uuid()) @db.VarChar(36)
-  busId       String     @map("bus_id") @db.VarChar(36)
-  seatNumber  String     @map("seat_number") @db.VarChar(10)
-  seatType    String     @default("STANDARD") @map("seat_type") @db.VarChar(20)
-  rowPosition String     @default("WINDOW") @map("row_position") @db.VarChar(20)
-  deck        String     @default("DECK_1") @db.VarChar(20)
-  isPriority  Boolean    @default(false) @map("is_priority")
-  status      String     @default("ACTIVE") @map("status") @db.VarChar(20)
-  createdAt   DateTime   @default(now()) @map("created_at")
-  updatedAt   DateTime   @updatedAt @map("updated_at")
-
-  bus       Bus        @relation(fields: [busId], references: [id], onDelete: Cascade)
-  tickets   Ticket[]
-  tripSeats TripSeat[]
-
-  @@unique([busId, seatNumber], name: "uq_bus_seat_number")
-  @@map("seats")
-}
-
-enum TripSeatStatus {
+enum SeatStatus {
   AVAILABLE
   LOCKED
   BOOKED
   CHECKED_IN
 }
 
-model TripSeat {
-  id             Int            @id @default(autoincrement())
-  tripId         Int            @map("trip_id")
-  seatId         String?        @map("seat_id") @db.VarChar(36)
-  seatNumber     String         @map("seat_number") @db.VarChar(10)
-  status         TripSeatStatus @default(AVAILABLE)
-  lockedAt       DateTime?      @map("locked_at")
-  lockedByUserId Int?           @map("locked_by_user_id")
-  lockExpiresAt  DateTime?      @map("lock_expires_at")
-  ticketId       String?        @map("ticket_id") @db.VarChar(36)
-  createdAt      DateTime       @default(now()) @map("created_at")
-  updatedAt      DateTime       @updatedAt @map("updated_at")
-
-  seat Seat? @relation(fields: [seatId], references: [id], onDelete: SetNull)
-
-  @@unique([tripId, seatNumber], name: "uq_trip_seat_number")
-  @@index([tripId, status], name: "idx_trip_seats_trip_status")
-  @@index([lockExpiresAt], name: "idx_trip_seats_lock_expires")
-  @@map("trip_seats")
+enum PaymentMethodCode {
+  VNPAY
+  MOMO
 }
 
-model Trip {
-  id                  String     @id @default(uuid()) @db.VarChar(36)
-  routeId             String     @map("route_id") @db.VarChar(36)
-  busId               String     @map("bus_id") @db.VarChar(36)
-  driverId            String?    @map("driver_id") @db.VarChar(36)
-  assistantId         String?    @map("assistant_id") @db.VarChar(36)
-  departureTime       DateTime   @map("departure_time")
-  arrivalTime         DateTime   @map("arrival_time")
-  actualDepartureTime DateTime?  @map("actual_departure_time")
-  actualArrivalTime   DateTime?  @map("actual_arrival_time")
-  status              TripStatus @default(SCHEDULED)
-  basePrice           Decimal    @map("base_price") @db.Decimal(12, 2)
-  dispatchNotes       String?    @map("dispatch_notes") @db.Text
-  createdAt           DateTime   @default(now()) @map("created_at")
-  updatedAt           DateTime   @updatedAt @map("updated_at")
-
-  route           Route            @relation(fields: [routeId], references: [id], onDelete: Restrict)
-  bus             Bus              @relation(fields: [busId], references: [id], onDelete: Restrict)
-  driver          User?            @relation("TripDriver", fields: [driverId], references: [id], onDelete: SetNull)
-  assistant       User?            @relation("TripAssistant", fields: [assistantId], references: [id], onDelete: SetNull)
-  bookings        Booking[]
-  tickets         Ticket[]
-  incidentReports IncidentReport[]
-  feedbacks       Feedback[]
-
-  @@index([routeId, status, departureTime], name: "idx_trips_route_status_departure")
-  @@index([status, departureTime])
-  @@map("trips")
+enum PaymentStatusCode {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
 }
 
-model Booking {
-  id          String        @id @default(uuid()) @db.VarChar(36)
-  tripId      String        @map("trip_id") @db.VarChar(36)
-  userId      String?       @map("user_id") @db.VarChar(36)
-  bookingCode String        @unique(map: "uq_bookings_booking_code") @map("booking_code") @db.VarChar(50)
-  status      BookingStatus @default(PENDING)
-  totalAmount Decimal       @default(0) @map("total_amount") @db.Decimal(12, 2)
-  createdAt   DateTime      @default(now()) @map("created_at")
-  updatedAt   DateTime      @updatedAt @map("updated_at")
+model Role {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique @db.VarChar(50)
+  description String?  @db.VarChar(255)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  users       User[]
 
-  trip     Trip      @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  user     User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
-  tickets  Ticket[]
-  payments Payment[]
-
-  @@index([tripId, status], name: "idx_bookings_trip_status")
-  @@map("bookings")
+  @@map("roles")
 }
 
-model Ticket {
-  id                   String       @id @default(uuid()) @db.VarChar(36)
-  bookingId            String       @map("booking_id") @db.VarChar(36)
-  tripId               String       @map("trip_id") @db.VarChar(36)
-  userId               String?      @map("user_id") @db.VarChar(36)
-  seatId               String?      @map("seat_id") @db.VarChar(36)
-  seatNumber           String       @map("seat_number") @db.VarChar(10)
-  fromStopId           String?      @map("from_stop_id") @db.VarChar(36)
-  toStopId             String?      @map("to_stop_id") @db.VarChar(36)
-  voucherId            String?      @map("voucher_id") @db.VarChar(36)
-  ticketCode           String?      @unique(map: "uq_tickets_code") @map("ticket_code") @db.VarChar(50)
-  qrCode               String?      @map("qr_code") @db.VarChar(500)
-  price                Decimal      @db.Decimal(12, 2)
-  status               TicketStatus @default(RESERVED)
-  reservationExpiresAt DateTime?    @map("reservation_expires_at")
-  checkedInAt          DateTime?    @map("checked_in_at")
-  createdAt            DateTime     @default(now()) @map("created_at")
-  updatedAt            DateTime     @updatedAt @map("updated_at")
+model User {
+  id             String    @id @default(dbgenerated("gen_random_uuid()::text"))
+  fullName       String    @map("full_name") @db.VarChar(100)
+  email          String    @unique @db.VarChar(100)
+  phoneNumber    String?   @unique(map: "users_phone_unique") @map("phone_number") @db.VarChar(20)
+  passwordHash   String    @map("password_hash") @db.VarChar(255)
+  roleId         Int       @map("role_id")
+  role           String    @default("PASSENGER") @db.VarChar(20)
+  status         String    @default("ACTIVE") @db.VarChar(20)
+  discountType   String    @default("NONE") @map("discount_type") @db.VarChar(20)
+  discountStatus String    @default("NOT_REGISTERED") @map("discount_status") @db.VarChar(30)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime  @default(now()) @map("updated_at") @db.Timestamptz(3)
+  roleRef        Role      @relation(fields: [roleId], references: [id], onDelete: Restrict, map: "fk_users_role")
+  trips          Trip[]
+  tickets        Ticket[]
+  feedbacks      Feedback[]
+  incidents      Incident[]
+  seatLocks      TripSeat[]
 
-  booking  Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  trip     Trip      @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  user     User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
-  seat     Seat?     @relation(fields: [seatId], references: [id], onDelete: SetNull)
-  fromStop BusStop?  @relation("TicketFromStop", fields: [fromStopId], references: [id], onDelete: SetNull)
-  toStop   BusStop?  @relation("TicketToStop", fields: [toStopId], references: [id], onDelete: SetNull)
-  voucher  Voucher?  @relation(fields: [voucherId], references: [id], onDelete: SetNull)
-  payments Payment[]
+  @@index([roleId], map: "users_role_idx")
+  @@map("users")
+}
 
-  @@index([tripId, status], name: "idx_tickets_trip_status")
-  @@map("tickets")
+model Route {
+  id                   String     @id @default(dbgenerated("gen_random_uuid()::text"))
+  code                 String     @unique @db.VarChar(20)
+  name                 String     @db.VarChar(150)
+  description          String?    @db.Text
+  distanceKm           Decimal?   @default(0) @map("distance_km") @db.Decimal(6, 2)
+  basePrice            Decimal    @default(10000) @map("base_price") @db.Decimal(10, 2)
+  estimatedDurationMin Int        @default(0) @map("estimated_duration_min")
+  status               String     @default("ACTIVE") @db.VarChar(20)
+  deletedAt            DateTime?  @map("deleted_at") @db.Timestamptz(3)
+  createdAt            DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime   @default(now()) @map("updated_at") @db.Timestamptz(3)
+  trips                Trip[]
+  routeStops           RouteStop[]
+  fares                Fare[]
+
+  @@map("routes")
+}
+
+model BusStop {
+  id        String      @id @default(dbgenerated("gen_random_uuid()::text"))
+  code      String      @unique @db.VarChar(20)
+  name      String      @db.VarChar(150)
+  address   String?     @db.VarChar(255)
+  latitude  Decimal?    @db.Decimal(10, 7)
+  longitude Decimal?    @db.Decimal(10, 7)
+  isActive  Boolean     @default(true) @map("is_active")
+  deletedAt DateTime?   @map("deleted_at") @db.Timestamptz(3)
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  routeStops RouteStop[]
+
+  @@map("bus_stops")
+}
+
+model RouteStop {
+  id                   String  @id @default(dbgenerated("gen_random_uuid()::text"))
+  routeId              String  @map("route_id")
+  stopId               String  @map("stop_id")
+  stopOrder            Int     @map("stop_order")
+  distanceFromStartKm  Decimal @default(0) @map("distance_from_start_km") @db.Decimal(6, 2)
+  estimatedTimeMinutes Int     @default(0) @map("estimated_time_minutes")
+  route                Route   @relation(fields: [routeId], references: [id], onDelete: Cascade, map: "fk_rs_route")
+  stop                 BusStop @relation(fields: [stopId], references: [id], onDelete: Cascade, map: "fk_rs_stop")
+
+  @@unique([routeId, stopOrder], map: "uq_route_stop_order")
+  @@index([routeId, stopOrder], map: "idx_route_stops_order")
+  @@index([stopId], map: "route_stops_stop_idx")
+  @@map("route_stops")
+}
+model Bus {
+  id               String   @id
+  plateNumber      String   @unique @map("plate_number") @db.VarChar(20)
+  busType          String?  @default("STANDARD") @map("bus_type") @db.VarChar(50)
+  totalSeats       Int      @default(40) @map("total_seats")
+  standingCapacity Int      @default(15) @map("standing_capacity")
+  status           String?  @default("READY") @db.VarChar(50)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  seats            Seat[]
+  trips            Trip[]
+
+  @@map("buses")
+}
+
+model Seat {
+  id          String     @id
+  busId       String     @map("bus_id")
+  seatNumber  String     @map("seat_number") @db.VarChar(10)
+  seatType    String?    @default("STANDARD") @map("seat_type") @db.VarChar(20)
+  rowPosition String?    @default("WINDOW") @map("row_position") @db.VarChar(20)
+  deck        String?    @default("DECK_1") @db.VarChar(20)
+  isPriority  Boolean    @default(false) @map("is_priority")
+  status      String?    @default("ACTIVE") @db.VarChar(20)
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime   @default(now()) @map("updated_at") @db.Timestamptz(3)
+  bus         Bus        @relation(fields: [busId], references: [id], onDelete: Cascade, map: "fk_seats_bus")
+  tripSeats   TripSeat[]
+
+  @@unique([busId, seatNumber], map: "uq_seats_bus_seat_number")
+  @@index([busId], map: "idx_seats_bus_id")
+  @@map("seats")
 }
 
 model Fare {
-  id            String     @id @default(uuid()) @db.VarChar(36)
-  routeId       String     @map("route_id") @db.VarChar(36)
-  fareType      FareType   @default(FLAT_FARE)
-  ticketType    TicketType @default(SINGLE) @map("ticket_type")
-  amount        Float
-  fromStopId    String?    @map("from_stop_id") @db.VarChar(36)
-  toStopId      String?    @map("to_stop_id") @db.VarChar(36)
-  effectiveFrom DateTime   @default(now()) @map("effective_from")
-  effectiveTo   DateTime?  @map("effective_to")
-  isActive      Boolean    @default(true) @map("is_active")
-  deletedAt     DateTime?  @map("deleted_at")
-  createdAt     DateTime   @default(now()) @map("created_at")
-  updatedAt     DateTime   @updatedAt @map("updated_at")
+  id         String     @id
+  routeId    String     @map("route_id")
+  fareType   FareType   @default(FLAT_FARE) @map("fare_type")
+  ticketType TicketType @default(SINGLE) @map("ticket_type")
+  amount     Decimal    @db.Decimal(12, 2)
+  isActive   Boolean    @default(true) @map("is_active")
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  route      Route      @relation(fields: [routeId], references: [id], onDelete: Cascade)
 
-  route    Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
-  fromStop BusStop? @relation("FareFromStop", fields: [fromStopId], references: [id], onDelete: SetNull)
-  toStop   BusStop? @relation("FareToStop", fields: [toStopId], references: [id], onDelete: SetNull)
-
-  @@index([routeId])
-  @@index([fareType])
-  @@index([deletedAt])
   @@map("fares")
 }
 
-model Payment {
-  id                    String        @id @default(uuid()) @db.VarChar(36)
-  bookingId             String?       @map("booking_id") @db.VarChar(36)
-  ticketId              String?       @map("ticket_id") @db.VarChar(36)
-  gatewayTransactionId  String?       @map("gateway_transaction_id") @db.VarChar(100)
-  paymentMethod         PaymentMethod @default(VNPAY) @map("payment_method")
-  amount                Decimal       @db.Decimal(12, 2)
-  status                PaymentStatus @default(PENDING)
-  electronicInvoiceCode String?       @map("electronic_invoice_code") @db.VarChar(100)
-  invoiceEmail          String?       @map("invoice_email") @db.VarChar(191)
-  paidAt                DateTime?     @map("paid_at")
-  createdAt             DateTime      @default(now()) @map("created_at")
-  updatedAt             DateTime      @updatedAt @map("updated_at")
+model Trip {
+  id            String     @id @default(dbgenerated("gen_random_uuid()::text"))
+  routeId       String     @map("route_id")
+  busId         String?    @map("bus_id")
+  busPlate      String?    @map("bus_plate") @db.VarChar(20)
+  driverId      String?    @map("driver_id")
+  departureTime DateTime   @map("departure_time") @db.Timestamptz(3)
+  arrivalTime   DateTime   @map("arrival_time") @db.Timestamptz(3)
+  totalSeats    Int        @default(40) @map("total_seats")
+  bookedSeats   Int        @default(0) @map("booked_seats")
+  basePrice     Decimal    @default(10000) @map("base_price") @db.Decimal(10, 2)
+  status        TripStatus @default(SCHEDULED)
+  createdAt     DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  route         Route      @relation(fields: [routeId], references: [id], onDelete: Cascade, map: "fk_trips_route")
+  bus           Bus?       @relation(fields: [busId], references: [id], onDelete: Restrict)
+  driver        User?      @relation(fields: [driverId], references: [id], onDelete: SetNull, map: "fk_trips_driver")
+  tickets       Ticket[]
+  tripSeats     TripSeat[]
+  incidents     Incident[]
+  feedbacks     Feedback[]
 
-  booking Booking? @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  ticket  Ticket?  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-
-  @@map("payments")
+  @@index([routeId, departureTime], map: "idx_trips_route_departure")
+  @@index([busId], map: "trips_bus_idx")
+  @@index([driverId], map: "trips_driver_idx")
+  @@map("trips")
 }
 
-model MonthlyPass {
-  id        String          @id @default(uuid()) @db.VarChar(36)
-  userId    String          @map("user_id") @db.VarChar(36)
-  routeId   String          @map("route_id") @db.VarChar(36)
-  cardCode  String          @unique(map: "uq_monthly_pass_code") @map("card_code") @db.VarChar(50)
-  passType  MonthlyPassType @default(REGULAR) @map("pass_type")
-  startDate DateTime        @map("start_date")
-  endDate   DateTime        @map("end_date")
-  price     Decimal         @db.Decimal(12, 2)
-  status    PassStatus      @default(ACTIVE)
-  createdAt DateTime        @default(now()) @map("created_at")
-  updatedAt DateTime        @updatedAt @map("updated_at")
+model Ticket {
+  id                   String       @id
+  ticketCode           String?      @unique @map("ticket_code") @db.VarChar(50)
+  tripId               String       @map("trip_id")
+  status               TicketStatus @default(BOOKED)
+  seatNumber           String?      @map("seat_number") @db.VarChar(10)
+  userId               String?      @map("user_id")
+  fareAmount           Decimal      @default(10000) @map("fare_amount") @db.Decimal(10, 2)
+  reservationExpiresAt DateTime?    @map("reservation_expires_at") @db.Timestamptz(3)
+  createdAt            DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  trip                 Trip         @relation(fields: [tripId], references: [id], onDelete: Cascade, map: "fk_tickets_trip")
+  user                 User?        @relation(fields: [userId], references: [id], onDelete: SetNull, map: "fk_tickets_user")
+  tripSeats            TripSeat[]
+  payment              PaymentTransaction?
 
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  route Route @relation(fields: [routeId], references: [id], onDelete: Cascade)
-
-  @@map("monthly_passes")
+  @@index([userId], map: "tickets_user_idx")
+  @@map("tickets")
 }
 
-model Voucher {
-  id                String        @id @default(uuid()) @db.VarChar(36)
-  code              String        @unique(map: "uq_vouchers_code") @db.VarChar(50)
-  title             String        @db.VarChar(255)
-  discountPercent   Float         @default(0) @map("discount_percent")
-  maxDiscountAmount Decimal       @default(0) @map("max_discount_amount") @db.Decimal(12, 2)
-  minOrderAmount    Decimal       @default(0) @map("min_order_amount") @db.Decimal(12, 2)
-  startDate         DateTime      @map("start_date")
-  endDate           DateTime      @map("end_date")
-  usageLimit        Int           @default(100) @map("usage_limit")
-  usedCount         Int           @default(0) @map("used_count")
-  status            VoucherStatus @default(ACTIVE)
-  createdAt         DateTime      @default(now()) @map("created_at")
-  updatedAt         DateTime      @updatedAt @map("updated_at")
+model TripSeat {
+  id             String     @id @default(dbgenerated("gen_random_uuid()::text"))
+  tripId         String     @map("trip_id")
+  seatId         String?    @map("seat_id")
+  seatNumber     String     @map("seat_number") @db.VarChar(10)
+  status         SeatStatus @default(AVAILABLE)
+  lockedAt       DateTime?  @map("locked_at") @db.Timestamptz(3)
+  lockedByUserId String?    @map("locked_by_user_id")
+  lockExpiresAt  DateTime?  @map("lock_expires_at") @db.Timestamptz(3)
+  ticketId       String?    @map("ticket_id")
+  redisLockId    String?    @map("redis_lock_id")
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime   @default(now()) @map("updated_at") @db.Timestamptz(3)
+  trip           Trip       @relation(fields: [tripId], references: [id], onDelete: Cascade, map: "fk_trip_seats_trip")
+  seat           Seat?      @relation(fields: [seatId], references: [id], onDelete: SetNull, map: "fk_trip_seats_seat")
+  lockedByUser   User?      @relation(fields: [lockedByUserId], references: [id], onDelete: SetNull, map: "fk_trip_seats_user")
+  ticket         Ticket?    @relation(fields: [ticketId], references: [id], onDelete: SetNull, map: "fk_trip_seats_ticket")
 
-  tickets Ticket[]
-
-  @@map("vouchers")
+  @@unique([tripId, seatNumber], map: "uq_trip_seats_trip_number")
+  @@index([tripId, status], map: "idx_trip_seats_trip_status")
+  @@index([lockExpiresAt], map: "idx_trip_seats_lock_expires")
+  @@index([seatId], map: "trip_seats_seat_idx")
+  @@index([lockedByUserId], map: "trip_seats_user_idx")
+  @@index([ticketId], map: "trip_seats_ticket_idx")
+  @@map("trip_seats")
 }
 
-model IncidentReport {
-  id           String           @id @default(uuid()) @db.VarChar(36)
-  tripId       String           @map("trip_id") @db.VarChar(36)
-  driverId     String           @map("driver_id") @db.VarChar(36)
-  incidentType IncidentType     @default(OTHER) @map("incident_type")
-  severity     IncidentSeverity @default(MEDIUM)
-  description  String           @db.Text
-  delayMinutes Int              @default(0) @map("delay_minutes")
-  actionTaken  String?          @map("action_taken") @db.Text
-  reportedAt   DateTime         @default(now()) @map("reported_at")
-  createdAt    DateTime         @default(now()) @map("created_at")
-  updatedAt    DateTime         @updatedAt @map("updated_at")
+model Incident {
+  id           String   @id @default(dbgenerated("gen_random_uuid()::text"))
+  tripId       String   @map("trip_id")
+  driverId     String?  @map("driver_id")
+  incidentType String   @map("incident_type") @db.VarChar(50)
+  severity     String?  @default("MEDIUM") @db.VarChar(20)
+  description  String   @db.Text
+  delayMinutes Int      @default(0) @map("delay_minutes")
+  actionTaken  String?  @map("action_taken") @db.Text
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  trip         Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade, map: "fk_incidents_trip")
+  driver       User?    @relation(fields: [driverId], references: [id], onDelete: SetNull, map: "fk_incidents_driver")
 
-  trip   Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  driver User @relation(fields: [driverId], references: [id], onDelete: Cascade)
-
-  @@map("incident_reports")
+  @@index([tripId], map: "incidents_trip_idx")
+  @@map("incidents")
 }
 
 model Feedback {
-  id                String         @id @default(uuid()) @db.VarChar(36)
-  userId            String         @map("user_id") @db.VarChar(36)
-  tripId            String         @map("trip_id") @db.VarChar(36)
-  ratingStars       Int            @default(5) @map("rating_stars")
-  criteria          String?        @db.VarChar(100)
-  content           String         @db.Text
-  responseFromStaff String?        @map("response_from_staff") @db.Text
-  status            FeedbackStatus @default(PENDING)
-  submittedAt       DateTime       @default(now()) @map("submitted_at")
-  createdAt         DateTime       @default(now()) @map("created_at")
-  updatedAt         DateTime       @updatedAt @map("updated_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  id          String   @id @default(dbgenerated("gen_random_uuid()::text"))
+  tripId      String   @map("trip_id")
+  userId      String?  @map("user_id")
+  ratingStars Int      @map("rating_stars")
+  criteria    String?  @db.VarChar(100)
+  content     String   @db.Text
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  trip        Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade, map: "fk_feedbacks_trip")
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull, map: "fk_feedbacks_user")
 
   @@map("feedbacks")
 }
 
-model Notification {
-  id        String           @id @default(uuid()) @db.VarChar(36)
-  userId    String           @map("user_id") @db.VarChar(36)
-  title     String           @db.VarChar(255)
-  content   String           @db.Text
-  type      NotificationType @default(SYSTEM)
-  isRead    Boolean          @default(false) @map("is_read")
-  sentAt    DateTime         @default(now()) @map("sent_at")
-  createdAt DateTime         @default(now()) @map("created_at")
-  updatedAt DateTime         @updatedAt @map("updated_at")
+/// One row per ticket handed to an online gateway.
+///
+/// There is no separate "bookings" or "payments" table: the ticket id doubles
+/// as order_id (services/booking.ts inserts both from the same UUID). That is
+/// why vnp_TxnRef and the MoMo orderId must be the UUID returned as
+/// payment.orderId by POST /api/v1/ticketing/bookings, never a value such as
+/// "ORD-20261002-001".
+model PaymentTransaction {
+  id                   String             @id @default(dbgenerated("gen_random_uuid()::text"))
+  ticketId             String             @unique @map("ticket_id")
+  orderId              String             @unique @map("order_id")
+  paymentMethod        PaymentMethodCode  @map("payment_method")
+  amount               Decimal            @db.Decimal(12, 2)
+  status               PaymentStatusCode
+  gatewayTransactionId String?            @map("gateway_transaction_id")
+  refundRequestId      String?            @unique @map("refund_request_id")
+  redisLockId          String?            @map("redis_lock_id")
+  paidAt               DateTime?          @map("paid_at") @db.Timestamptz(3)
+  createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  ticket               Ticket             @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("notifications")
-}
-
-model ActivityLog {
-  id        String   @id @default(uuid()) @db.VarChar(36)
-  userId    String?  @map("user_id") @db.VarChar(36)
-  action    String   @db.VarChar(100)
-  module    String   @db.VarChar(50)
-  ipAddress String?  @map("ip_address") @db.VarChar(50)
-  userAgent String?  @map("user_agent") @db.VarChar(255)
-  createdAt DateTime @default(now()) @map("created_at")
-
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@map("activity_logs")
+  @@index([status], map: "idx_payment_transactions_status")
+  @@map("payment_transactions")
 }

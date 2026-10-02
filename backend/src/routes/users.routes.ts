@@ -2,7 +2,9 @@ import { authenticateJWT } from '../middlewares/auth';
 import { authorizeRoles } from '../middlewares/rbac';
 import { Router, Request, Response } from 'express';
 import { query } from '../config/database';
+import { appLogger } from '../config/logger';
 
+const logger = appLogger.child('users');
 const router = Router();
 router.use(authenticateJWT, authorizeRoles('ADMIN','MANAGER'));
 
@@ -23,7 +25,7 @@ router.get('/', async (_req: Request, res: Response): Promise<void> => {
       data: users,
     });
   } catch (err: any) {
-    console.error('Lỗi API getUsers:', err);
+    logger.error('users_list_failed', { table: 'users', operation: 'select', error: err });
     res.status(500).json({
       statusCode: 500,
       success: false,
@@ -58,7 +60,7 @@ router.patch('/:id/discount-approval', async (req: Request, res: Response): Prom
       message: `Đã cập nhật trạng thái duyệt ưu đãi thành ${status}`,
     });
   } catch (err: any) {
-    console.error('Lỗi duyệt ưu đãi người dùng:', err);
+    logger.error('discount_approval_failed', { table: 'users', operation: 'update', user_id: req.params.id ?? '', error: err });
     res.status(500).json({
       statusCode: 500,
       success: false,

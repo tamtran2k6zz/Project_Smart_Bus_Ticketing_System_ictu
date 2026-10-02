@@ -1,8 +1,11 @@
 import { Request, Response } from 'express';
 import { query, transaction } from '../config/database';
 import { releaseSeatLock } from '../config/redis';
+import { appLogger } from '../config/logger';
 import { AuthenticatedRequest } from '../middlewares/auth';
 import { prepareSeats, holdSeat } from '../services/booking';
+
+const logger = appLogger.child('seats');
 
 export const getSeatsByTrip = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -77,7 +80,7 @@ export const unlockSeat = async (req: AuthenticatedRequest, res: Response): Prom
       );
     res.status(rows.length ? 200 : 409).json({ success: !!rows.length });
   } catch (error) {
-    console.error('[Seats] Could not unlock seat:', error);
+    logger.error('seat_unlock_failed', { table: 'trip_seats', operation: 'update', trip_id: req.params.tripId ?? '', seat_number: String(req.body?.seatNumber ?? ''), error });
     res.status(500).json({ success: false, message: 'Không thể mở khóa ghế.' });
   }
 };

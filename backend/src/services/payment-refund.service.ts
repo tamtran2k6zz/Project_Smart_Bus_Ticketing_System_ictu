@@ -1,4 +1,8 @@
 import { createHmac } from 'crypto';
+import { readEnv } from '../config/env';
+import { appLogger } from '../config/logger';
+
+const logger = appLogger.child('refund');
 
 export type RefundPaymentMethod = 'VNPAY' | 'MOMO';
 
@@ -45,9 +49,9 @@ export class PaymentRefundService {
       vnp_Amount: String(payment.amount * 100),
       vnp_TransactionNo: payment.gatewayTransactionId!,
       vnp_TransactionDate: this.toVnpayDate(payment.paidAt),
-      vnp_CreateBy: process.env.PAYMENT_REFUND_OPERATOR || 'smartbus-system',
+      vnp_CreateBy: readEnv('PAYMENT_REFUND_OPERATOR') || 'smartbus-system',
       vnp_CreateDate: this.toVnpayDate(new Date()),
-      vnp_IpAddr: process.env.PAYMENT_REFUND_IP || '127.0.0.1',
+      vnp_IpAddr: readEnv('PAYMENT_REFUND_IP') || '127.0.0.1',
       vnp_OrderInfo: `Hoan tien ve ${payment.bookingCode}`,
     };
     const fields = [
@@ -69,11 +73,16 @@ export class PaymentRefundService {
       .update(fields.map(field => request[field]).join('|'))
       .digest('hex');
     const response = await this.postJson(
-      process.env.VNPAY_REFUND_URL ||
+      readEnv('VNPAY_REFUND_URL') ||
         'https://sandbox.vnpayment.vn/merchant_webapi/api/transaction',
       request
     );
     if (response.vnp_ResponseCode !== '00') {
+      logger.error('vnpay_refund_rejected', {
+        order_id: payment.bookingCode,
+        gateway_transaction_id: payment.gatewayTransactionId,
+        response_code: String(response.vnp_ResponseCode || 'unknown'),
+      });
       throw new PaymentRefundError(
         `VNPay từ chối hoàn tiền (mã ${response.vnp_ResponseCode || 'không xác định'}).`
       );
@@ -103,7 +112,7 @@ export class PaymentRefundService {
       )
       .digest('hex');
     const response = await this.postJson(
-      process.env.MOMO_REFUND_URL || 'https://test-payment.momo.vn/v2/gateway/api/refund',
+      readEnv('MOMO_REFUND_URL') || 'https://test-payment.momo.vn/v2/gateway/api/refund',
       {
         partnerCode,
         orderId: payment.bookingCode,
@@ -116,6 +125,11 @@ export class PaymentRefundService {
       }
     );
     if (Number(response.resultCode) !== 0) {
+      logger.error('momo_refund_rejected', {
+        order_id: payment.bookingCode,
+        gateway_transaction_id: payment.gatewayTransactionId,
+        result_code: String(response.resultCode ?? 'unknown'),
+      });
       throw new PaymentRefundError(
         `MoMo từ chối hoàn tiền (mã ${response.resultCode ?? 'không xác định'}).`
       );
@@ -123,8 +137,11 @@ export class PaymentRefundService {
   }
 
   private requiredEnv(name: string): string {
-    const value = process.env[name]?.trim();
-    if (!value) throw new PaymentRefundError(`Thiếu cấu hình ${name} để gửi yêu cầu hoàn tiền.`);
+    const value = readEnv(name);
+    if (!value) {
+      logger.error('missing_required_configuration', { variable: name, operation: 'refund' });
+      throw new PaymentRefundError(`Thiếu cấu hình ${name} để gửi yêu cầu hoàn tiền.`);
+    }
     return value;
   }
 

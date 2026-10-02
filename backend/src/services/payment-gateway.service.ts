@@ -1,7 +1,8 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
-import * as dotenv from 'dotenv';
+import { getGatewayCallbacks, readGatewayEnv, readEnv } from '../config/env';
+import { appLogger } from '../config/logger';
 
-dotenv.config();
+const logger = appLogger.child('gateway');
 
 export type OnlinePaymentMethod = 'VNPAY' | 'MOMO';
 
@@ -24,8 +25,12 @@ export class PaymentGatewayService {
 
   verifyVnpayCallback(params: Record<string, string>): boolean {
     const secureHash = params.vnp_SecureHash;
-    const hashSecret = process.env.VNPAY_HASH_SECRET?.trim();
+    const hashSecret = readGatewayEnv('VNPAY_HASH_SECRET');
     if (!secureHash || !hashSecret) {
+      logger.warn('vnpay_signature_missing_config', {
+        has_secure_hash: Boolean(secureHash),
+        has_hash_secret: Boolean(hashSecret),
+      });
       return false;
     }
 
@@ -39,8 +44,8 @@ export class PaymentGatewayService {
   }
 
   verifyMomoCallback(payload: Record<string, unknown>): boolean {
-    const accessKey = process.env.MOMO_ACCESS_KEY?.trim();
-    const secretKey = process.env.MOMO_SECRET_KEY?.trim();
+    const accessKey = readGatewayEnv('MOMO_ACCESS_KEY');
+    const secretKey = readGatewayEnv('MOMO_SECRET_KEY');
     const signature = payload.signature;
     if (!accessKey || !secretKey || typeof signature !== 'string') {
       return false;
@@ -71,7 +76,7 @@ export class PaymentGatewayService {
   private createVnpayUrl(orderId: string, amount: number, clientIp: string): string {
     const tmnCode = this.requiredEnv('VNPAY_TMN_CODE');
     const hashSecret = this.requiredEnv('VNPAY_HASH_SECRET');
-    const returnUrl = this.requiredEnv('VNPAY_RETURN_URL');
+    const { vnpayReturnUrl } = getGatewayCallbacks();
     const now = new Date();
     const params: Record<string, string> = {
       vnp_Version: '2.1.0',
@@ -83,7 +88,7 @@ export class PaymentGatewayService {
       vnp_OrderInfo: `Thanh toan ve xe ${orderId}`,
       vnp_OrderType: 'other',
       vnp_Locale: 'vn',
-      vnp_ReturnUrl: returnUrl,
+      vnp_ReturnUrl: vnpayReturnUrl,
       vnp_IpAddr: clientIp,
       vnp_CreateDate: this.toVnpayDate(now),
       vnp_ExpireDate: this.toVnpayDate(new Date(now.getTime() + 10 * 60 * 1000)),
@@ -91,7 +96,13 @@ export class PaymentGatewayService {
     const queryString = this.encodeSortedParams(params);
     const secureHash = this.hmac('sha512', hashSecret, queryString);
     const endpoint =
-      process.env.VNPAY_PAYMENT_URL || 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html';
+      readGatewayEnv('VNPAY_PAYMENT_URL') || 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html';
+    logger.info('vnpay_payment_url_created', {
+      order_id: orderId,
+      amount_vnd: amount,
+      return_url: vnpayReturnUrl,
+      gateway: endpoint,
+    });
     return `${endpoint}?${queryString}&vnp_SecureHash=${secureHash}`;
   }
 
@@ -99,19 +110,18 @@ export class PaymentGatewayService {
     const partnerCode = this.requiredEnv('MOMO_PARTNER_CODE');
     const accessKey = this.requiredEnv('MOMO_ACCESS_KEY');
     const secretKey = this.requiredEnv('MOMO_SECRET_KEY');
-    const ipnUrl = this.requiredEnv('MOMO_IPN_URL');
-    const redirectBase = this.requiredEnv('PAYMENT_RESULT_URL');
+    const { momoIpnUrl, paymentResultUrl } = getGatewayCallbacks();
     const requestId = randomUUID();
     const orderInfo = `Thanh toan ve xe ${orderId}`;
     const extraData = '';
     const requestType = 'captureWallet';
-    const redirectUrl = new URL(redirectBase);
+    const redirectUrl = new URL(paymentResultUrl);
     redirectUrl.searchParams.set('paymentOrder', orderId);
     const rawSignature = [
       `accessKey=${accessKey}`,
       `amount=${amount}`,
       `extraData=${extraData}`,
-      `ipnUrl=${ipnUrl}`,
+      `ipnUrl=${momoIpnUrl}`,
       `orderId=${orderId}`,
       `orderInfo=${orderInfo}`,
       `partnerCode=${partnerCode}`,
@@ -127,21 +137,32 @@ export class PaymentGatewayService {
       orderId,
       orderInfo,
       redirectUrl: redirectUrl.toString(),
-      ipnUrl,
+      ipnUrl: momoIpnUrl,
       extraData,
       requestType,
       lang: 'vi',
       signature: this.hmac('sha256', secretKey, rawSignature),
     };
-    const response = await this.postJson(
-      process.env.MOMO_CREATE_URL || 'https://test-payment.momo.vn/v2/gateway/api/create',
-      payload
-    );
+    const createUrl =
+      readGatewayEnv('MOMO_CREATE_URL') || 'https://test-payment.momo.vn/v2/gateway/api/create';
+    const response = await this.postJson(createUrl, payload);
     if (Number(response.resultCode) !== 0 || typeof response.payUrl !== 'string') {
+      logger.error('momo_create_rejected', {
+        order_id: orderId,
+        result_code: String(response.resultCode ?? 'unknown'),
+        ipn_url: momoIpnUrl,
+        gateway: createUrl,
+      });
       throw new Error(
         `MoMo không tạo được giao dịch (mã ${response.resultCode ?? 'không xác định'}).`
       );
     }
+    logger.info('momo_payment_url_created', {
+      order_id: orderId,
+      amount_vnd: amount,
+      ipn_url: momoIpnUrl,
+      redirect_url: redirectUrl.toString(),
+    });
     return response.payUrl;
   }
 
@@ -168,8 +189,10 @@ export class PaymentGatewayService {
       return body as Record<string, unknown>;
     } catch (error) {
       if (error instanceof Error && error.name !== 'AbortError') {
+        logger.error('gateway_request_failed', { gateway_url: url, error });
         throw error;
       }
+      logger.error('gateway_request_timeout', { gateway_url: url, timeout_ms: 15_000 });
       throw new Error('Không thể kết nối cổng thanh toán hoặc đã hết thời gian chờ.');
     } finally {
       clearTimeout(timeout);
@@ -177,8 +200,9 @@ export class PaymentGatewayService {
   }
 
   private requiredEnv(name: string): string {
-    const value = process.env[name]?.trim();
+    const value = readGatewayEnv(name);
     if (!value) {
+      logger.error('missing_required_configuration', { variable: name });
       throw new Error(`Thiếu cấu hình bắt buộc ${name}.`);
     }
     return value;

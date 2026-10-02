@@ -4,17 +4,37 @@ import { dbPool, query, transaction } from '../config/database';
 import { getSeatsByTrip } from '../controllers/seats.controller';
 import { AuthenticatedRequest, authenticateJWT } from '../middlewares/auth';
 import { authorizeRoles } from '../middlewares/rbac';
-import { acquireSeatLock, releaseSeatLock } from '../config/redis';
+import { acquireSeatLock, releaseSeatLock, redisSeatLockEnabled } from '../config/redis';
+import { appLogger } from '../config/logger';
+import { getGatewayCallbacks, readEnv } from '../config/env';
 import { PaymentGatewayService, OnlinePaymentMethod } from '../services/payment-gateway.service';
 import { BookingError, bookSeat, reserveSeatForPayment } from '../services/booking';
 import { PaymentRefundError, PaymentRefundService } from '../services/payment-refund.service';
 
 const router = Router();
+const logger = appLogger.child('ticketing');
 const gateway = new PaymentGatewayService();
 const refunds = new PaymentRefundService();
 
+/**
+ * Order ids handed to the gateways are PostgreSQL text UUIDs
+ * (payment_transactions.order_id = tickets.id = randomUUID()).
+ * QA sent values such as "ORD-20261002-001", which can never match a row.
+ */
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export function isValidOrderId(value: unknown): value is string {
+  return typeof value === 'string' && UUID_PATTERN.test(value.trim());
+}
+
+function paymentResultRedirect(orderId: string | undefined, result: string): string {
+  const target = new URL(getGatewayCallbacks().paymentResultUrl);
+  if (orderId) target.searchParams.set('paymentOrder', orderId);
+  target.searchParams.set('paymentResult', result);
+  return target.toString();
+}
+
 function clientIp(req: Request): string {
-  const configured = process.env.PAYMENT_CLIENT_IP?.trim();
+  const configured = readEnv('PAYMENT_CLIENT_IP');
   if (configured) return configured;
   const ip = req.ip?.replace(/^::ffff:/, '') || '127.0.0.1';
   return ip.includes(':') ? '127.0.0.1' : ip;
@@ -149,19 +169,35 @@ async function recordFailedPayment(orderId: string, method: OnlinePaymentMethod)
 async function handleVnpayCallback(req: Request, res: Response, redirect: boolean): Promise<void> {
   const params = stringQuery(req.query);
   const orderId = params.vnp_TxnRef;
+  const entrypoint = redirect ? 'return' : 'ipn';
+  logger.info('vnpay_callback_received', {
+    entrypoint,
+    order_id: orderId,
+    response_code: params.vnp_ResponseCode,
+    transaction_status: params.vnp_TransactionStatus,
+    transaction_no: params.vnp_TransactionNo,
+    tmn_code: params.vnp_TmnCode,
+    client_ip: clientIp(req),
+  });
   try {
     if (!gateway.verifyVnpayCallback(params) || !orderId) {
       throw new Error('Chữ ký hoặc mã đơn VNPay không hợp lệ.');
     }
+    if (!isValidOrderId(orderId)) {
+      logger.error('vnpay_order_id_invalid', {
+        entrypoint,
+        order_id: orderId,
+        expected: 'UUID v4 trả về trong payment.orderId của POST /api/v1/ticketing/bookings',
+        table: 'payment_transactions.order_id',
+      });
+      throw new Error(
+        'vnp_TxnRef phải là UUID của giao dịch trả về từ API đặt vé (payment.orderId).'
+      );
+    }
     if (params.vnp_ResponseCode !== '00' || params.vnp_TransactionStatus !== '00') {
       await recordFailedPayment(orderId, 'VNPAY');
       if (redirect) {
-        const target = new URL(
-          process.env.PAYMENT_RESULT_URL || 'http://localhost:3000/passenger/booking'
-        );
-        target.searchParams.set('paymentOrder', orderId);
-        target.searchParams.set('paymentResult', 'failed');
-        res.redirect(target.toString());
+        res.redirect(paymentResultRedirect(orderId, 'failed'));
       } else {
         res.status(200).json({ RspCode: '00', Message: 'Payment failed status recorded' });
       }
@@ -176,28 +212,19 @@ async function handleVnpayCallback(req: Request, res: Response, redirect: boolea
     );
     if (result === 'INVALID') throw new Error('Giao dịch VNPay không hợp lệ.');
     if (result === 'LATE') await refundLatePayment(orderId);
+    logger.info('vnpay_callback_applied', { entrypoint, order_id: orderId, outcome: result });
 
     if (redirect) {
-      const target = new URL(
-        process.env.PAYMENT_RESULT_URL || 'http://localhost:3000/passenger/booking'
-      );
-      target.searchParams.set('paymentOrder', orderId);
-      target.searchParams.set('paymentResult', result === 'CONFIRMED' ? 'success' : 'failed');
-      res.redirect(target.toString());
+      res.redirect(paymentResultRedirect(orderId, result === 'CONFIRMED' ? 'success' : 'failed'));
     } else {
       res
         .status(200)
         .json({ RspCode: '00', Message: result === 'LATE' ? 'Late payment refunded' : 'Success' });
     }
   } catch (error) {
-    console.error('[VNPay] Callback could not be confirmed:', error);
+    logger.error('vnpay_callback_failed', { entrypoint, order_id: orderId, error });
     if (redirect) {
-      const target = new URL(
-        process.env.PAYMENT_RESULT_URL || 'http://localhost:3000/passenger/booking'
-      );
-      if (orderId) target.searchParams.set('paymentOrder', orderId);
-      target.searchParams.set('paymentResult', 'failed');
-      res.redirect(target.toString());
+      res.redirect(paymentResultRedirect(isValidOrderId(orderId) ? orderId : undefined, 'failed'));
     } else {
       res.status(200).json({ RspCode: '99', Message: 'Payment confirmation failed' });
     }
@@ -268,7 +295,14 @@ router.post(
     try {
       lockId = await acquireSeatLock(String(tripId), seatNumber, userId);
     } catch (error) {
-      console.error('[Redis] Could not acquire seat lock:', error);
+      logger.error('seat_lock_failed', {
+        table: 'trip_seats',
+        trip_id: String(tripId),
+        seat_number: seatNumber,
+        user_id: userId,
+        redis_seat_lock: redisSeatLockEnabled(),
+        error,
+      });
       res.status(503).json({ success: false, message: 'Dịch vụ giữ ghế tạm thời không khả dụng.' });
       return;
     }
@@ -363,11 +397,21 @@ router.post(
             [reservationTicketId]
           );
         }).catch(cleanupError =>
-          console.error('[Payments] Reservation rollback failed:', cleanupError)
+          logger.error('reservation_rollback_failed', {
+            table: 'payment_transactions/tickets/trip_seats',
+            ticket_id: reservationTicketId,
+            error: cleanupError,
+          })
         );
         await releaseSeatLock(String(tripId), seatNumber, lockId);
       }
-      console.error('[Ticketing] Booking failed:', error);
+      logger.error('booking_failed', {
+        trip_id: String(tripId),
+        seat_number: seatNumber,
+        user_id: userId,
+        payment_method: String(paymentMethod ?? 'CASH'),
+        error,
+      });
       const status =
         error instanceof BookingError ? error.status : error.code === '23505' ? 409 : 502;
       res.status(status).json({ success: false, message: error.message || 'Không thể đặt vé.' });
@@ -379,14 +423,40 @@ router.post(
   }
 );
 
+// Canonical callback paths (registered on /api and /api/v1 ticketing):
+//   GET|POST /payments/vnpay/ipn     - server-to-server notification
+//   GET      /payments/vnpay/return  - browser redirect after payment
+//   POST     /payments/momo/ipn
+//   GET      /payments/momo/return
+// Hyphenated aliases are kept so older merchant-portal configurations and QA
+// documentation that use vnpay-ipn / vnpay-return keep working.
 router.get('/payments/vnpay/ipn', (req, res) => {
+  void handleVnpayCallback(req, res, false);
+});
+router.post('/payments/vnpay/ipn', (req, res) => {
   void handleVnpayCallback(req, res, false);
 });
 router.get('/payments/vnpay/return', (req, res) => {
   void handleVnpayCallback(req, res, true);
 });
+router.get('/payments/vnpay-ipn', (req, res) => {
+  void handleVnpayCallback(req, res, false);
+});
+router.post('/payments/vnpay-ipn', (req, res) => {
+  void handleVnpayCallback(req, res, false);
+});
+router.get('/payments/vnpay-return', (req, res) => {
+  void handleVnpayCallback(req, res, true);
+});
 router.post('/payments/momo/ipn', async (req: Request, res: Response): Promise<void> => {
   const payload = req.body as Record<string, unknown>;
+  logger.info('momo_ipn_received', {
+    order_id: String(payload.orderId ?? ''),
+    result_code: String(payload.resultCode ?? ''),
+    trans_id: String(payload.transId ?? ''),
+    amount: String(payload.amount ?? ''),
+    client_ip: clientIp(req),
+  });
   try {
     if (
       !gateway.verifyMomoCallback(payload) ||
@@ -395,6 +465,16 @@ router.post('/payments/momo/ipn', async (req: Request, res: Response): Promise<v
       !Number.isSafeInteger(Number(payload.transId)) ||
       Number(payload.transId) <= 0
     ) {
+      logger.warn('momo_ipn_rejected', { reason: 'invalid_signature_or_payload' });
+      res.status(400).json({ resultCode: 97, message: 'Invalid payment notification.' });
+      return;
+    }
+    if (!isValidOrderId(payload.orderId)) {
+      logger.error('momo_order_id_invalid', {
+        order_id: payload.orderId,
+        expected: 'UUID v4 trả về trong payment.orderId của POST /api/v1/ticketing/bookings',
+        table: 'payment_transactions.order_id',
+      });
       res.status(400).json({ resultCode: 97, message: 'Invalid payment notification.' });
       return;
     }
@@ -410,15 +490,21 @@ router.post('/payments/momo/ipn', async (req: Request, res: Response): Promise<v
       Number(payload.amount)
     );
     if (result === 'INVALID') {
+      logger.warn('momo_ipn_order_not_matched', { order_id: payload.orderId });
       res.status(400).json({ resultCode: 99, message: 'Payment transaction was not found.' });
       return;
     }
     if (result === 'LATE') await refundLatePayment(payload.orderId);
+    logger.info('momo_ipn_applied', { order_id: payload.orderId, outcome: result });
     res
       .status(200)
       .json({ resultCode: 0, message: result === 'LATE' ? 'Late payment refunded' : 'Success' });
   } catch (error) {
-    console.error('[MoMo] IPN could not be confirmed:', error);
+    logger.error('momo_ipn_failed', {
+      table: 'payment_transactions',
+      order_id: String((req.body as Record<string, unknown>)?.orderId ?? ''),
+      error,
+    });
     res.status(500).json({ resultCode: 99, message: 'Payment confirmation failed.' });
   }
 });
@@ -461,7 +547,12 @@ router.get(
         },
       });
     } catch (error) {
-      console.error('[Payments] Status lookup failed:', error);
+      logger.error('payment_status_lookup_failed', {
+        table: 'payment_transactions/tickets',
+        order_id: req.params.orderId,
+        user_id: req.user?.id,
+        error,
+      });
       res
         .status(500)
         .json({ success: false, message: 'Không thể kiểm tra trạng thái thanh toán.' });
@@ -555,7 +646,12 @@ router.post(
         refundAmount: ticket.payment_status === 'SUCCESS' ? Number(ticket.amount) : 0,
       });
     } catch (error: any) {
-      console.error('[Ticketing] Cancellation failed:', error);
+      logger.error('ticket_cancellation_failed', {
+        table: 'tickets/trip_seats/payment_transactions',
+        ticket_id: req.params.id,
+        user_id: req.user?.id,
+        error,
+      });
       res.status(error instanceof PaymentRefundError ? error.statusCode : 500).json({
         success: false,
         message: error.message || 'Không thể hủy vé.',
@@ -581,7 +677,10 @@ async function releaseExpiredHandler(req: Request, res: Response): Promise<void>
     const affectedRows = await releaseExpiredReservations();
     res.json({ success: true, affectedRows });
   } catch (error) {
-    console.error('[Ticketing] Expiry cleanup failed:', error);
+    logger.error('expiry_cleanup_failed', {
+      table: 'tickets/trip_seats/payment_transactions',
+      error,
+    });
     res.status(500).json({ success: false, message: 'Không thể giải phóng ghế quá hạn.' });
   }
 }

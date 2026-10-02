@@ -8,6 +8,23 @@ describe('PaymentGatewayService', () => {
   beforeEach(() => {
     service = new PaymentGatewayService();
     jest.restoreAllMocks();
+    // Start every case from a clean gateway configuration so ordering between
+    // tests cannot leak an old URL or credential.
+    for (const key of [
+      'VNPAY_TMN_CODE',
+      'VNPAY_HASH_SECRET',
+      'VNPAY_RETURN_URL',
+      'VNPAY_IPN_URL',
+      'VNPAY_PAYMENT_URL',
+      'VNP_TMN_CODE',
+      'VNP_HASH_SECRET',
+      'VNP_RETURN_URL',
+      'VNP_IPN_URL',
+      'PAYMENT_PUBLIC_BASE_URL',
+      'PORT',
+    ]) {
+      delete process.env[key];
+    }
   });
 
   afterAll(() => {
@@ -111,5 +128,56 @@ describe('PaymentGatewayService', () => {
 
     expect(service.verifyMomoCallback(payload)).toBe(true);
     expect(service.verifyMomoCallback({ ...payload, amount: 1 })).toBe(false);
+  });
+it('uses the canonical VNPAY_* variable names, not the legacy VNP_* ones', async () => {
+    process.env.VNPAY_TMN_CODE = 'canonical-merchant';
+    process.env.VNPAY_HASH_SECRET = 'canonical-secret';
+    process.env.VNPAY_RETURN_URL = 'https://bus.example/api/v1/ticketing/payments/vnpay/return';
+    // Stale aliases left over from an old .env must not win.
+    process.env.VNP_TMN_CODE = 'legacy-merchant';
+    process.env.VNP_HASH_SECRET = 'legacy-secret';
+    process.env.VNP_RETURN_URL = 'https://legacy.example/wrong/path';
+
+    const paymentUrl = await service.createPaymentUrl('VNPAY', 'order-3', 10000, '127.0.0.1');
+    const url = new URL(paymentUrl);
+
+    expect(url.searchParams.get('vnp_TmnCode')).toBe('canonical-merchant');
+    expect(url.searchParams.get('vnp_ReturnUrl')).toBe(
+      'https://bus.example/api/v1/ticketing/payments/vnpay/return'
+    );
+
+    delete process.env.VNP_TMN_CODE;
+    delete process.env.VNP_HASH_SECRET;
+    delete process.env.VNP_RETURN_URL;
+  });
+
+  it('falls back to a legacy VNP_* alias when the canonical name is absent', async () => {
+    process.env.VNPAY_TMN_CODE = 'merchant';
+    process.env.VNPAY_HASH_SECRET = 'secret';
+    delete process.env.VNPAY_RETURN_URL;
+    process.env.VNP_RETURN_URL = 'https://legacy.example/api/v1/ticketing/payments/vnpay/return';
+
+    const paymentUrl = await service.createPaymentUrl('VNPAY', 'order-4', 10000, '127.0.0.1');
+
+    expect(new URL(paymentUrl).searchParams.get('vnp_ReturnUrl')).toBe(
+      'https://legacy.example/api/v1/ticketing/payments/vnpay/return'
+    );
+
+    delete process.env.VNP_RETURN_URL;
+  });
+
+  it('defaults the return URL to the real Express route on port 5000', async () => {
+    process.env.VNPAY_TMN_CODE = 'merchant';
+    process.env.VNPAY_HASH_SECRET = 'secret';
+    delete process.env.VNPAY_RETURN_URL;
+    delete process.env.VNP_RETURN_URL;
+    delete process.env.PAYMENT_PUBLIC_BASE_URL;
+    process.env.PORT = '5000';
+
+    const paymentUrl = await service.createPaymentUrl('VNPAY', 'order-5', 10000, '127.0.0.1');
+
+    expect(new URL(paymentUrl).searchParams.get('vnp_ReturnUrl')).toBe(
+      'http://localhost:5000/api/v1/ticketing/payments/vnpay/return'
+    );
   });
 });

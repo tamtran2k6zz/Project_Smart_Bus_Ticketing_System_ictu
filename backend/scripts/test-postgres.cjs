@@ -10,6 +10,12 @@ process.env.MOMO_PARTNER_CODE = 'test-partner';
 process.env.MOMO_ACCESS_KEY = 'test-access-key';
 process.env.MOMO_SECRET_KEY = 'test-secret-key';
 process.env.PAYMENT_CRON_SECRET = 'test-cron-secret';
+// The suite must not depend on a running Redis. Seat locking falls back to the
+// PostgreSQL row lock, which is the concurrency guard under test.
+delete process.env.REDIS_URL;
+delete process.env.REDIS_HOST;
+delete process.env.REDIS_PORT;
+delete process.env.REDIS_PASSWORD;
 
 async function main() {
   const db = new PGlite();
@@ -22,6 +28,14 @@ async function main() {
     await db.exec(fs.readFileSync(path.join(dir, file), 'utf8'));
   }
   const pool = require('../dist/config/database').dbPool;
+  // config/database loads dotenv, which can repopulate REDIS_* from backend/.env.
+  // Clear them here, before the app (and config/redis) is required, so the
+  // suite never needs a live Redis: seat locking then uses the PostgreSQL
+  // row lock, which is the concurrency guard under test.
+  delete process.env.REDIS_URL;
+  delete process.env.REDIS_HOST;
+  delete process.env.REDIS_PORT;
+  delete process.env.REDIS_PASSWORD;
   const gatewayServer = createServer((req, res) => {
     let body = '';
     req.setEncoding('utf8');
