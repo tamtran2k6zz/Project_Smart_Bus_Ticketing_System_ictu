@@ -29,4 +29,3 @@ export const authorizeRoles = (...allowedRoles: string[]) => {
 };
 
 export const requireRoles = authorizeRoles;
-

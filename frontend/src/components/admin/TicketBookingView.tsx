@@ -7,6 +7,7 @@ interface SeatInfo {
   rowPosition: string;
   isPriority: boolean;
   isAvailable: boolean;
+  status?: string; // Trạng thái ghế từ API: AVAILABLE, LOCKED, BOOKED, CHECKED_IN
 }
 
 interface TripItem {
@@ -31,6 +32,42 @@ export const TicketBookingView: React.FC = () => {
   // Soát vé QR
   const [verifyCode, setVerifyCode] = useState<string>('');
   const [verifyResult, setVerifyResult] = useState<any>(null);
+
+  // =========================================================
+  // HÀM QUY ĐỊNH MÀU SẮC GHẾ (Xanh, Cam, Xám) THEO TASK 2
+  // =========================================================
+  const getSeatStyles = (seat: SeatInfo, isSelected: boolean) => {
+    // 1. Đang chọn (bởi bạn) hoặc Đang bị giữ (bởi người khác) -> MÀU CAM
+    if (isSelected || seat.status === 'LOCKED') {
+      return {
+        border: '1px solid #f97316',
+        backgroundColor: 'rgba(249, 115, 22, 0.25)',
+        color: '#fdba74',
+        boxShadow: '0 0 16px rgba(249, 115, 22, 0.4)',
+        cursor: 'pointer'
+      };
+    }
+    
+    // 2. Trống (AVAILABLE) -> MÀU XANH
+    if (seat.status === 'AVAILABLE' || seat.isAvailable) {
+      return {
+        border: '1px solid #10b981',
+        backgroundColor: 'rgba(16, 185, 129, 0.08)',
+        color: '#34d399',
+        boxShadow: 'none',
+        cursor: 'pointer'
+      };
+    }
+
+    // 3. Đã bán (BOOKED, CHECKED_IN) -> MÀU XÁM
+    return {
+      border: '1px solid rgba(255, 255, 255, 0.2)',
+      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+      color: 'rgba(255, 255, 255, 0.3)',
+      boxShadow: 'none',
+      cursor: 'not-allowed'
+    };
+  };
 
   // 1. Nạp danh sách chuyến xe từ cơ sở dữ liệu
   useEffect(() => {
@@ -64,12 +101,17 @@ export const TicketBookingView: React.FC = () => {
     fetchTrips();
   }, []);
 
-  // 2. Nạp sơ đồ ghế thực tế từ cơ sở dữ liệu cho chuyến đã chọn
+  // Xóa trắng ghế đang chọn nếu đổi sang chuyến xe khác
+  useEffect(() => {
+    setSelectedSeat('');
+  }, [selectedTripId]);
+
+  // 2. Nạp sơ đồ ghế thực tế từ CSDL & Cập nhật Thời Gian Thực (Polling)
   useEffect(() => {
     if (!selectedTripId) return;
 
-    const fetchSeats = async () => {
-      setIsLoading(true);
+    const fetchSeats = async (showLoading = false) => {
+      if (showLoading) setIsLoading(true);
       try {
         const res = await apiFetch(getApiUrl(`/api/v1/ticketing/trips/${selectedTripId}/seats`));
         const json = await res.json();
@@ -79,15 +121,22 @@ export const TicketBookingView: React.FC = () => {
           ? json.seats
           : [];
         setSeats(rawSeats);
-        setSelectedSeat('');
       } catch (err) {
         console.error(err);
       } finally {
-        setIsLoading(false);
+        if (showLoading) setIsLoading(false);
       }
     };
 
-    fetchSeats();
+    // Lần đầu tải có hiện xoay vòng Loading
+    fetchSeats(true);
+
+    // Chạy ngầm (polling): tự động gọi lại API sau mỗi 3 giây để cập nhật trạng thái ghế
+    const intervalId = setInterval(() => {
+      fetchSeats(false); // Gọi API ngầm, không hiện Loading để tránh giật màn hình
+    }, 3000);
+
+    return () => clearInterval(intervalId);
   }, [selectedTripId]);
 
   // 3. Xử lý đặt vé và lưu vào cơ sở dữ liệu (US 2, 3, 4, 6)
@@ -127,7 +176,7 @@ export const TicketBookingView: React.FC = () => {
       setBookingResult(json.data || json);
       setStatusMessage('🎉 Đặt vé và giữ chỗ 10 phút thành công! Mã QR đã được lưu trong cơ sở dữ liệu.');
 
-      // Tải lại sơ đồ ghế
+      // Tải lại sơ đồ ghế ngay lập tức sau khi đặt vé
       const seatsRes = await apiFetch(getApiUrl(`/api/v1/ticketing/trips/${selectedTripId}/seats`));
       const seatsJson = await seatsRes.json();
       const rawSeats = Array.isArray(seatsJson?.data?.seats)
@@ -222,15 +271,15 @@ export const TicketBookingView: React.FC = () => {
             <div style={{ display: 'flex', gap: '16px', fontSize: '12px' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ width: '14px', height: '14px', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10b981', borderRadius: '4px' }} />
-                Ghế trống
+                Ghế trống (Xanh)
               </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ width: '14px', height: '14px', background: '#38bdf8', borderRadius: '4px', boxShadow: '0 0 10px #38bdf8' }} />
-                Đang chọn ({selectedSeat || 'Chưa chọn'})
+                <span style={{ width: '14px', height: '14px', background: 'rgba(249, 115, 22, 0.25)', border: '1px solid #f97316', borderRadius: '4px', boxShadow: '0 0 10px #f97316' }} />
+                Đang chọn/Giữ
               </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ width: '14px', height: '14px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '4px' }} />
-                Đã đặt
+                <span style={{ width: '14px', height: '14px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '4px' }} />
+                Đã bán (Xám)
               </span>
             </div>
           </div>
@@ -248,35 +297,28 @@ export const TicketBookingView: React.FC = () => {
           >
             {(Array.isArray(seats) ? seats : []).map((s) => {
               const isSelected = selectedSeat === s.seatNumber;
+              
+              // Áp dụng hàm tính màu sắc vào từng ghế
+              const seatStyle = getSeatStyles(s, isSelected);
+
               return (
                 <button
                   key={s.id}
-                  disabled={!s.isAvailable}
-                  onClick={() => setSelectedSeat(s.seatNumber)}
+                  disabled={s.status !== 'AVAILABLE' && !s.isAvailable && !isSelected}
+                  onClick={() => {
+                    // Chỉ cho click chọn khi ghế AVAILABLE
+                    if (s.status === 'AVAILABLE' || s.isAvailable) {
+                      setSelectedSeat(s.seatNumber);
+                    }
+                  }}
                   style={{
                     padding: '14px 6px',
                     borderRadius: '12px',
                     fontSize: '13px',
                     fontWeight: 600,
-                    cursor: s.isAvailable ? 'pointer' : 'not-allowed',
-                    border: isSelected
-                      ? '1px solid #38bdf8'
-                      : s.isAvailable
-                      ? '1px solid rgba(16, 185, 129, 0.4)'
-                      : '1px solid rgba(255, 255, 255, 0.06)',
-                    backgroundColor: isSelected
-                      ? 'rgba(56, 189, 248, 0.25)'
-                      : s.isAvailable
-                      ? 'rgba(16, 185, 129, 0.08)'
-                      : 'rgba(255, 255, 255, 0.02)',
-                    color: isSelected ? '#ffffff' : s.isAvailable ? '#34d399' : 'rgba(255, 255, 255, 0.25)',
-                    boxShadow: isSelected
-                      ? '0 0 16px rgba(56, 189, 248, 0.4)'
-                      : s.isAvailable
-                      ? '0 0 8px rgba(16, 185, 129, 0.15)'
-                      : 'none',
                     backdropFilter: 'blur(8px)',
                     transition: 'all 0.18s ease',
+                    ...seatStyle // Truyền màu vào
                   }}
                 >
                   <div style={{ fontSize: '15px' }}>{s.seatNumber}</div>

@@ -1,45 +1,32 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe, Logger } from '@nestjs/common';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
-import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
-import * as dotenv from 'dotenv';
-
-dotenv.config();
+import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule);
   app.enableShutdownHooks();
 
-  app.enableCors();
-
-  app.useGlobalFilters(new AllExceptionsFilter());
-  app.useGlobalInterceptors(new TransformResponseInterceptor());
-
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       transform: true,
       forbidNonWhitelisted: true,
-      transformOptions: { enableImplicitConversion: true },
-    })
+    }),
   );
 
-  const config = new DocumentBuilder()
-    .setTitle('Smart Bus Ticketing System API')
-    .setDescription('Hệ thống API bán vé & điều hành xe buýt thông minh')
-    .setVersion('1.0.0')
-    .addBearerAuth()
-    .build();
+  app.enableCors({
+    origin: '*',
+    credentials: true,
+  });
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+  const configService = app.get(ConfigService);
+  const port = configService.get<number>('PORT', 3000);
 
-  const port = process.env.PORT || 5000;
   await app.listen(port);
-  logger.log(`🚀 Smart Bus Backend is running on: http://localhost:${port}`);
-  logger.log(`📖 Swagger API Docs: http://localhost:${port}/api/docs`);
+  logger.log(`Smart Bus Ticketing Backend running on http://localhost:${port}`);
 }
+
 bootstrap();
+

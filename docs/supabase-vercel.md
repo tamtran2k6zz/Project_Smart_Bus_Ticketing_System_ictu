@@ -83,6 +83,8 @@ Use repository root as the Vercel **Root Directory**, **Other** as the framework
 
 In the target project's **Settings → Environment Variables**, set `DATABASE_URL`, `JWT_SECRET`, and `DB_POOL_MAX=2` for Production. Set Preview separately to a test database. Remove old `VITE_API_URL`/`VITE_API_BASE_URL` overrides so requests use the same Vercel origin. The Supabase URL is a database endpoint, not a replacement for the Express API URL.
 
+Repository `vercel.json` intentionally does not configure Vercel Cron Jobs. The Hobby plan only supports daily schedules, so use the external scheduler below for minute-by-minute reservation cleanup.
+
 After sign-in, the equivalent CLI workflow from repository root is:
 
 ```powershell
