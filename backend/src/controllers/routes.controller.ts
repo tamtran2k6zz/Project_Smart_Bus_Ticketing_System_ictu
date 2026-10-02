@@ -1,6 +1,9 @@
 import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { query } from '../config/database';
+import { appLogger } from '../config/logger';
+
+const logger = appLogger.child('routes');
 
 // 1. Lấy danh sách tất cả tuyến xe kèm trạm dừng theo thứ tự (US 12)
 export const getRoutes = async (req: Request, res: Response): Promise<void> => {
@@ -57,7 +60,7 @@ export const getRoutes = async (req: Request, res: Response): Promise<void> => {
       data: routesWithStops,
     });
   } catch (err: any) {
-    console.error('Lỗi API getRoutes:', err);
+    logger.error('routes_list_failed', { table: 'routes/route_stops/bus_stops', operation: 'select', error: err });
     res.status(500).json({
       statusCode: 500,
       success: false,
@@ -123,7 +126,7 @@ export const createRoute = async (req: Request, res: Response): Promise<void> =>
       },
     });
   } catch (err: any) {
-    console.error('Lỗi API createRoute:', err);
+    logger.error('route_create_failed', { table: 'routes', operation: 'insert', code: String(req.body?.code ?? ''), error: err });
     res.status(500).json({
       statusCode: 500,
       success: false,
@@ -176,7 +179,7 @@ export const updateRoute = async (req: Request, res: Response): Promise<void> =>
       message: 'Cập nhật tuyến xe thành công trong PostgreSQL!',
     });
   } catch (err: any) {
-    console.error('Lỗi API updateRoute:', err);
+    logger.error('route_update_failed', { table: 'routes', operation: 'update', route_id: req.params.id ?? '', error: err });
     res.status(500).json({
       statusCode: 500,
       success: false,
@@ -209,7 +212,7 @@ export const deleteRoute = async (req: Request, res: Response): Promise<void> =>
       message: 'Xóa tuyến xe thành công khỏi CSDL PostgreSQL!',
     });
   } catch (err: any) {
-    console.error('Lỗi API deleteRoute:', err);
+    logger.error('route_delete_failed', { table: 'routes', operation: 'delete', route_id: req.params.id ?? '', error: err });
     res.status(500).json({
       statusCode: 500,
       success: false,
@@ -249,7 +252,7 @@ export const assignStopToRoute = async (req: Request, res: Response): Promise<vo
       message: 'Gán trạm dừng vào tuyến thành công trong PostgreSQL!',
     });
   } catch (err: any) {
-    console.error('Lỗi API assignStopToRoute:', err);
+    logger.error('route_stop_assign_failed', { table: 'route_stops', operation: 'insert', route_id: req.params.id ?? '', stop_id: String(req.body?.stopId ?? ''), error: err });
     res.status(500).json({
       statusCode: 500,
       success: false,

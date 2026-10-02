@@ -1,10 +1,17 @@
 import { createClient } from 'redis';
 import { randomUUID } from 'crypto';
+import { describeRedisTarget } from './env';
+import { appLogger } from './logger';
 
-const configured = Boolean(process.env.REDIS_URL);
-const redisClient = configured
+const logger = appLogger.child('redis');
+
+// Seat locking is optional: without Redis the PostgreSQL row lock in
+// services/booking.ts remains the concurrency guard. Redis only adds a
+// cross-instance SET NX lock when it is explicitly configured.
+const target = describeRedisTarget();
+const redisClient = target.configured
   ? createClient({
-      url: process.env.REDIS_URL,
+      url: target.url,
       socket: {
         reconnectStrategy: retries => Math.min(1000 * 2 ** retries, 30_000),
       },
@@ -12,12 +19,31 @@ const redisClient = configured
   : null;
 
 redisClient?.on('error', error => {
-  console.error(`[Redis] ${error.message}`);
+  logger.error('client_error', { error, url: target.url });
 });
 
+export function redisStatus(): 'DISABLED' | 'CONNECTING' | 'READY' | 'RECONNECTING' {
+  if (!redisClient) return 'DISABLED';
+  if (redisClient.isReady) return 'READY';
+  return redisClient.isOpen ? 'RECONNECTING' : 'CONNECTING';
+}
+
+export function redisSeatLockEnabled(): boolean {
+  return redisClient !== null;
+}
+
 export async function connectRedis(): Promise<void> {
-  if (redisClient && !redisClient.isOpen) {
+  if (!redisClient) {
+    logger.warn('seat_lock_disabled', {
+      reason: 'REDIS_URL / REDIS_HOST chưa được cấu hình',
+      fallback: 'postgres-row-lock',
+    });
+    return;
+  }
+  if (!redisClient.isOpen) {
+    logger.info('connecting', { url: target.url });
     await redisClient.connect();
+    logger.info('connected', { url: target.url });
   }
 }
 
@@ -28,13 +54,27 @@ export async function acquireSeatLock(
   ttlSeconds = 600
 ): Promise<string | null> {
   if (!redisClient) return 'redis-disabled';
-  if (!redisClient.isReady) throw new Error('Redis is configured but unavailable.');
+  if (!redisClient.isReady) {
+    logger.error('seat_lock_unavailable', {
+      trip_id: tripId,
+      seat_number: seatNumber,
+      owner_id: ownerId,
+      redis_status: redisStatus(),
+      url: target.url,
+    });
+    throw new Error('Redis is configured but unavailable.');
+  }
   const lockId = `${ownerId}:${randomUUID()}`;
   const result = await redisClient.set(`lock:trip:${tripId}:seat:${seatNumber}`, lockId, {
     NX: true,
     EX: ttlSeconds,
   });
-  return result === 'OK' ? lockId : null;
+  if (result === 'OK') {
+    logger.debug('seat_lock_acquired', { trip_id: tripId, seat_number: seatNumber, owner_id: ownerId });
+    return lockId;
+  }
+  logger.warn('seat_lock_conflict', { trip_id: tripId, seat_number: seatNumber, owner_id: ownerId });
+  return null;
 }
 
 export async function releaseSeatLock(

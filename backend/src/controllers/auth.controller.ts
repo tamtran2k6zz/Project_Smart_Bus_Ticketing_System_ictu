@@ -2,11 +2,15 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { query } from '../config/database';
+import { appLogger } from '../config/logger';
+import { readEnv } from '../config/env';
 import { AuthenticatedRequest } from '../middlewares/auth';
+
+const logger = appLogger.child('auth');
 
 import { getJwtSecret } from '../config/auth';
 const getExpiry = (): string | number => {
-  const envVal = process.env.JWT_EXPIRES_IN || '86400';
+  const envVal = readEnv('JWT_EXPIRES_IN') || '86400';
   const num = Number(envVal);
   return isNaN(num) ? envVal : num;
 };
@@ -73,7 +77,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       );
       newUserId = insertResult[0].id;
     } catch (insertErr: any) {
-      console.error('Lỗi khi INSERT users:', insertErr.message);
+      logger.error('user_insert_failed', { table: 'users', operation: 'insert', email: String(email ?? ''), error: insertErr });
       throw insertErr;
     }
 
@@ -110,7 +114,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       },
     });
   } catch (err: any) {
-    console.error('Lỗi API Register:', err);
+    logger.error('register_failed', { table: 'users', operation: 'insert', email: String(req.body?.email ?? ''), error: err });
     res.status(500).json({
       statusCode: 500,
       success: false,
@@ -223,7 +227,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       },
     });
   } catch (err: any) {
-    console.error('Lỗi API Login:', err);
+    logger.error('login_failed', { table: 'users', operation: 'select', email: String(req.body?.email ?? ''), error: err });
     res.status(500).json({
       statusCode: 500,
       success: false,
@@ -293,7 +297,7 @@ export const getMe = async (req: AuthenticatedRequest, res: Response): Promise<v
       },
     });
   } catch (err: any) {
-    console.error('Lỗi API GetMe:', err);
+    logger.error('profile_lookup_failed', { table: 'users', operation: 'select', user_id: (req as AuthenticatedRequest).user?.id ?? '', error: err });
     res.status(500).json({
       statusCode: 500,
       success: false,

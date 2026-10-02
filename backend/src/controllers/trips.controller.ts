@@ -1,6 +1,9 @@
 import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { query } from '../config/database';
+import { appLogger } from '../config/logger';
+
+const logger = appLogger.child('trips');
 
 // 1. Tra cứu chuyến xe theo điểm đi, điểm đến và ngày khởi hành (US 01)
 // Sử dụng thuật toán so khớp stop_order qua SQL JOIN trực tiếp
@@ -61,7 +64,7 @@ export const searchTrips = async (req: Request, res: Response): Promise<void> =>
 
     res.status(200).json({ statusCode: 200, success: true, total: trips.length, data: trips });
   } catch (err: any) {
-    console.error('Lỗi API searchTrips:', err);
+    logger.error('trip_search_failed', { table: 'trips/routes/route_stops/bus_stops', operation: 'select', error: err });
     res.status(500).json({ statusCode: 500, success: false, message: `Lỗi tra cứu chuyến xe: ${err.message}` });
   }
 };
@@ -89,7 +92,7 @@ export const getTrips = async (req: Request, res: Response): Promise<void> => {
         availableSeats: t.available_seats, status: t.status, createdAt: t.created_at })),
     });
   } catch (err: any) {
-    console.error('Lỗi API getTrips:', err);
+    logger.error('trips_list_failed', { table: 'trips', operation: 'select', error: err });
     res.status(500).json({ statusCode: 500, success: false, message: `Lỗi truy vấn CSDL: ${err.message}` });
   }
 };
@@ -128,7 +131,7 @@ export const createTrip = async (req: Request, res: Response): Promise<void> => 
       id: tripId, routeId: route_id, busPlate: bus_plate, departureTime: departure_time, arrivalTime: arrival_time, totalSeats: total_seats, status,
     }});
   } catch (err: any) {
-    console.error('Lỗi API createTrip:', err);
+    logger.error('trip_create_failed', { table: 'trips', operation: 'insert', route_id: String(req.body?.routeId ?? ''), error: err });
     res.status(500).json({ statusCode: 500, success: false, message: `Lỗi tạo chuyến xe: ${err.message}` });
   }
 };

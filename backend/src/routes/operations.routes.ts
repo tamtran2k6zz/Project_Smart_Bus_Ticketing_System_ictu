@@ -2,7 +2,9 @@ import { authenticateJWT, AuthenticatedRequest } from '../middlewares/auth';
 import { authorizeRoles } from '../middlewares/rbac';
 import { Router, Request, Response } from 'express';
 import { query } from '../config/database';
+import { appLogger } from '../config/logger';
 
+const logger = appLogger.child('operations');
 const router = Router();
 
 // 1. Dashboard summary kết nối trực tiếp PostgreSQL (US 19, 20)
@@ -42,7 +44,7 @@ router.get('/dashboard/summary', authenticateJWT, authorizeRoles('ADMIN','MANAGE
       },
     });
   } catch (err: any) {
-    console.error('Lỗi dashboard summary:', err);
+    logger.error('dashboard_summary_failed', { table: 'routes/trips/tickets/incidents/feedbacks', operation: 'select', error: err });
     res.status(500).json({
       success: false,
       message: `Lỗi CSDL PostgreSQL: ${err.message}`,
@@ -70,7 +72,7 @@ router.get('/incidents', authenticateJWT, authorizeRoles('ADMIN','MANAGER','DRIV
       data: incidents,
     });
   } catch (err: any) {
-    console.error('Lỗi lấy danh sách sự cố:', err);
+    logger.error('incidents_list_failed', { table: 'incidents', operation: 'select', error: err });
     res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -104,7 +106,7 @@ router.post('/incidents', authenticateJWT, authorizeRoles('ADMIN','MANAGER','DRI
       },
     });
   } catch (err: any) {
-    console.error('Lỗi báo cáo sự cố:', err);
+    logger.error('incident_create_failed', { table: 'incidents', operation: 'insert', trip_id: String(req.body?.tripId ?? ''), error: err });
     res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -128,7 +130,7 @@ router.get('/feedbacks', authenticateJWT, async (req: AuthenticatedRequest, res:
       data: feedbacks,
     });
   } catch (err: any) {
-    console.error('Lỗi lấy feedbacks:', err);
+    logger.error('feedbacks_list_failed', { table: 'feedbacks', operation: 'select', error: err });
     res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -155,7 +157,7 @@ router.post('/feedbacks', authenticateJWT, async (req: Request, res: Response): 
       data: { id: result[0].id, ratingStars, content },
     });
   } catch (err: any) {
-    console.error('Lỗi gửi feedback:', err);
+    logger.error('feedback_create_failed', { table: 'feedbacks', operation: 'insert', trip_id: String(req.body?.tripId ?? ''), error: err });
     res.status(500).json({ success: false, message: err.message });
   }
 });
