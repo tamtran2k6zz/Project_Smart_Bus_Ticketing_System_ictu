@@ -3,8 +3,6 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
-    ports:
-      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -12,37 +10,17 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
-  postgres:
-    image: postgres:17-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: smartbus_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
-    ports:
-      - "127.0.0.1:5433:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./supabase/migrations:/docker-entrypoint-initdb.d:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d smartbus_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
   backend:
     build: ./backend
     restart: unless-stopped
     ports:
       - "5000:5000"
     environment:
-      PGHOST: postgres
-      PGPORT: 5432
-      PGUSER: postgres
-      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
-      PGDATABASE: smartbus_db
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env to the Supabase transaction pooler URL}
+      DB_POOL_MAX: ${DB_POOL_MAX:-2}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       CORS_ORIGIN: http://localhost:3000,http://localhost:5173
-      REDIS_URL: redis://redis:6379
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       VNPAY_TMN_CODE: ${VNPAY_TMN_CODE:-}
       VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET:-}
       VNPAY_PAYMENT_URL: ${VNPAY_PAYMENT_URL:-https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
@@ -60,17 +38,14 @@ services:
       PAYMENT_REFUND_IP: ${PAYMENT_REFUND_IP:-127.0.0.1}
       PAYMENT_CRON_SECRET: ${PAYMENT_CRON_SECRET:-}
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
   frontend:
     build: ./frontend
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-3000}:3000"
     depends_on:
       - backend
 volumes:
-  postgres_data:
   redis_data:

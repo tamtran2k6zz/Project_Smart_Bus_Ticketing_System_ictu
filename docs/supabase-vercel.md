@@ -20,7 +20,7 @@ Complete each browser authorization. Confirm MCP authentication using `/mcp` in 
 
 In the Supabase project's **Connect** dialog, copy the **Transaction pooler** URL for `DATABASE_URL` and the **Session pooler** URL for `DIRECT_URL`. Keep the provided host and username; do not infer the pooler host from the region. Percent-encode special characters in the database password.
 
-Use `backend/.env.example` as a template. Do not overwrite the old MySQL connection until it has been copied to `MYSQL_SOURCE_URL` for import. Use `sslmode=verify-full`. If the client cannot validate the certificate chain, download the project's CA certificate and set `NODE_EXTRA_CA_CERTS` to its path. Do not turn off certificate validation.
+Use the repository-root `.env.example` as a template. Set `DATABASE_URL` to the Transaction pooler URL and `DIRECT_URL` to the Session pooler URL for local migrations/imports. Do not overwrite the old MySQL connection until it has been copied to `MYSQL_SOURCE_URL` for import. Use `sslmode=verify-full`. If the client cannot validate the certificate chain, download the project's CA certificate and set `NODE_EXTRA_CA_CERTS` to its path. Do not turn off certificate validation.
 
 | Variable | Purpose | Vercel runtime |
 | --- | --- | --- |
@@ -35,7 +35,7 @@ Use `backend/.env.example` as a template. Do not overwrite the old MySQL connect
 | `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET` | VNPay merchant credentials for signed payment and refund requests | Required to enable VNPay |
 | `MOMO_PARTNER_CODE`, `MOMO_ACCESS_KEY`, `MOMO_SECRET_KEY` | MoMo merchant credentials for signed payment and refund requests | Required to enable MoMo |
 | `VNPAY_RETURN_URL`, `MOMO_IPN_URL`, `PAYMENT_RESULT_URL` | Public callback/result URLs used by the gateways | Required for sandbox/live gateway tests |
-| `PAYMENT_CRON_SECRET` or `CRON_SECRET` | Bearer token protecting the expired-reservation cron endpoint | Required in Production |
+| `PAYMENT_CRON_SECRET` or `CRON_SECRET` | Bearer token shared with the external expired-reservation scheduler | Required in Production |
 
 No Supabase service key, publishable key, or `VITE_SUPABASE_*` variable is needed for this architecture. Never put database credentials or JWT secrets in `VITE_*` variables. Rotate the old repository's demo JWT secret; this requires users to sign in again.
 
@@ -83,6 +83,8 @@ Use repository root as the Vercel **Root Directory**, **Other** as the framework
 
 In the target project's **Settings → Environment Variables**, set `DATABASE_URL`, `JWT_SECRET`, and `DB_POOL_MAX=2` for Production. Set Preview separately to a test database. Remove old `VITE_API_URL`/`VITE_API_BASE_URL` overrides so requests use the same Vercel origin. The Supabase URL is a database endpoint, not a replacement for the Express API URL.
 
+Repository `vercel.json` intentionally does not configure Vercel Cron Jobs. The Hobby plan only supports daily schedules, so use the external scheduler below for minute-by-minute reservation cleanup.
+
 After sign-in, the equivalent CLI workflow from repository root is:
 
 ```powershell
@@ -95,6 +97,23 @@ npx vercel deploy --prod
 
 Enter secrets through the CLI prompt or dashboard, not command-line arguments. Updating environment variables requires a new deployment.
 
+Repository `vercel.json` intentionally does not configure Vercel Cron Jobs. The Hobby plan only supports daily schedules, so use the external scheduler below for minute-by-minute reservation cleanup.
+
+### External reservation cleanup on the free plan
+
+Use [cron-job.org](https://cron-job.org/en/), which supports free execution once per minute and custom HTTP headers.
+
+1. In Vercel **Settings → Environment Variables**, set `PAYMENT_CRON_SECRET` for Production to a private random value of at least 32 characters. Reuse the existing value if already configured. Redeploy after adding or changing it.
+2. Sign in to [the cron-job.org Console](https://console.cron-job.org/) and create a job named `Smart Bus - release expired reservations`.
+3. Use the stable Production domain shown in Vercel (not a deployment-specific Preview URL), with the path `/api/v1/ticketing/release-expired`.
+4. Set the method to **POST**, the schedule to **Every minute**, and the timezone to `Asia/Ho_Chi_Minh`. Leave the request body empty.
+5. Under advanced request settings, add the `Authorization` header with value `Bearer <PAYMENT_CRON_SECRET>`. Replace the placeholder with the same private value configured on Vercel. Never put this value in the URL, repository, frontend variables, or screenshots.
+6. Run **Test run** before enabling the job. Expect HTTP `200` with `{"success":true,"affectedRows":0}` (or a positive number when reservations have expired). Enable the job and check its execution history after the next minute.
+
+HTTP `401` means the authorization header is missing or incorrect. HTTP `503` with `PAYMENT_CRON_SECRET must be configured.` means the Production environment variable is missing. HTTP `500` means cleanup failed; inspect Vercel runtime logs and database connectivity. If Vercel Deployment Protection intercepts the request, target the public Production domain rather than disabling protection for Preview deployments.
+
+The endpoint supports both POST and GET, accepts either `PAYMENT_CRON_SECRET` or `CRON_SECRET`, and processes up to 100 expired reservations per call. External scheduling replaces Vercel Cron; keep only one active scheduler for this task.
+
 ## 6. Validate before reopening traffic
 
 ```powershell
@@ -105,7 +124,7 @@ npm --prefix frontend run build
 
 The embedded PostgreSQL suite verifies schema execution, parameterized SQL, registration/login, authorization, route/stop/trip operations, lock ownership/expiry, duplicate-sale constraints, QR verification, feedback, and Data API role denial. It also exercises a signed MoMo callback, ticket cancellation/refund, and expiry cleanup against a local fake gateway. Its single-session adapter serializes test transactions; test real concurrent connections and provider sandbox responses separately.
 
-On Vercel verify `/api/health` reports `CONNECTED_POSTGRESQL`, then test login, route search, booking, and driver verification. Configure gateway sandbox credentials and publicly reachable HTTPS callback URLs before attempting a payment or refund; register the VNPay IPN URL with the merchant. The scheduled `/api/v1/ticketing/release-expired` endpoint runs every minute and requires `CRON_SECRET` or `PAYMENT_CRON_SECRET`. Two concurrent attempts for one seat must produce exactly one ticket. Check imported table counts and timezone-sensitive trip searches. Run Supabase Database Advisors and resolve findings before reopening writes.
+On Vercel verify `/api/health` reports `CONNECTED_POSTGRESQL`, then test login, route search, booking, and driver verification. Configure gateway sandbox credentials and publicly reachable HTTPS callback URLs before attempting a payment or refund; register the VNPay IPN URL with the merchant. Confirm the external scheduler calls `/api/v1/ticketing/release-expired` every minute with `CRON_SECRET` or `PAYMENT_CRON_SECRET` and receives HTTP `200`. Two concurrent attempts for one seat must produce exactly one ticket. Check imported table counts and timezone-sensitive trip searches. Run Supabase Database Advisors and resolve findings before reopening writes.
 
 ## Rollback
 

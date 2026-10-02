@@ -11,6 +11,7 @@ interface SeatInfo {
   rowPosition: string;
   isPriority: boolean;
   isAvailable: boolean;
+  status?: string; // <-- 1. Đã thêm trường này
 }
 
 interface TripItem {
@@ -50,6 +51,39 @@ export const PassengerPortalPage: React.FC = () => {
   // Tuyến xe
   const [routes, setRoutes] = useState<BusRoute[]>([]);
 
+  // =========================================================
+  // 2. HÀM ĐỔI MÀU CHO GHẾ HÀNH KHÁCH
+  // =========================================================
+  const getSeatStyles = (seat: SeatInfo, isSelected: boolean) => {
+    if (isSelected || seat.status === 'LOCKED') {
+      return {
+        border: '1px solid #f97316',
+        backgroundColor: 'rgba(249, 115, 22, 0.25)',
+        color: '#fdba74',
+        boxShadow: '0 0 16px rgba(249, 115, 22, 0.4)',
+        cursor: 'pointer'
+      };
+    }
+    
+    if (seat.status === 'AVAILABLE' || seat.isAvailable) {
+      return {
+        border: '1px solid #10b981',
+        backgroundColor: 'rgba(16, 185, 129, 0.08)',
+        color: '#34d399',
+        boxShadow: 'none',
+        cursor: 'pointer'
+      };
+    }
+
+    return {
+      border: '1px solid rgba(255, 255, 255, 0.2)',
+      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+      color: 'rgba(255, 255, 255, 0.3)',
+      boxShadow: 'none',
+      cursor: 'not-allowed'
+    };
+  };
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -86,9 +120,17 @@ export const PassengerPortalPage: React.FC = () => {
     }
   }, []);
 
-  // Nạp sơ đồ ghế khi đổi chuyến
+  // Xóa trắng ghế đang chọn nếu hành khách đổi chuyến xe
+  useEffect(() => {
+    setSelectedSeat('');
+  }, [selectedTripId]);
+
+  // =========================================================
+  // 3. Nạp sơ đồ ghế & Thời gian thực (Polling mỗi 3 giây)
+  // =========================================================
   useEffect(() => {
     if (!selectedTripId) return;
+    
     const fetchSeats = async () => {
       try {
         const res = await apiFetch(getApiUrl(`/api/v1/ticketing/trips/${selectedTripId}/seats`));
@@ -99,13 +141,18 @@ export const PassengerPortalPage: React.FC = () => {
           ? json.seats
           : [];
         setSeats(rawSeats);
-        setSelectedSeat('');
       } catch (e) {
         console.error(e);
-        setSeats([]);
       }
     };
-    fetchSeats();
+
+    fetchSeats(); // Gọi lần đầu tiên
+
+    const intervalId = setInterval(() => {
+      fetchSeats(); // Gọi tự động mỗi 3 giây
+    }, 3000);
+
+    return () => clearInterval(intervalId);
   }, [selectedTripId]);
 
   // Nạp phản ánh & lộ trình
@@ -417,18 +464,19 @@ export const PassengerPortalPage: React.FC = () => {
                   <span style={{ fontSize: '14px', fontWeight: 500, color: 'rgba(255, 255, 255, 0.85)' }}>
                     Sơ đồ vị trí ghế ngồi:
                   </span>
+                  {/* 4. CẬP NHẬT CHÚ THÍCH */}
                   <div style={{ display: 'flex', gap: '16px', fontSize: '12px' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span style={{ width: '14px', height: '14px', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10b981', borderRadius: '4px' }} />
-                      Ghế trống
+                      Ghế trống (Xanh)
                     </span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ width: '14px', height: '14px', background: '#38bdf8', borderRadius: '4px', boxShadow: '0 0 10px #38bdf8' }} />
-                      Đang chọn ({selectedSeat || 'Chưa chọn'})
+                      <span style={{ width: '14px', height: '14px', background: 'rgba(249, 115, 22, 0.25)', border: '1px solid #f97316', borderRadius: '4px', boxShadow: '0 0 10px #f97316' }} />
+                      Đang chọn/Giữ
                     </span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ width: '14px', height: '14px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '4px' }} />
-                      Đã có khách
+                      <span style={{ width: '14px', height: '14px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '4px' }} />
+                      Đã bán (Xám)
                     </span>
                   </div>
                 </div>
@@ -446,31 +494,26 @@ export const PassengerPortalPage: React.FC = () => {
                 >
                   {(Array.isArray(seats) ? seats : []).map((s) => {
                     const isSelected = selectedSeat === s.seatNumber;
+                    // 5. GỌI HÀM LẤY MÀU SẮC
+                    const seatStyle = getSeatStyles(s, isSelected);
+
                     return (
                       <button
                         key={s.id}
-                        disabled={!s.isAvailable}
-                        onClick={() => setSelectedSeat(s.seatNumber)}
+                        disabled={s.status !== 'AVAILABLE' && !s.isAvailable && !isSelected}
+                        onClick={() => {
+                          if (s.status === 'AVAILABLE' || s.isAvailable) {
+                            setSelectedSeat(s.seatNumber);
+                          }
+                        }}
                         style={{
                           padding: '14px 6px',
                           borderRadius: '12px',
                           fontSize: '13px',
                           fontWeight: 600,
-                          cursor: s.isAvailable ? 'pointer' : 'not-allowed',
-                          border: isSelected
-                            ? '1px solid #38bdf8'
-                            : s.isAvailable
-                            ? '1px solid rgba(16, 185, 129, 0.4)'
-                            : '1px solid rgba(255, 255, 255, 0.06)',
-                          backgroundColor: isSelected
-                            ? 'rgba(56, 189, 248, 0.25)'
-                            : s.isAvailable
-                            ? 'rgba(16, 185, 129, 0.08)'
-                            : 'rgba(255, 255, 255, 0.02)',
-                          color: isSelected ? '#ffffff' : s.isAvailable ? '#34d399' : 'rgba(255, 255, 255, 0.25)',
-                          boxShadow: isSelected ? '0 0 16px rgba(56, 189, 248, 0.4)' : 'none',
                           backdropFilter: 'blur(8px)',
                           transition: 'all 0.18s ease',
+                          ...seatStyle // Áp dụng màu Xanh/Cam/Xám
                         }}
                       >
                         <div style={{ fontSize: '15px' }}>{s.seatNumber}</div>
