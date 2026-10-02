@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import type { BusRoute } from '../../types/route';
 import { getApiUrl, apiFetch } from '../../api/client';
+import type { PaymentPageState } from '../../types/payment';
 
 interface SeatInfo {
   id: string;
@@ -32,10 +33,8 @@ export const PassengerPortalPage: React.FC = () => {
   const [selectedTripId, setSelectedTripId] = useState<string>('');
   const [seats, setSeats] = useState<SeatInfo[]>([]);
   const [selectedSeat, setSelectedSeat] = useState<string>('');
-  const [paymentMethod, setPaymentMethod] = useState<'VNPAY' | 'MOMO'>('VNPAY');
   const [voucherCode, setVoucherCode] = useState<string>('');
   const [bookingResult, setBookingResult] = useState<any>(null);
-  const [isBooking, setIsBooking] = useState<boolean>(false);
   const [bookingMsg, setBookingMsg] = useState<string | null>(null);
 
   // Hồ sơ ưu đãi HSSV
@@ -171,59 +170,23 @@ export const PassengerPortalPage: React.FC = () => {
     void loadPayment();
   }, []);
 
-  // Xử lý đặt vé
-  const handleBook = async () => {
-    if (!selectedSeat) {
+  // Chuyển sang trang chọn cổng thanh toán (FE 3), mang theo chuyến + ghế đã chọn
+  const handleBook = () => {
+    const trip = trips.find((t) => t.id === selectedTripId);
+    if (!selectedSeat || !trip) {
       alert('Vui lòng chọn 1 vị trí ghế trên xe!');
       return;
     }
 
-    setIsBooking(true);
-    setBookingMsg(null);
-    try {
-      const token = localStorage.getItem('smartbus_access_token');
-      const res = await apiFetch(getApiUrl('/api/v1/ticketing/bookings'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          tripId: selectedTripId,
-          userId: user?.id,
-          seatNumber: selectedSeat,
-          paymentMethod,
-          voucherCode: voucherCode.trim() || undefined,
-          customerEmail: user?.email || 'khachhang@gmail.com',
-        }),
-      });
-
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.message || 'Đặt vé thất bại trong cơ sở dữ liệu!');
-      }
-
-      setBookingResult(json.data || json);
-      if (json.paymentUrl || json.data?.paymentUrl) {
-        window.location.assign(json.paymentUrl || json.data.paymentUrl);
-        return;
-      }
-      setBookingMsg('🎉 Đặt vé thành công!');
-
-      // Refresh seats
-      const seatsRes = await apiFetch(getApiUrl(`/api/v1/ticketing/trips/${selectedTripId}/seats`));
-      const seatsJson = await seatsRes.json();
-      const rawSeats = Array.isArray(seatsJson?.data?.seats)
-        ? seatsJson.data.seats
-        : Array.isArray(seatsJson?.seats)
-        ? seatsJson.seats
-        : [];
-      setSeats(rawSeats);
-    } catch (err: any) {
-      alert(err.message);
-    } finally {
-      setIsBooking(false);
-    }
+    const state: PaymentPageState = {
+      tripId: trip.id,
+      seatNumber: selectedSeat,
+      routeCode: trip.code,
+      routeName: trip.routeName,
+      departureTime: trip.departureTime,
+      fare: trip.basePrice,
+    };
+    navigate('/payment', { state });
   };
 
   const handleCancelTicket = async () => {
@@ -446,20 +409,6 @@ export const PassengerPortalPage: React.FC = () => {
                     style={{ width: '100%', borderRadius: '12px', height: '46px' }}
                   />
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'rgba(255, 255, 255, 0.75)', marginBottom: '8px' }}>
-                    Cổng thanh toán:
-                  </label>
-                  <select
-                    className="filter-select"
-                    value={paymentMethod}
-                    onChange={(event) => setPaymentMethod(event.target.value as 'VNPAY' | 'MOMO')}
-                    style={{ width: '100%', borderRadius: '12px', height: '46px' }}
-                  >
-                    <option value="VNPAY">VNPay</option>
-                    <option value="MOMO">MoMo</option>
-                  </select>
-                </div>
               </div>
 
               {/* Sơ đồ ghế */}
@@ -537,16 +486,16 @@ export const PassengerPortalPage: React.FC = () => {
               <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
                 <button
                   onClick={handleBook}
-                  disabled={!selectedSeat || isBooking}
+                  disabled={!selectedSeat}
                   className="primary-button"
                   style={{
                     padding: '12px 28px',
                     fontSize: '14px',
-                    cursor: !selectedSeat || isBooking ? 'not-allowed' : 'pointer',
-                    opacity: !selectedSeat || isBooking ? 0.5 : 1,
+                    cursor: !selectedSeat ? 'not-allowed' : 'pointer',
+                    opacity: !selectedSeat ? 0.5 : 1,
                   }}
                 >
-                  {isBooking ? 'Đang ghi nhận cơ sở dữ liệu...' : `Xác nhận Đặt Ghế ${selectedSeat || ''} & Nhận Vé QR →`}
+                  {`Tiếp tục thanh toán ghế ${selectedSeat || ''} →`}
                 </button>
                 {bookingMsg && (
                   <span style={{ color: '#34d399', fontSize: '14px', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: '8px' }}>

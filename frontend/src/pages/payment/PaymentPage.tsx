@@ -1,53 +1,106 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { createBooking, isAllowedGatewayUrl } from '../../services/payment';
+import { saveBookingSession } from '../../utils/bookingSession';
+import type { PaymentMethod, PaymentPageState } from '../../types/payment';
 
-type PaymentMethod = 'momo' | 'vnpay' | 'bank';
+const BOOKING_PAGE = '/passenger/booking';
+
+const paymentMethods: { id: PaymentMethod; name: string; description: string; icon: string }[] = [
+  {
+    id: 'VNPAY',
+    name: 'VNPay',
+    description: 'Thanh toán qua cổng VNPay (QR, thẻ ATM, Internet Banking)',
+    icon: 'VNP',
+  },
+  {
+    id: 'MOMO',
+    name: 'Ví MoMo',
+    description: 'Thanh toán nhanh qua ví điện tử MoMo',
+    icon: 'M',
+  },
+];
+
+const isValidState = (value: unknown): value is PaymentPageState => {
+  const s = value as Partial<PaymentPageState> | null;
+  return (
+    !!s &&
+    typeof s.tripId === 'string' && !!s.tripId &&
+    typeof s.seatNumber === 'string' && !!s.seatNumber &&
+    typeof s.departureTime === 'string' &&
+    Number.isFinite(s.fare)
+  );
+};
+
+const formatPrice = (price: number) => `${price.toLocaleString('vi-VN')}đ`;
 
 const PaymentPage: React.FC = () => {
   const navigate = useNavigate();
-  const [selectedMethod, setSelectedMethod] =
-    useState<PaymentMethod>('momo');
+  const location = useLocation();
+  const { user } = useAuth();
+  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('VNPAY');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const order = {
-    route: 'Bến xe Thái Nguyên → ICTU',
-    date: '30/09/2026',
-    time: '08:00',
-    seat: 'T01',
-    quantity: 1,
-    price: 8000,
-  };
+  const order = isValidState(location.state) ? location.state : null;
 
-  const paymentMethods = [
-    {
-      id: 'momo' as PaymentMethod,
-      name: 'Ví MoMo',
-      description: 'Thanh toán nhanh qua ví điện tử MoMo',
-      icon: 'M',
-    },
-    {
-      id: 'vnpay' as PaymentMethod,
-      name: 'VNPay QR',
-      description: 'Quét mã QR để thanh toán qua VNPay',
-      icon: 'QR',
-    },
-    {
-      id: 'bank' as PaymentMethod,
-      name: 'Thẻ ATM / Ngân hàng',
-      description: 'Thanh toán bằng thẻ ATM hoặc tài khoản ngân hàng',
-      icon: 'ATM',
-    },
-  ];
-
-  const formatPrice = (price: number) => {
-    return `${price.toLocaleString('vi-VN')}đ`;
-  };
-
-  const handlePayment = () => {
-    alert(
-      `Bạn đã chọn ${
-        paymentMethods.find((method) => method.id === selectedMethod)?.name
-      }.`
+  if (!order) {
+    return (
+      <div style={styles.page}>
+        <div style={styles.container}>
+          <section style={styles.card}>
+            <h2 style={styles.sectionTitle}>Chưa có thông tin đặt chỗ</h2>
+            <p style={styles.subtitle}>Vui lòng chọn chuyến xe và ghế trước khi thanh toán.</p>
+            <button onClick={() => navigate(BOOKING_PAGE)} style={{ ...styles.paymentButton, marginTop: '20px' }}>
+              Chọn chuyến xe
+            </button>
+          </section>
+        </div>
+      </div>
     );
+  }
+
+  const departure = new Date(order.departureTime);
+  const hasDeparture = !Number.isNaN(departure.getTime());
+
+  const handlePayment = async () => {
+    if (submitting || !user) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const booking = await createBooking({
+        tripId: order.tripId,
+        seatNumber: order.seatNumber,
+        paymentMethod: selectedMethod,
+      });
+      if (!isAllowedGatewayUrl(booking.paymentUrl)) {
+        throw new Error('Địa chỉ thanh toán trả về không hợp lệ. Vui lòng liên hệ hỗ trợ.');
+      }
+
+      saveBookingSession(user.id, {
+        orderId: booking.orderId,
+        ticketId: booking.ticketId,
+        ticketCode: booking.ticketCode,
+        tripId: order.tripId,
+        routeCode: order.routeCode,
+        routeName: order.routeName,
+        departureTime: order.departureTime,
+        seatNumber: booking.seatNumber || order.seatNumber,
+        amount: booking.amount,
+        paymentMethod: selectedMethod,
+        paymentUrl: booking.paymentUrl,
+        reservationExpiresAt: booking.reservationExpiresAt,
+        status: 'PENDING',
+        createdAt: new Date().toISOString(),
+      });
+
+      // Domain ngoài nên dùng window.location, không dùng navigate() của router.
+      window.location.assign(booking.paymentUrl);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Không thể tạo giao dịch thanh toán.');
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -63,7 +116,8 @@ const PaymentPage: React.FC = () => {
           </div>
 
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => navigate(BOOKING_PAGE)}
+            disabled={submitting}
             style={styles.backButton}
           >
             ← Quay lại
@@ -78,29 +132,31 @@ const PaymentPage: React.FC = () => {
             <div style={styles.routeBox}>
               <div>
                 <span style={styles.label}>Tuyến xe</span>
-                <strong style={styles.route}>{order.route}</strong>
+                <strong style={styles.route}>
+                  {order.routeCode ? `[${order.routeCode}] ` : ''}
+                  {order.routeName || '—'}
+                </strong>
               </div>
             </div>
 
             <div style={styles.infoGrid}>
               <div>
                 <span style={styles.label}>Ngày đi</span>
-                <strong>{order.date}</strong>
+                <strong>{hasDeparture ? departure.toLocaleDateString('vi-VN') : '—'}</strong>
               </div>
 
               <div>
                 <span style={styles.label}>Giờ khởi hành</span>
-                <strong>{order.time}</strong>
+                <strong>
+                  {hasDeparture
+                    ? departure.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+                    : '—'}
+                </strong>
               </div>
 
               <div>
                 <span style={styles.label}>Vị trí ghế</span>
-                <strong>{order.seat}</strong>
-              </div>
-
-              <div>
-                <span style={styles.label}>Số lượng vé</span>
-                <strong>{order.quantity} vé</strong>
+                <strong>{order.seatNumber}</strong>
               </div>
             </div>
 
@@ -109,7 +165,7 @@ const PaymentPage: React.FC = () => {
             <div style={styles.totalRow}>
               <span>Tổng tiền</span>
               <strong style={styles.total}>
-                {formatPrice(order.price * order.quantity)}
+                {formatPrice(order.fare)}
               </strong>
             </div>
           </section>
@@ -128,6 +184,7 @@ const PaymentPage: React.FC = () => {
                   <button
                     key={method.id}
                     onClick={() => setSelectedMethod(method.id)}
+                    disabled={submitting}
                     style={{
                       ...styles.method,
                       ...(isSelected ? styles.methodSelected : {}),
@@ -164,20 +221,26 @@ const PaymentPage: React.FC = () => {
           </section>
         </div>
 
+        {error && <div style={styles.errorBox}>{error}</div>}
+
         {/* Payment Footer */}
         <div style={styles.footer}>
           <div>
             <span style={styles.footerLabel}>Số tiền cần thanh toán</span>
             <strong style={styles.footerTotal}>
-              {formatPrice(order.price * order.quantity)}
+              {formatPrice(order.fare)}
             </strong>
           </div>
 
           <button
             onClick={handlePayment}
-            style={styles.paymentButton}
+            disabled={submitting}
+            style={{
+              ...styles.paymentButton,
+              ...(submitting ? styles.paymentButtonDisabled : {}),
+            }}
           >
-            Thanh toán ngay
+            {submitting ? 'Đang chuyển sang cổng thanh toán...' : 'Thanh toán ngay'}
           </button>
         </div>
       </div>
@@ -385,6 +448,21 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '16px',
     fontWeight: 600,
     cursor: 'pointer',
+  },
+
+  paymentButtonDisabled: {
+    opacity: 0.6,
+    cursor: 'not-allowed',
+  },
+
+  errorBox: {
+    marginTop: '20px',
+    padding: '14px 18px',
+    borderRadius: '10px',
+    background: '#fef2f2',
+    border: '1px solid #fecaca',
+    color: '#b91c1c',
+    fontSize: '14px',
   },
 };
 
