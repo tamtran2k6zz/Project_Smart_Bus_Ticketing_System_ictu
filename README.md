@@ -200,7 +200,8 @@ Redis mặc định chạy riêng trên từng máy. Điều này phù hợp đ�
 # 1. Cài đặt dependencies cho Backend
 cd backend
 npm install
-cp .env.example .env
+cp ../.env.example .env
+# PowerShell: Copy-Item ..\.env.example .env
 # (Điền DATABASE_URL và JWT_SECRET vào backend/.env)
 
 # 2. Chạy migration CSDL

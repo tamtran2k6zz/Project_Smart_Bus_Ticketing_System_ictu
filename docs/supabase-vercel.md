@@ -20,7 +20,7 @@ Complete each browser authorization. Confirm MCP authentication using `/mcp` in 
 
 In the Supabase project's **Connect** dialog, copy the **Transaction pooler** URL for `DATABASE_URL` and the **Session pooler** URL for `DIRECT_URL`. Keep the provided host and username; do not infer the pooler host from the region. Percent-encode special characters in the database password.
 
-Use `backend/.env.example` as a template. Do not overwrite the old MySQL connection until it has been copied to `MYSQL_SOURCE_URL` for import. Use `sslmode=verify-full`. If the client cannot validate the certificate chain, download the project's CA certificate and set `NODE_EXTRA_CA_CERTS` to its path. Do not turn off certificate validation.
+Use the repository-root `.env.example` as a template. Set `DATABASE_URL` to the Transaction pooler URL and `DIRECT_URL` to the Session pooler URL for local migrations/imports. Do not overwrite the old MySQL connection until it has been copied to `MYSQL_SOURCE_URL` for import. Use `sslmode=verify-full`. If the client cannot validate the certificate chain, download the project's CA certificate and set `NODE_EXTRA_CA_CERTS` to its path. Do not turn off certificate validation.
 
 | Variable | Purpose | Vercel runtime |
 | --- | --- | --- |
