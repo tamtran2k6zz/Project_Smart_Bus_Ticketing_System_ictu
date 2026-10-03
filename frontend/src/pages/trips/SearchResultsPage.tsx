@@ -326,9 +326,7 @@ export const SearchResultsPage: React.FC = () => {
               Không tìm thấy chuyến xe phù hợp
             </h3>
             <p style={{ color: '#94a3b8', maxWidth: '550px', margin: '0 auto 20px', fontSize: '14px', lineHeight: 1.6 }}>
-              Không có chuyến xe nào chạy theo thứ tự từ <strong>{originStopName}</strong> đến <strong>{destStopName}</strong> trong ngày đã chọn.
-              <br />
-              <em>Quy tắc nghiệp vụ: Hệ thống chỉ hiển thị chuyến khi thứ tự trạm đón nhỏ hơn thứ tự trạm trả (origin_rs.stop_order &lt; dest_rs.stop_order).</em>
+              Không có chuyến xe nào chạy từ <strong>{originStopName}</strong> đến <strong>{destStopName}</strong> trong ngày đã chọn.
             </p>
             <button
               onClick={() => {
