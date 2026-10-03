@@ -109,15 +109,27 @@ export const PassengerPortalPage: React.FC = () => {
   // Nạp chuyến xe từ cơ sở dữ liệu
   const fetchTrips = useCallback(async () => {
     try {
-      const dashRes = await apiFetch(getApiUrl('/api/v1/trips?bookable=true'));
-      const dashJson = await dashRes.json();
-      const rawOccupancy: TripOccupancy[] = Array.isArray(dashJson?.data)
+      let dashRes = await apiFetch(getApiUrl('/api/v1/trips?bookable=true'));
+      let dashJson = await dashRes.json();
+      let rawOccupancy: TripOccupancy[] = Array.isArray(dashJson?.data)
         ? dashJson.data
         : Array.isArray(dashJson?.tripOccupancy)
         ? dashJson.tripOccupancy
         : Array.isArray(dashJson?.data?.tripOccupancy)
         ? dashJson.data.tripOccupancy
         : [];
+
+      if (rawOccupancy.length === 0) {
+        dashRes = await apiFetch(getApiUrl('/api/v1/trips'));
+        dashJson = await dashRes.json();
+        rawOccupancy = Array.isArray(dashJson?.data)
+          ? dashJson.data
+          : Array.isArray(dashJson?.tripOccupancy)
+          ? dashJson.tripOccupancy
+          : Array.isArray(dashJson?.data?.tripOccupancy)
+          ? dashJson.data.tripOccupancy
+          : [];
+      }
 
       const tripList: TripItem[] = rawOccupancy.map(t => ({
         id: String(t.id),
