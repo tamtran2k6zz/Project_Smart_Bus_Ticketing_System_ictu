@@ -240,7 +240,9 @@ async function handleVnpayCallback(req: Request, res: Response, redirect: boolea
 
 export async function releaseExpiredReservations(): Promise<number> {
   const lockAcquired = await transaction(async client => {
-    const { rows: [res] } = await client.query('SELECT pg_try_advisory_lock(88888888) AS acquired');
+    const {
+      rows: [res],
+    } = await client.query('SELECT pg_try_advisory_lock(88888888) AS acquired');
     return res?.acquired === true;
   });
   if (!lockAcquired) {
@@ -284,7 +286,11 @@ export async function releaseExpiredReservations(): Promise<number> {
       });
       if (released) {
         releasedCount += 1;
-        await releaseSeatLock(ticket.trip_id, ticket.seat_number, ticket.redis_lock_id || undefined);
+        await releaseSeatLock(
+          ticket.trip_id,
+          ticket.seat_number,
+          ticket.redis_lock_id || undefined
+        );
       }
     }
     return releasedCount;
