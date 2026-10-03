@@ -239,46 +239,58 @@ async function handleVnpayCallback(req: Request, res: Response, redirect: boolea
 }
 
 export async function releaseExpiredReservations(): Promise<number> {
-  const expired = await query<any[]>(
-    `SELECT t.id,t.trip_id,t.seat_number,p.redis_lock_id
-     FROM tickets t JOIN payment_transactions p ON p.ticket_id=t.id
-     WHERE t.status='RESERVED' AND p.status='PENDING'
-       AND t.reservation_expires_at <= NOW()
-     ORDER BY t.reservation_expires_at LIMIT 100`
-  );
-  let releasedCount = 0;
-  for (const ticket of expired) {
-    const released = await transaction(async client => {
-      const {
-        rows: [current],
-      } = await client.query(
-        `SELECT t.id FROM tickets t JOIN payment_transactions p ON p.ticket_id=t.id
-         WHERE t.id=$1 AND t.status='RESERVED' AND p.status='PENDING'
-           AND t.reservation_expires_at <= NOW() FOR UPDATE OF t,p`,
-        [ticket.id]
-      );
-      if (!current) return false;
-      await client.query(
-        "UPDATE tickets SET status='CANCELLED',reservation_expires_at=NULL WHERE id=$1",
-        [ticket.id]
-      );
-      await client.query(
-        "UPDATE payment_transactions SET status='FAILED' WHERE ticket_id=$1 AND status='PENDING'",
-        [ticket.id]
-      );
-      await client.query(
-        `UPDATE trip_seats SET status='AVAILABLE',ticket_id=NULL,locked_at=NULL,
-         lock_expires_at=NULL,locked_by_user_id=NULL,redis_lock_id=NULL WHERE ticket_id=$1`,
-        [ticket.id]
-      );
-      return true;
-    });
-    if (released) {
-      releasedCount += 1;
-      await releaseSeatLock(ticket.trip_id, ticket.seat_number, ticket.redis_lock_id || undefined);
-    }
+  const lockAcquired = await transaction(async client => {
+    const { rows: [res] } = await client.query('SELECT pg_try_advisory_lock(88888888) AS acquired');
+    return res?.acquired === true;
+  });
+  if (!lockAcquired) {
+    return 0;
   }
-  return releasedCount;
+
+  try {
+    const expired = await query<any[]>(
+      `SELECT t.id,t.trip_id,t.seat_number,p.redis_lock_id
+       FROM tickets t JOIN payment_transactions p ON p.ticket_id=t.id
+       WHERE t.status='RESERVED' AND p.status='PENDING'
+         AND t.reservation_expires_at <= NOW()
+       ORDER BY t.reservation_expires_at LIMIT 100`
+    );
+    let releasedCount = 0;
+    for (const ticket of expired) {
+      const released = await transaction(async client => {
+        const {
+          rows: [current],
+        } = await client.query(
+          `SELECT t.id FROM tickets t JOIN payment_transactions p ON p.ticket_id=t.id
+           WHERE t.id=$1 AND t.status='RESERVED' AND p.status='PENDING'
+             AND t.reservation_expires_at <= NOW() FOR UPDATE OF t,p`,
+          [ticket.id]
+        );
+        if (!current) return false;
+        await client.query(
+          "UPDATE tickets SET status='CANCELLED',reservation_expires_at=NULL WHERE id=$1",
+          [ticket.id]
+        );
+        await client.query(
+          "UPDATE payment_transactions SET status='FAILED' WHERE ticket_id=$1 AND status='PENDING'",
+          [ticket.id]
+        );
+        await client.query(
+          `UPDATE trip_seats SET status='AVAILABLE',ticket_id=NULL,locked_at=NULL,
+           lock_expires_at=NULL,locked_by_user_id=NULL,redis_lock_id=NULL WHERE ticket_id=$1`,
+          [ticket.id]
+        );
+        return true;
+      });
+      if (released) {
+        releasedCount += 1;
+        await releaseSeatLock(ticket.trip_id, ticket.seat_number, ticket.redis_lock_id || undefined);
+      }
+    }
+    return releasedCount;
+  } finally {
+    await query('SELECT pg_advisory_unlock(88888888)').catch(() => {});
+  }
 }
 
 router.get('/trips/:tripId/seats', getSeatsByTrip);
