@@ -41,15 +41,11 @@ router.get(
       const [{ totalRoutes }] = await query<any[]>(
         'SELECT COUNT(*) AS "totalRoutes" FROM routes WHERE status = \'ACTIVE\''
       );
-      const [{ totalBuses }] = await query<any[]>(
-        'SELECT COUNT(*) AS "totalBuses" FROM buses'
-      );
+      const [{ totalBuses }] = await query<any[]>('SELECT COUNT(*) AS "totalBuses" FROM buses');
       const [{ totalBusStops }] = await query<any[]>(
         'SELECT COUNT(*) AS "totalBusStops" FROM bus_stops'
       );
-      const [{ totalUsers }] = await query<any[]>(
-        'SELECT COUNT(*) AS "totalUsers" FROM users'
-      );
+      const [{ totalUsers }] = await query<any[]>('SELECT COUNT(*) AS "totalUsers" FROM users');
       const [{ totalIncidents }] = await query<any[]>(
         'SELECT COUNT(*) AS "totalIncidents" FROM incidents'
       );
