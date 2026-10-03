@@ -74,56 +74,6 @@ export const LoginPage: React.FC = () => {
         </div>
       )}
 
-      <div className="demo-role-box">
-        <div className="demo-role-label">⚡ Chuyển nhanh tài khoản kiểm thử</div>
-        <div className="demo-role-buttons">
-          <button
-            type="button"
-            className="demo-btn"
-            onClick={() => {
-              setIdentifier('admin@smartbus.ictu.vn');
-              setPassword('Admin@123456');
-              if (formError) setFormError(null);
-            }}
-          >
-            🛡️ Admin
-          </button>
-          <button
-            type="button"
-            className="demo-btn"
-            onClick={() => {
-              setIdentifier('manager@smartbus.ictu.vn');
-              setPassword('Manager@123456');
-              if (formError) setFormError(null);
-            }}
-          >
-            📊 Manager
-          </button>
-          <button
-            type="button"
-            className="demo-btn"
-            onClick={() => {
-              setIdentifier('driver@smartbus.ictu.vn');
-              setPassword('Driver@123456');
-              if (formError) setFormError(null);
-            }}
-          >
-            🚌 Driver
-          </button>
-          <button
-            type="button"
-            className="demo-btn"
-            onClick={() => {
-              setIdentifier('passenger@smartbus.ictu.vn');
-              setPassword('Passenger@123456');
-              if (formError) setFormError(null);
-            }}
-          >
-            🎫 Passenger
-          </button>
-        </div>
-      </div>
-
       <form onSubmit={handleSubmit} noValidate>
         <div className="form-group">
           <label className="form-label" htmlFor="identifier">

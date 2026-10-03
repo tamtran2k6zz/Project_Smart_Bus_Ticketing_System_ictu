@@ -90,7 +90,6 @@ Docker Compose chạy frontend, Express API và Redis cục bộ; API kết nố
 - **Đăng ký / Đăng nhập:** Hỗ trợ đăng nhập linh hoạt bằng Email hoặc Số điện thoại.
 - **Mã hóa bảo mật:** Mật khẩu được băm qua thuật toán `bcrypt` (Salt rounds = 10), cấp phát mã thông hành JSON Web Token (JWT) thời hạn 24 giờ.
 - **Phân quyền 4 vai trò:** `ADMIN`, `MANAGER`, `DRIVER`, `PASSENGER`.
-- **Bộ chuyển đổi nhanh tài khoản:** 4 nút bấm tiện ích trên màn hình đăng nhập `/login` phục vụ hội đồng và giảng viên kiểm thử nhanh tính năng theo từng vai trò.
 - **Bảo mật tuyến đường:**
   - `ProtectedRoute`: Kiểm tra Token hợp lệ và đối soát mảng vai trò được cấp phép.
   - `PublicRoute`: Tự động nhận diện tài khoản đã đăng nhập để chuyển hướng vào cổng nghiệp vụ tương ứng.
