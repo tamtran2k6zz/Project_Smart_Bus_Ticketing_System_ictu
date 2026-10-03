@@ -50,8 +50,7 @@ router.get(
       }
 
       const isStaff = ['ADMIN', 'MANAGER'].includes(req.user?.role ?? '');
-      const isAssignedDriver =
-        req.user?.role === 'DRIVER' && ticket.driver_id === req.user.id;
+      const isAssignedDriver = req.user?.role === 'DRIVER' && ticket.driver_id === req.user.id;
       if (!isStaff && !isAssignedDriver && ticket.user_id !== req.user?.id) {
         res.status(403).json({ success: false, message: 'Bạn không có quyền xem vé này.' });
         return;
@@ -82,9 +81,7 @@ router.get(
         route_name: ticket.route_name ?? '',
         origin_stop: ticket.origin_stop ?? '',
         destination_stop: ticket.destination_stop ?? '',
-        departure_time: ticket.departure_time
-          ? new Date(ticket.departure_time).toISOString()
-          : '',
+        departure_time: ticket.departure_time ? new Date(ticket.departure_time).toISOString() : '',
         arrival_time: ticket.arrival_time ? new Date(ticket.arrival_time).toISOString() : '',
         bus_plate_number: ticket.bus_plate || ticket.bus_plate_number || '',
         bus_type: ticket.bus_type ?? '',
