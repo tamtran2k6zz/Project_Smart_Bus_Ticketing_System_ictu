@@ -17,26 +17,60 @@ import { appLogger } from './config/logger';
 
 const logger = appLogger.child('http');
 getJwtSecret();
-const app=express();
+const app = express();
 app.disable('x-powered-by');
-app.use(cors({origin:readEnv('CORS_ORIGIN')?.split(',').map(v=>v.trim()) || false}));
-app.use(express.json({limit:'100kb'}));
-app.get('/api/health',async(_req,res)=>{
-  const database=describeDatabaseTarget();
-  const callbacks=getGatewayCallbacks();
+app.use(
+  cors({
+    origin:
+      readEnv('CORS_ORIGIN')
+        ?.split(',')
+        .map(v => v.trim()) || false,
+  })
+);
+app.use(express.json({ limit: '100kb' }));
+app.use(express.urlencoded({ extended: false, limit: '100kb' }));
+app.get('/api/health', async (_req, res) => {
+  const database = describeDatabaseTarget();
+  const callbacks = getGatewayCallbacks();
   try {
-    const [row]=await query<any[]>('SELECT NOW() AS db_time');
+    const [row] = await query<any[]>('SELECT NOW() AS db_time');
     res.json({
-      status:'UP',
-      database:'CONNECTED_POSTGRESQL',
-      dbTime:row.db_time,
-      target:{driver:database.driver,host:database.host,port:database.port,database:database.database,poolMax:database.poolMax},
-      redis:{status:redisStatus(),seatLock:redisSeatLockEnabled()?'redis-and-postgresql':'postgresql-only'},
-      callbacks:{vnpayReturn:callbacks.vnpayReturnUrl,vnpayIpn:callbacks.vnpayIpnUrl,momoIpn:callbacks.momoIpnUrl},
+      status: 'UP',
+      database: 'CONNECTED_POSTGRESQL',
+      dbTime: row.db_time,
+      target: {
+        driver: database.driver,
+        host: database.host,
+        port: database.port,
+        database: database.database,
+        poolMax: database.poolMax,
+      },
+      redis: {
+        status: redisStatus(),
+        seatLock: redisSeatLockEnabled() ? 'redis-and-postgresql' : 'postgresql-only',
+      },
+      callbacks: {
+        vnpayReturn: callbacks.vnpayReturnUrl,
+        vnpayIpn: callbacks.vnpayIpnUrl,
+        momoIpn: callbacks.momoIpnUrl,
+      },
     });
-  } catch(error) {
-    logger.error('health_check_failed',{table:'NOW()',target:`${database.driver}://${database.host}:${database.port}/${database.database}`,error});
-    res.status(503).json({status:'DOWN',database:'DISCONNECTED',target:{driver:database.driver,host:database.host,port:database.port,database:database.database}});
+  } catch (error) {
+    logger.error('health_check_failed', {
+      table: 'NOW()',
+      target: `${database.driver}://${database.host}:${database.port}/${database.database}`,
+      error,
+    });
+    res.status(503).json({
+      status: 'DOWN',
+      database: 'DISCONNECTED',
+      target: {
+        driver: database.driver,
+        host: database.host,
+        port: database.port,
+        database: database.database,
+      },
+    });
   }
 });
 app.use('/api/auth', authRoutes);
@@ -56,10 +90,20 @@ app.use('/api/v1/ticketing', ticketingRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/v1/users', usersRoutes);
 
-
-app.use((req,res)=>{logger.warn('route_not_found',{method:req.method,path:req.originalUrl});res.status(404).json({success:false,message:'API endpoint not found'});});
-app.use((err:any,req:express.Request,res:express.Response,_next:express.NextFunction)=>{
-  logger.error('unhandled_request_error',{method:req.method,path:req.originalUrl,status:err.status||500,error:err});
-  res.status(err.status || 500).json({success:false,message:err.status===400?'Invalid JSON':'Internal server error'});
+app.use((req, res) => {
+  logger.warn('route_not_found', { method: req.method, path: req.originalUrl });
+  res.status(404).json({ success: false, message: 'API endpoint not found' });
+});
+app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  logger.error('unhandled_request_error', {
+    method: req.method,
+    path: req.originalUrl,
+    status: err.status || 500,
+    error: err,
+  });
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.status === 400 ? 'Invalid JSON' : 'Internal server error',
+  });
 });
 export default app;

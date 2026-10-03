@@ -54,7 +54,12 @@ export async function query<T = any>(sql: string, params: any[] = []): Promise<T
         database: target.database,
       });
     } else {
-      logger.debug('query_ok', { operation, table, duration_ms: durationMs, database: target.database });
+      logger.debug('query_ok', {
+        operation,
+        table,
+        duration_ms: durationMs,
+        database: target.database,
+      });
     }
     return result.rows as T;
   } catch (error) {

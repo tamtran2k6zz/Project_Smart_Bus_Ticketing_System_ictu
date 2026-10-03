@@ -3,19 +3,15 @@ import { appLogger, createLogger, maskUrlCredentials } from './logger';
 describe('config/logger', () => {
   const originalEnv = { ...process.env };
   let lines: string[];
-  let logSpy: jest.SpyInstance;
-  let warnSpy: jest.SpyInstance;
-  let errorSpy: jest.SpyInstance;
-
   beforeEach(() => {
     process.env.LOG_LEVEL = 'debug';
     lines = [];
     const capture = (line: string) => {
       lines.push(line);
     };
-    logSpy = jest.spyOn(console, 'log').mockImplementation(capture);
-    warnSpy = jest.spyOn(console, 'warn').mockImplementation(capture);
-    errorSpy = jest.spyOn(console, 'error').mockImplementation(capture);
+    jest.spyOn(console, 'log').mockImplementation(capture);
+    jest.spyOn(console, 'warn').mockImplementation(capture);
+    jest.spyOn(console, 'error').mockImplementation(capture);
   });
 
   afterEach(() => jest.restoreAllMocks());

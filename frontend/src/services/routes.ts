@@ -14,13 +14,15 @@ interface ApiRoute {
   code: string;
   name: string;
   status: 'DRAFT' | 'ACTIVE' | 'INACTIVE';
-  routeStops: Array<{
+  stops?: Array<{
+    stopId: string;
     stopOrder: number;
-    stop: {
-      id: string;
-      name: string;
-      address: string;
-    };
+    name: string;
+    address: string;
+  }>;
+  routeStops?: Array<{
+    stopOrder: number;
+    stop: { id: string; name: string; address: string };
   }>;
 }
 
@@ -28,7 +30,7 @@ interface SaveRouteInput {
   code: string;
   name: string;
   status: BusRoute['status'];
-  stations: Array<Pick<Station, 'name' | 'address' | 'order'>>;
+  stations: Array<Pick<Station, 'id' | 'name' | 'address' | 'order'>>;
 }
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
@@ -59,12 +61,19 @@ export async function getRoutes(): Promise<BusRoute[]> {
     code: route.code,
     name: route.name,
     status: route.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE',
-    stations: (Array.isArray(route.routeStops) ? route.routeStops : []).map(({ stop, stopOrder }) => ({
-      id: stop?.id,
-      name: stop?.name,
-      address: stop?.address,
-      order: stopOrder,
-    })),
+    stations: Array.isArray(route.stops)
+      ? route.stops.map(({ stopId, name, address, stopOrder }) => ({
+          id: stopId,
+          name,
+          address,
+          order: stopOrder,
+        }))
+      : (Array.isArray(route.routeStops) ? route.routeStops : []).map(({ stop, stopOrder }) => ({
+          id: stop?.id,
+          name: stop?.name,
+          address: stop?.address,
+          order: stopOrder,
+        })),
   }));
 }
 
@@ -73,7 +82,8 @@ export function saveRoute(route: BusRoute): Promise<BusRoute> {
     code: route.code,
     name: route.name,
     status: route.status,
-    stations: (Array.isArray(route.stations) ? route.stations : []).map(({ name, address, order }) => ({
+    stations: (Array.isArray(route.stations) ? route.stations : []).map(({ id, name, address, order }) => ({
+      id,
       name,
       address,
       order,

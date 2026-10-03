@@ -12,7 +12,6 @@ import RouteManagementPage from '../pages/admin/RouteManagementPage';
 import DriverPortalPage from '../pages/driver/DriverPortalPage';
 import PassengerPortalPage from '../pages/passenger/PassengerPortalPage';
 import DriverTripDetailPage from '../pages/driver/DriverTripDetailPage';
-import PaymentPage from '../pages/payment/PaymentPage';
 
 export const AppRoutes: React.FC = () => {
   return (
@@ -23,7 +22,7 @@ export const AppRoutes: React.FC = () => {
 
       {/* US 01: Trang kết quả tìm kiếm chuyến xe theo điểm đi, điểm đến, ngày */}
       <Route path="/search" element={<SearchResultsPage />} />
-      <Route path="/payment" element={<PaymentPage />} />
+      <Route path="/payment" element={<Navigate to="/passenger/booking" replace />} />
 
       {/* US 22: Trang xác thực / Đăng nhập: PublicRoute chỉ cho phép khi chưa đăng nhập */}
       <Route

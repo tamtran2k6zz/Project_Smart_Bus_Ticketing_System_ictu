@@ -1,8 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import type { BusRoute } from '../../types/route';
 import { getApiUrl, apiFetch } from '../../api/client';
+import { PaymentQrCode } from '../../components/PaymentQrCode';
+import { buildPaymentQrPayload } from '../../utils/paymentQr';
+import type { BookingResult } from '../../types/booking';
+import type { ApiRoute, FeedbackRecord, TripOccupancy } from '../../types/api';
+import { getErrorMessage } from '../../utils/errorMessage';
 
 interface SeatInfo {
   id: string;
@@ -22,9 +27,19 @@ interface TripItem {
   basePrice: number;
 }
 
+interface CompletedTrip {
+  tripId: string;
+  routeCode: string;
+  routeName: string;
+  departureTime: string;
+  arrivalTime: string;
+}
+
 export const PassengerPortalPage: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const requestedTripId = searchParams.get('trip_id');
 
   const [activeTab, setActiveTab] = useState<'booking' | 'discount' | 'feedback' | 'routes'>('booking');
 
@@ -33,9 +48,8 @@ export const PassengerPortalPage: React.FC = () => {
   const [selectedTripId, setSelectedTripId] = useState<string>('');
   const [seats, setSeats] = useState<SeatInfo[]>([]);
   const [selectedSeat, setSelectedSeat] = useState<string>('');
-  const [paymentMethod, setPaymentMethod] = useState<'VNPAY' | 'MOMO'>('VNPAY');
   const [voucherCode, setVoucherCode] = useState<string>('');
-  const [bookingResult, setBookingResult] = useState<any>(null);
+  const [bookingResult, setBookingResult] = useState<BookingResult | null>(null);
   const [isBooking, setIsBooking] = useState<boolean>(false);
   const [bookingMsg, setBookingMsg] = useState<string | null>(null);
 
@@ -47,7 +61,9 @@ export const PassengerPortalPage: React.FC = () => {
   const [ratingStars, setRatingStars] = useState(5);
   const [feedbackContent, setFeedbackContent] = useState('');
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
-  const [feedbacks, setFeedbacks] = useState<any[]>([]);
+  const [feedbacks, setFeedbacks] = useState<FeedbackRecord[]>([]);
+  const [completedTrips, setCompletedTrips] = useState<CompletedTrip[]>([]);
+  const [selectedFeedbackTripId, setSelectedFeedbackTripId] = useState('');
 
   // Tuyến xe
   const [routes, setRoutes] = useState<BusRoute[]>([]);
@@ -93,33 +109,38 @@ export const PassengerPortalPage: React.FC = () => {
   // Nạp chuyến xe từ cơ sở dữ liệu
   const fetchTrips = useCallback(async () => {
     try {
-      const dashRes = await apiFetch(getApiUrl('/api/v1/trips'));
+      const dashRes = await apiFetch(getApiUrl('/api/v1/trips?bookable=true'));
       const dashJson = await dashRes.json();
-      dashJson.tripOccupancy = dashJson.data;
-      const rawOccupancy = Array.isArray(dashJson?.tripOccupancy)
+      const rawOccupancy: TripOccupancy[] = Array.isArray(dashJson?.data)
+        ? dashJson.data
+        : Array.isArray(dashJson?.tripOccupancy)
         ? dashJson.tripOccupancy
         : Array.isArray(dashJson?.data?.tripOccupancy)
         ? dashJson.data.tripOccupancy
         : [];
 
-      const tripList = rawOccupancy.map((t: any) => ({
-        id: t.id,
-        code: t.routeCode,
-        routeName: t.routeName,
-        plateNumber: t.busPlate,
-        departureTime: t.departureTime,
+      const tripList: TripItem[] = rawOccupancy.map(t => ({
+        id: String(t.id),
+        code: t.routeCode || '',
+        routeName: t.routeName || '',
+        plateNumber: t.busPlate || '',
+        departureTime: t.departureTime || '',
         basePrice: Number(t.basePrice),
       }));
 
       setTrips(tripList);
       if (tripList.length > 0) {
-        setSelectedTripId(tripList[0].id);
+        setSelectedTripId(
+          requestedTripId && tripList.some((trip: TripItem) => trip.id === requestedTripId)
+            ? requestedTripId
+            : tripList[0].id
+        );
       }
     } catch (e) {
       console.error(e);
       setTrips([]);
     }
-  }, []);
+  }, [requestedTripId]);
 
   // Xóa trắng ghế đang chọn nếu hành khách đổi chuyến xe
   useEffect(() => {
@@ -159,25 +180,41 @@ export const PassengerPortalPage: React.FC = () => {
   // Nạp phản ánh & lộ trình
   const fetchOtherData = useCallback(async () => {
     try {
-      const [fbRes, rRes] = await Promise.all([
+      const [fbRes, rRes, completedTripsRes] = await Promise.all([
         apiFetch(getApiUrl('/api/v1/operations/feedbacks')),
         apiFetch(getApiUrl('/api/v1/routes')),
+        apiFetch(getApiUrl('/api/v1/ticketing/completed-trips')),
       ]);
       const fbJson = await fbRes.json();
       const rJson = await rRes.json();
+      const completedTripsJson = await completedTripsRes.json();
+      if (!fbRes.ok || !rRes.ok || !completedTripsRes.ok) {
+        throw new Error(
+          completedTripsJson?.message || 'Không thể tải dữ liệu đánh giá chuyến đi.',
+        );
+      }
       setFeedbacks(Array.isArray(fbJson?.data) ? fbJson.data : Array.isArray(fbJson) ? fbJson : []);
+      const eligibleTrips: CompletedTrip[] = Array.isArray(completedTripsJson?.data)
+        ? completedTripsJson.data
+        : [];
+      setCompletedTrips(eligibleTrips);
+      setSelectedFeedbackTripId(current =>
+        eligibleTrips.some(trip => trip.tripId === current)
+          ? current
+          : eligibleTrips[0]?.tripId ?? '',
+      );
 
-      const rawList = Array.isArray(rJson?.data) ? rJson.data : Array.isArray(rJson) ? rJson : [];
-      const mapped: BusRoute[] = rawList.map((r: any) => ({
-        id: r.id,
+      const rawList: ApiRoute[] = Array.isArray(rJson?.data) ? rJson.data : Array.isArray(rJson) ? rJson : [];
+      const mapped: BusRoute[] = rawList.map(r => ({
+        id: String(r.id),
         code: r.code,
         name: r.name,
-        status: r.status,
-        stations: (Array.isArray(r.stops) ? r.stops : Array.isArray(r.routeStops) ? r.routeStops : []).map((rs: any) => ({
-          id: rs.stop?.id || rs.stopId || rs.id || `st-${rs.stopOrder}`,
+        status: r.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE',
+        stations: (Array.isArray(r.stops) ? r.stops : Array.isArray(r.routeStops) ? r.routeStops : []).map(rs => ({
+          id: String(rs.stop?.id || rs.stopId || rs.id || `st-${rs.stopOrder ?? 0}`),
           name: rs.stop?.name || rs.name || 'Trạm đón trả',
           address: rs.stop?.address || rs.address || '',
-          order: rs.stopOrder,
+          order: rs.stopOrder ?? 0,
         })),
       }));
       setRoutes(mapped);
@@ -185,6 +222,7 @@ export const PassengerPortalPage: React.FC = () => {
       console.error(e);
       setFeedbacks([]);
       setRoutes([]);
+      setCompletedTrips([]);
     }
   }, []);
 
@@ -239,7 +277,7 @@ export const PassengerPortalPage: React.FC = () => {
           tripId: selectedTripId,
           userId: user?.id,
           seatNumber: selectedSeat,
-          paymentMethod,
+          paymentMethod: 'QR',
           voucherCode: voucherCode.trim() || undefined,
           customerEmail: user?.email || 'khachhang@gmail.com',
         }),
@@ -255,7 +293,7 @@ export const PassengerPortalPage: React.FC = () => {
         window.location.assign(json.paymentUrl || json.data.paymentUrl);
         return;
       }
-      setBookingMsg('🎉 Đặt vé thành công!');
+      setBookingMsg('Đã lưu giao dịch và tạo mã QR. Thanh toán chưa được xác nhận.');
 
       // Tải lại dữ liệu ghế ngay lập tức
       const seatsRes = await apiFetch(getApiUrl(`/api/v1/ticketing/trips/${selectedTripId}/seats`));
@@ -266,8 +304,8 @@ export const PassengerPortalPage: React.FC = () => {
         ? seatsJson.seats
         : [];
       setSeats(rawSeats);
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, 'Không thể đặt vé.'));
     } finally {
       setIsBooking(false);
     }
@@ -283,13 +321,62 @@ export const PassengerPortalPage: React.FC = () => {
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || 'Không thể hủy vé.');
       setBookingMsg(result.message);
-      setBookingResult((current: any) => ({
-        ...current,
-        ticket: { ...current.ticket, status: 'CANCELLED' },
-        paymentStatus: current.paymentStatus === 'SUCCESS' ? 'REFUNDED' : current.paymentStatus,
-      }));
+      setBookingResult(current =>
+        current
+          ? {
+              ...current,
+              ticket: { ...current.ticket, status: 'CANCELLED' },
+              paymentStatus:
+                current.paymentStatus === 'SUCCESS' ? 'REFUNDED' : current.paymentStatus,
+            }
+          : current,
+      );
     } catch (error) {
       setBookingMsg(error instanceof Error ? error.message : 'Không thể hủy vé.');
+    }
+  };
+
+  const handleDemoTripComplete = async () => {
+    const ticketId = bookingResult?.ticket?.id || bookingResult?.ticketId;
+    if (!ticketId) {
+      setBookingMsg('Không tìm thấy mã vé để hoàn tất chuyến demo.');
+      return;
+    }
+
+    setIsBooking(true);
+    setBookingMsg(null);
+    try {
+      const response = await apiFetch(
+        getApiUrl(`/api/v1/ticketing/bookings/${ticketId}/demo-complete`),
+        { method: 'POST' },
+      );
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result?.message || 'Không thể hoàn tất chuyến demo.');
+      }
+
+      setBookingResult(current =>
+        current
+          ? {
+              ...current,
+              status: 'BOOKED',
+              paymentStatus: 'SUCCESS',
+              payment: current.payment ? { ...current.payment, status: 'SUCCESS' } : current.payment,
+              ticket: current.ticket
+                ? { ...current.ticket, status: 'BOOKED', reservationExpiresAt: undefined }
+                : current.ticket,
+            }
+          : current,
+      );
+      setBookingMsg(result.message);
+      setFeedbackMsg(result.message);
+      await fetchTrips();
+      await fetchOtherData();
+      setActiveTab('feedback');
+    } catch (error) {
+      setBookingMsg(getErrorMessage(error, 'Không thể hoàn tất chuyến demo.'));
+    } finally {
+      setIsBooking(false);
     }
   };
 
@@ -303,7 +390,9 @@ export const PassengerPortalPage: React.FC = () => {
 
     try {
       const token = localStorage.getItem('smartbus_access_token');
-      const firstTripId = trips[0]?.id || 'trip-1';
+      if (!completedTrips.some(trip => trip.tripId === selectedFeedbackTripId)) {
+        throw new Error('Chỉ có thể đánh giá chuyến đã hoàn thành mà bạn có vé hợp lệ.');
+      }
 
       const res = await apiFetch(getApiUrl('/api/v1/operations/feedbacks'), {
         method: 'POST',
@@ -312,7 +401,7 @@ export const PassengerPortalPage: React.FC = () => {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
-          tripId: firstTripId,
+          tripId: selectedFeedbackTripId,
           userId: user?.id,
           ratingStars: Number(ratingStars),
           criteria: 'ThaiDoVaDungGio',
@@ -326,8 +415,8 @@ export const PassengerPortalPage: React.FC = () => {
       setFeedbackContent('');
       await fetchOtherData();
       setTimeout(() => setFeedbackMsg(null), 4000);
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, 'Không thể gửi đánh giá.'));
     }
   };
 
@@ -435,13 +524,6 @@ export const PassengerPortalPage: React.FC = () => {
           🎓 Ưu đãi HSSV (US 17)
         </button>
         <button
-          className={`menu-item ${activeTab === 'feedback' ? 'active' : ''}`}
-          onClick={() => setActiveTab('feedback')}
-          style={{ width: 'auto', padding: '9px 20px', borderRadius: '9999px' }}
-        >
-          💬 Đánh giá chuyến đi (US 24)
-        </button>
-        <button
           className={`menu-item ${activeTab === 'routes' ? 'active' : ''}`}
           onClick={() => setActiveTab('routes')}
           style={{ width: 'auto', padding: '9px 20px', borderRadius: '9999px' }}
@@ -493,19 +575,8 @@ export const PassengerPortalPage: React.FC = () => {
                     style={{ width: '100%', borderRadius: '12px', height: '46px' }}
                   />
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'rgba(255, 255, 255, 0.75)', marginBottom: '8px' }}>
-                    Cổng thanh toán:
-                  </label>
-                  <select
-                    className="filter-select"
-                    value={paymentMethod}
-                    onChange={(event) => setPaymentMethod(event.target.value as 'VNPAY' | 'MOMO')}
-                    style={{ width: '100%', borderRadius: '12px', height: '46px' }}
-                  >
-                    <option value="VNPAY">VNPay</option>
-                    <option value="MOMO">MoMo</option>
-                  </select>
+                <div style={{ alignSelf: 'end', padding: '12px 16px', borderRadius: '12px', background: 'rgba(56, 189, 248, 0.08)', color: '#bae6fd', fontSize: '13px' }}>
+                  Thanh toán QR tạm thời — mã chứa thông tin chuyến và số tiền, chưa xác nhận giao dịch.
                 </div>
               </div>
 
@@ -600,18 +671,34 @@ export const PassengerPortalPage: React.FC = () => {
 
               {/* Vé điện tử vừa đặt */}
               {bookingResult && (() => {
-                const tCode = bookingResult.ticket?.ticketCode || bookingResult.ticketCode || 'TKT-ICTU-8888';
-                const sNumber = bookingResult.ticket?.seatNumber || bookingResult.seatNumber || selectedSeat || 'A01';
-                const payAmount = bookingResult.payment?.amount || bookingResult.ticket?.fareAmount || bookingResult.fareAmount || 10000;
+                const tCode = bookingResult.ticket?.ticketCode || bookingResult.ticketCode || '';
+                const sNumber = bookingResult.ticket?.seatNumber || bookingResult.seatNumber || selectedSeat || '';
+                const payAmount = Number(bookingResult.payment?.amount ?? bookingResult.ticket?.fareAmount ?? bookingResult.fareAmount ?? 0);
                 const expRaw = bookingResult.ticket?.reservationExpiresAt || bookingResult.expiresAt;
                 const expTime = (expRaw && !isNaN(new Date(expRaw).getTime()))
                   ? new Date(expRaw).toLocaleTimeString('vi-VN')
-                  : new Date(Date.now() + 10 * 60000).toLocaleTimeString('vi-VN');
-                const qrVal = bookingResult.qrCode || `SMARTBUS-QR-${tCode}`;
-                const qrImg = bookingResult.qrCodeUrl || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrVal)}`;
+                  : null;
                 const ticketStatus = bookingResult.ticket?.status || bookingResult.status;
                 const paymentStatus = bookingResult.paymentStatus || bookingResult.payment?.status;
+                const paymentMethod = bookingResult.paymentMethod || bookingResult.payment?.method;
                 const isPaid = ticketStatus === 'BOOKED' || paymentStatus === 'SUCCESS';
+                const selectedTrip = trips.find(trip => trip.id === String(bookingResult.ticket?.tripId || selectedTripId));
+                const paymentQrValue = paymentMethod === 'QR' && tCode && selectedTrip
+                  ? buildPaymentQrPayload({
+                      orderId: bookingResult.payment?.orderId || bookingResult.orderId || bookingResult.ticket?.id || '',
+                      ticketCode: tCode,
+                      tripId: String(bookingResult.ticket?.tripId || selectedTrip.id),
+                      routeCode: selectedTrip.code,
+                      routeName: selectedTrip.routeName,
+                      departureTime: selectedTrip.departureTime,
+                      seatNumber: sNumber,
+                      amount: payAmount,
+                      expiresAt: expRaw || null,
+                    })
+                  : '';
+                const ticketQrValue = tCode
+                  ? bookingResult.qrCode || `SMARTBUS-QR-${tCode}`
+                  : '';
 
                 return (
                   <div
@@ -633,12 +720,44 @@ export const PassengerPortalPage: React.FC = () => {
                         <p style={{ margin: 0 }}><strong>Số ghế:</strong> <span style={{ color: '#34d399', fontWeight: 600 }}>{sNumber}</span></p>
                         <p style={{ margin: 0 }}><strong>Số tiền:</strong> {Number(payAmount).toLocaleString('vi-VN')} VNĐ</p>
                         <p style={{ margin: 0 }}><strong>Trạng thái thanh toán:</strong> {paymentStatus || (isPaid ? 'SUCCESS' : 'PENDING')}</p>
-                        {!isPaid && <p style={{ margin: 0 }}><strong>Giữ chỗ đến:</strong> {expTime}</p>}
-                        <div style={{ marginTop: '10px', fontSize: '12.5px', color: '#34d399', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span>{isPaid ? '✓' : '…'}</span> {isPaid ? 'Vé đã được xác nhận' : 'Vé chỉ được xác nhận sau khi cổng thanh toán báo thành công'}
+                        {expTime && !isPaid && <p style={{ margin: 0 }}><strong>Giữ chỗ đến:</strong> {expTime}</p>}
+                        <div style={{ marginTop: '10px', fontSize: '12.5px', color: isPaid ? '#34d399' : '#fbbf24', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span>{isPaid ? '✓' : '…'}</span> {isPaid ? 'Vé đã được xác nhận' : 'Mã QR chỉ lưu thông tin giao dịch; chưa ghi nhận đã thanh toán'}
                         </div>
                       </div>
 
+                      {!isPaid && paymentQrValue && <div
+                        style={{
+                          padding: '16px 20px',
+                          background: '#ffffff',
+                          color: '#0f172a',
+                          borderRadius: '16px',
+                          textAlign: 'center',
+                        }}
+                      >
+                        <div style={{ fontSize: '12px', marginBottom: '8px', fontWeight: 700 }}>
+                          QR THÔNG TIN GIAO DỊCH (CHƯA PHẢI QR CHUYỂN KHOẢN)
+                        </div>
+                        <PaymentQrCode value={paymentQrValue} size={220} alt="QR thông tin giao dịch SmartBus" />
+                        <div style={{ maxWidth: '240px', marginTop: '8px', fontSize: '11px', lineHeight: 1.4 }}>
+                          Quét mã để xem mã vé, chuyến xe, ghế và số tiền. Mã này không chuyển tiền và không tự xác nhận thanh toán.
+                        </div>
+                      </div>}
+                      {!isPaid && paymentMethod === 'QR' && (
+                        <div style={{ flexBasis: '100%' }}>
+                          <button
+                            type="button"
+                            className="primary-button"
+                            onClick={handleDemoTripComplete}
+                            disabled={isBooking}
+                          >
+                            {isBooking ? 'Đang cập nhật dữ liệu...' : 'Hoàn thành chuyến đi (demo) → Đánh giá chuyến đi'}
+                          </button>
+                          <p style={{ color: '#fbbf24', fontSize: '12px', margin: '8px 0 0' }}>
+                            Thao tác demo cập nhật thanh toán/vé/chuyến lên dữ liệu chung nhưng không chuyển tiền thật.
+                          </p>
+                        </div>
+                      )}
                       {isPaid && <div
                         style={{
                           padding: '16px 20px',
@@ -653,18 +772,7 @@ export const PassengerPortalPage: React.FC = () => {
                           MÃ QR ĐƯA CHO TÀI XẾ SOÁT VÉ
                         </div>
                         <div style={{ background: '#ffffff', padding: '10px', borderRadius: '12px', display: 'inline-block', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)' }}>
-                          <img
-                            src={qrImg}
-                            alt="Mã QR Vé Xe Buýt"
-                            style={{
-                              width: '140px',
-                              height: '140px',
-                              display: 'block',
-                            }}
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                            }}
-                          />
+                          <PaymentQrCode value={ticketQrValue} size={140} alt="Mã QR vé xe buýt" />
                         </div>
                         <div
                           style={{
@@ -678,7 +786,7 @@ export const PassengerPortalPage: React.FC = () => {
                             border: '1px solid rgba(56, 189, 248, 0.25)',
                           }}
                         >
-                          {qrVal}
+                          {ticketQrValue}
                         </div>
                       </div>}
                       {ticketStatus === 'BOOKED' && (
@@ -776,7 +884,42 @@ export const PassengerPortalPage: React.FC = () => {
               </div>
             )}
 
+            {completedTrips.length === 0 && (
+              <div
+                role="status"
+                style={{
+                  padding: '16px 20px',
+                  borderRadius: '12px',
+                  background: 'rgba(251, 191, 36, 0.1)',
+                  border: '1px solid rgba(251, 191, 36, 0.3)',
+                  color: '#fbbf24',
+                  marginBottom: '24px',
+                }}
+              >
+                Bạn chỉ có thể đánh giá sau khi chuyến đã đến điểm cuối và vé của bạn được xác nhận. Nút thanh toán demo không xác nhận giao dịch thật.
+              </div>
+            )}
+
+            {completedTrips.length > 0 && (
             <form onSubmit={handleSendFeedback} style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '640px', marginBottom: '28px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'rgba(255, 255, 255, 0.75)', marginBottom: '8px' }}>
+                  Chuyến đã hoàn thành:
+                </label>
+                <select
+                  className="filter-select"
+                  required
+                  value={selectedFeedbackTripId}
+                  onChange={event => setSelectedFeedbackTripId(event.target.value)}
+                  style={{ width: '100%', borderRadius: '12px', height: '44px' }}
+                >
+                  {completedTrips.map(trip => (
+                    <option key={trip.tripId} value={trip.tripId}>
+                      [{trip.routeCode}] {trip.routeName} — {new Date(trip.arrivalTime).toLocaleString('vi-VN')}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'rgba(255, 255, 255, 0.75)', marginBottom: '8px' }}>
                   Đánh giá số sao:
@@ -817,6 +960,7 @@ export const PassengerPortalPage: React.FC = () => {
                 Gửi phản ánh (Lưu cơ sở dữ liệu) →
               </button>
             </form>
+            )}
 
             <h3 style={{ fontSize: '18px', margin: '0 0 14px' }}>Các đánh giá gần đây:</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>

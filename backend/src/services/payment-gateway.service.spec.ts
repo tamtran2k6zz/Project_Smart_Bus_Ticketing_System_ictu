@@ -21,6 +21,12 @@ describe('PaymentGatewayService', () => {
       'VNP_RETURN_URL',
       'VNP_IPN_URL',
       'PAYMENT_PUBLIC_BASE_URL',
+      'PAYMENT_RESULT_URL',
+      'MOMO_REDIRECT_URL',
+      'MOMO_IPN_URL',
+      'MOMO_PARTNER_CODE',
+      'MOMO_ACCESS_KEY',
+      'MOMO_SECRET_KEY',
       'PORT',
     ]) {
       delete process.env[key];
@@ -72,7 +78,8 @@ describe('PaymentGatewayService', () => {
     process.env.MOMO_ACCESS_KEY = 'access';
     process.env.MOMO_SECRET_KEY = 'secret';
     process.env.MOMO_IPN_URL = 'https://bus.example/api/v1/ticketing/payments/momo/ipn';
-    process.env.PAYMENT_RESULT_URL = 'https://bus.example/passenger/booking';
+    process.env.PAYMENT_RESULT_URL = 'https://wrong.example/payment-result';
+    process.env.MOMO_REDIRECT_URL = 'https://bus.example/passenger/booking';
     const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => ({ resultCode: 0, payUrl: 'https://momo.example/pay/1' }),
@@ -88,6 +95,10 @@ describe('PaymentGatewayService', () => {
       amount: 10000,
       ipnUrl: 'https://bus.example/api/v1/ticketing/payments/momo/ipn',
     });
+    expect(new URL(body.redirectUrl).origin + new URL(body.redirectUrl).pathname).toBe(
+      'https://bus.example/passenger/booking'
+    );
+    expect(new URL(body.redirectUrl).searchParams.get('paymentOrder')).toBe('order-2');
     expect(body.signature).toEqual(expect.any(String));
   });
 
@@ -129,7 +140,7 @@ describe('PaymentGatewayService', () => {
     expect(service.verifyMomoCallback(payload)).toBe(true);
     expect(service.verifyMomoCallback({ ...payload, amount: 1 })).toBe(false);
   });
-it('uses the canonical VNPAY_* variable names, not the legacy VNP_* ones', async () => {
+  it('uses the canonical VNPAY_* variable names, not the legacy VNP_* ones', async () => {
     process.env.VNPAY_TMN_CODE = 'canonical-merchant';
     process.env.VNPAY_HASH_SECRET = 'canonical-secret';
     process.env.VNPAY_RETURN_URL = 'https://bus.example/api/v1/ticketing/payments/vnpay/return';

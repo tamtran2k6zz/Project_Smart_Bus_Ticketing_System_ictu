@@ -31,21 +31,24 @@ export const DashboardView: React.FC = () => {
   const [data, setData] = useState<SummaryData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchSummary = async () => {
-    setLoading(true);
+  const fetchSummary = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
       const res = await apiFetch(getApiUrl('/api/v1/operations/dashboard/summary'));
       const json = await res.json();
+      if (!res.ok) throw new Error(json?.message || 'Không thể tải báo cáo chuyến.');
       setData(json.data || json);
     } catch (e) {
       console.error(e);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchSummary();
+    void fetchSummary();
+    const intervalId = setInterval(() => void fetchSummary(false), 15_000);
+    return () => clearInterval(intervalId);
   }, []);
 
   if (loading) {
@@ -158,7 +161,7 @@ export const DashboardView: React.FC = () => {
             </p>
           </div>
           <button
-            onClick={fetchSummary}
+            onClick={() => void fetchSummary()}
             className="secondary-button"
             style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
           >

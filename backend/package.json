@@ -10,7 +10,7 @@
     "start": "ts-node src/server.ts",
     "start:express": "ts-node src/server.ts",
     "start:prod": "node dist/server.js",
-    "lint": "eslint \"src/**/*.ts\" --fix",
+    "lint": "eslint \"src/**/*.ts\"",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",

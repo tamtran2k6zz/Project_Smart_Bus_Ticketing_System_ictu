@@ -144,8 +144,7 @@ export function getGatewayCallbacks(): GatewayCallbacks {
   return {
     vnpayReturnUrl:
       readGatewayEnv('VNPAY_RETURN_URL') || `${base}/api/v1/ticketing/payments/vnpay/return`,
-    vnpayIpnUrl:
-      readGatewayEnv('VNPAY_IPN_URL') || `${base}/api/v1/ticketing/payments/vnpay/ipn`,
+    vnpayIpnUrl: readGatewayEnv('VNPAY_IPN_URL') || `${base}/api/v1/ticketing/payments/vnpay/ipn`,
     momoRedirectUrl: readGatewayEnv('MOMO_REDIRECT_URL') || `${base}/passenger/booking`,
     momoIpnUrl: readGatewayEnv('MOMO_IPN_URL') || `${base}/api/v1/ticketing/payments/momo/ipn`,
     paymentResultUrl: readGatewayEnv('PAYMENT_RESULT_URL') || `${base}/passenger/booking`,
@@ -248,11 +247,13 @@ export function logEnvironmentSummary(): void {
     vnpay_ipn_url: callbacks.vnpayIpnUrl,
     momo_ipn_url: callbacks.momoIpnUrl,
     payment_result_url: callbacks.paymentResultUrl,
-    vnpay_configured: Boolean(readGatewayEnv('VNPAY_TMN_CODE') && readGatewayEnv('VNPAY_HASH_SECRET')),
+    vnpay_configured: Boolean(
+      readGatewayEnv('VNPAY_TMN_CODE') && readGatewayEnv('VNPAY_HASH_SECRET')
+    ),
     momo_configured: Boolean(
       readGatewayEnv('MOMO_PARTNER_CODE') &&
-        readGatewayEnv('MOMO_ACCESS_KEY') &&
-        readGatewayEnv('MOMO_SECRET_KEY')
+      readGatewayEnv('MOMO_ACCESS_KEY') &&
+      readGatewayEnv('MOMO_SECRET_KEY')
     ),
   });
   for (const issue of collectEnvironmentIssues()) {

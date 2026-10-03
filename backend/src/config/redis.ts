@@ -70,10 +70,18 @@ export async function acquireSeatLock(
     EX: ttlSeconds,
   });
   if (result === 'OK') {
-    logger.debug('seat_lock_acquired', { trip_id: tripId, seat_number: seatNumber, owner_id: ownerId });
+    logger.debug('seat_lock_acquired', {
+      trip_id: tripId,
+      seat_number: seatNumber,
+      owner_id: ownerId,
+    });
     return lockId;
   }
-  logger.warn('seat_lock_conflict', { trip_id: tripId, seat_number: seatNumber, owner_id: ownerId });
+  logger.warn('seat_lock_conflict', {
+    trip_id: tripId,
+    seat_number: seatNumber,
+    owner_id: ownerId,
+  });
   return null;
 }
 

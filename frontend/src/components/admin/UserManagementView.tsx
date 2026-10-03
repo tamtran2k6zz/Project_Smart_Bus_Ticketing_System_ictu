@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { getApiUrl, apiFetch } from '../../api/client';
+import { getErrorMessage } from '../../utils/errorMessage';
 
 interface UserData {
   id: string;
@@ -64,8 +65,8 @@ export const UserManagementView: React.FC = () => {
 
       await fetchUsers();
       setTimeout(() => setActionMessage(null), 3000);
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, 'Không thể cập nhật trạng thái người dùng.'));
     }
   };
 

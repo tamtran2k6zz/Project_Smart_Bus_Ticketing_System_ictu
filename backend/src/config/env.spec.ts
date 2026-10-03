@@ -72,7 +72,8 @@ describe('config/env', () => {
   });
 
   it('accepts a Supabase postgresql pooler URL', () => {
-    process.env.DATABASE_URL = 'postgresql://postgres.abc:pw@aws-0-ap.pooler.supabase.com:6543/postgres';
+    process.env.DATABASE_URL =
+      'postgresql://postgres.abc:pw@aws-0-ap.pooler.supabase.com:6543/postgres';
     process.env.JWT_SECRET = 'a'.repeat(32);
     expect(collectEnvironmentIssues().filter(issue => issue.level === 'error')).toEqual([]);
     expect(describeDatabaseTarget()).toMatchObject({

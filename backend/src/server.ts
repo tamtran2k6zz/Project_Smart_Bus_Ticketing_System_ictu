@@ -36,9 +36,7 @@ async function cleanupExpiredReservations(): Promise<void> {
   }
 }
 
-void connectRedis().catch(error =>
-  logger.error('redis_initial_connection_failed', { error })
-);
+void connectRedis().catch(error => logger.error('redis_initial_connection_failed', { error }));
 void cleanupExpiredReservations();
 const cleanupInterval = setInterval(() => void cleanupExpiredReservations(), 60_000);
 cleanupInterval.unref();
@@ -47,9 +45,7 @@ process.on('SIGTERM', () => {
   logger.info('shutdown_started', {});
   clearInterval(cleanupInterval);
   server.close(() => {
-    void Promise.all([pool.end(), closeRedis()]).then(() =>
-      logger.info('shutdown_completed', {})
-    );
+    void Promise.all([pool.end(), closeRedis()]).then(() => logger.info('shutdown_completed', {}));
   });
 });
 

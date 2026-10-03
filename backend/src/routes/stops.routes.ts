@@ -1,10 +1,5 @@
 import { Router } from 'express';
-import {
-  getStops,
-  createStop,
-  updateStop,
-  deleteStop,
-} from '../controllers/stops.controller';
+import { getStops, createStop, updateStop, deleteStop } from '../controllers/stops.controller';
 import { authenticateJwt } from '../middlewares/auth';
 import { requireRoles } from '../middlewares/rbac';
 

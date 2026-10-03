@@ -10,6 +10,8 @@ process.env.MOMO_PARTNER_CODE = 'test-partner';
 process.env.MOMO_ACCESS_KEY = 'test-access-key';
 process.env.MOMO_SECRET_KEY = 'test-secret-key';
 process.env.PAYMENT_CRON_SECRET = 'test-cron-secret';
+process.env.VNPAY_TMN_CODE = 'test-tmn';
+process.env.VNPAY_HASH_SECRET = 'test-vnpay-secret';
 // The suite must not depend on a running Redis. Seat locking falls back to the
 // PostgreSQL row lock, which is the concurrency guard under test.
 delete process.env.REDIS_URL;
@@ -199,6 +201,41 @@ async function main() {
     );
     await call('get', '/api/routes');
     await call('get', '/api/stops');
+    const routeWithStops = (
+      await call(
+        'post',
+        '/api/routes',
+        {
+          code: 'WITH_STOPS',
+          name: 'Tuyến có trạm tạo cùng lúc',
+          stations: [{ name: 'Trạm tự tạo 1', address: 'Địa chỉ 1', order: 1 }],
+        },
+        admin,
+        201
+      )
+    ).data.id;
+    let routeList = await call('get', '/api/routes');
+    let createdRoute = routeList.data.find(item => item.id === routeWithStops);
+    assert.equal(createdRoute.stops.length, 1);
+    assert.ok(createdRoute.stops.every(stop => stop.stopId && stop.code.startsWith('ST-')));
+    const firstSavedStop = createdRoute.stops[0];
+    await call(
+      'patch',
+      `/api/routes/${routeWithStops}`,
+      {
+        stations: [
+          { id: firstSavedStop.stopId, name: firstSavedStop.name, address: firstSavedStop.address, order: 2 },
+          { name: 'Trạm tự tạo 2', address: 'Địa chỉ 2', order: 1 },
+        ],
+      },
+      admin
+    );
+    routeList = await call('get', '/api/routes');
+    createdRoute = routeList.data.find(item => item.id === routeWithStops);
+    assert.equal(createdRoute.stops.length, 2);
+    assert.equal(createdRoute.stops[0].name, 'Trạm tự tạo 2');
+    assert.equal(createdRoute.stops[1].stopId, firstSavedStop.stopId);
+    assert.equal(createdRoute.stops[0].stopOrder, 1);
     const trip = (
       await call(
         'post',
@@ -224,6 +261,40 @@ async function main() {
     const search = `/api/trips/search?origin_stop_id=${stops[0]}&destination_stop_id=${stops[1]}`;
     assert.equal((await call('get', search)).data.length, 1);
     assert.equal((await call('get', search + '&departure_date=2099-01-01')).data.length, 1);
+    assert.equal((await call('get', '/api/trips?bookable=true')).data.length, 1);
+    const pastTrip = (
+      await call(
+        'post',
+        '/api/trips',
+        {
+          route_id: route,
+          bus_plate: '20A-54321',
+          departure_time: '2000-01-01T08:00:00+07:00',
+          arrival_time: '2000-01-01T09:00:00+07:00',
+          base_price: 15000,
+        },
+        admin,
+        201
+      )
+    ).data.id;
+    assert.equal((await call('get', '/api/trips?bookable=true')).data.length, 1);
+    assert.equal((await call('get', search + '&departure_date=2000-01-01')).data.length, 0);
+    await call(
+      'post',
+      '/api/ticketing/bookings',
+      { tripId: pastTrip, seatNumber: 'A01', paymentMethod: 'QR' },
+      passenger,
+      409
+    );
+    await db.query("UPDATE routes SET status='INACTIVE' WHERE id=$1", [route]);
+    await call(
+      'post',
+      '/api/ticketing/bookings',
+      { tripId: trip, seatNumber: 'A39', paymentMethod: 'QR' },
+      passenger,
+      409
+    );
+    await db.query("UPDATE routes SET status='ACTIVE' WHERE id=$1", [route]);
     assert.equal((await call('get', `/api/trips/${trip}/seats`)).data.totalSeats, 40);
     await call('get', '/api/seats');
     const [{ bus_id }] = (await db.query('SELECT bus_id FROM trips WHERE id=$1', [trip])).rows;
@@ -262,6 +333,51 @@ async function main() {
       true
     );
     await call('post', '/api/ticketing/verify', { code: booked.qrCode }, other, 403);
+    const qrReservation = await call(
+      'post',
+      '/api/ticketing/bookings',
+      { tripId: trip, seatNumber: 'A06', paymentMethod: 'QR' },
+      passenger,
+      201
+    );
+    assert.equal(qrReservation.data.payment.method, 'QR');
+    assert.equal(qrReservation.data.payment.status, 'PENDING');
+    assert.equal(qrReservation.data.payment.paymentUrl, undefined);
+    assert.equal(
+      (
+        await db.query('SELECT payment_method,amount,status FROM payment_transactions WHERE order_id=$1', [
+          qrReservation.ticketId,
+        ])
+      ).rows[0].payment_method,
+      'QR'
+    );
+    assert.equal(
+      (
+        await db.query('SELECT amount,status FROM payment_transactions WHERE order_id=$1', [
+          qrReservation.ticketId,
+        ])
+      ).rows[0].amount,
+      '15000.00'
+    );
+    assert.equal((await call('get', '/api/trips?bookable=true')).data[0].availableSeats, 38);
+    await db.query(
+      "UPDATE tickets SET reservation_expires_at=NOW()-INTERVAL '1 minute' WHERE id=$1",
+      [qrReservation.ticketId]
+    );
+    await call('get', `/api/ticketing/trips/${trip}/seats`, null);
+    assert.equal(
+      (await db.query('SELECT status FROM tickets WHERE id=$1', [qrReservation.ticketId])).rows[0]
+        .status,
+      'CANCELLED'
+    );
+    assert.equal(
+      (
+        await db.query('SELECT status FROM payment_transactions WHERE order_id=$1', [
+          qrReservation.ticketId,
+        ])
+      ).rows[0].status,
+      'FAILED'
+    );
     const paidReservation = await call(
       'post',
       '/api/ticketing/bookings',
@@ -300,6 +416,48 @@ async function main() {
       ).rows[0].status,
       'REFUNDED'
     );
+
+    const vnpayReservation = await call(
+      'post',
+      '/api/v1/ticketing/bookings',
+      { tripId: trip, seatNumber: 'A07', paymentMethod: 'VNPAY' },
+      passenger,
+      201
+    );
+    const vnpayFields = {
+      vnp_Amount: '1500000',
+      vnp_ResponseCode: '00',
+      vnp_TmnCode: process.env.VNPAY_TMN_CODE,
+      vnp_TransactionNo: 'vn-tx-10003',
+      vnp_TransactionStatus: '00',
+      vnp_TxnRef: vnpayReservation.ticketId,
+    };
+    const vnpayQuery = new URLSearchParams(
+      Object.keys(vnpayFields)
+        .sort()
+        .map(key => [key, vnpayFields[key]])
+    ).toString();
+    const vnpayPayload = {
+      ...vnpayFields,
+      vnp_SecureHashType: 'HMACSHA512',
+      vnp_SecureHash: createHmac('sha512', process.env.VNPAY_HASH_SECRET)
+        .update(vnpayQuery)
+        .digest('hex'),
+    };
+    const vnpayFormResponse = await request(app)
+      .post('/api/v1/ticketing/payments/vnpay/ipn')
+      .type('form')
+      .send(vnpayPayload);
+    assert.equal(vnpayFormResponse.status, 200, JSON.stringify(vnpayFormResponse.body));
+    assert.equal(
+      (
+        await db.query('SELECT status FROM payment_transactions WHERE order_id=$1', [
+          vnpayReservation.ticketId,
+        ])
+      ).rows[0].status,
+      'SUCCESS'
+    );
+    checks++;
 
     const expiredReservation = await call(
       'post',
@@ -371,6 +529,21 @@ async function main() {
       201
     );
     await call('get', '/api/operations/incidents', null, admin);
+    assert.equal((await call('get', '/api/ticketing/completed-trips', null, other)).data.length, 0);
+    await call(
+      'post',
+      '/api/operations/feedbacks',
+      { tripId: trip, content: 'Chưa hoàn thành', ratingStars: 5 },
+      other,
+      403
+    );
+    await db.query(
+      "UPDATE trips SET departure_time=NOW()-INTERVAL '2 hours', arrival_time=NOW()-INTERVAL '1 hour' WHERE id=$1",
+      [trip]
+    );
+    const completedTrips = await call('get', '/api/ticketing/completed-trips', null, other);
+    assert.equal(completedTrips.data.length, 1);
+    assert.equal(completedTrips.data[0].tripId, trip);
     await call(
       'post',
       '/api/operations/feedbacks',
@@ -379,9 +552,75 @@ async function main() {
       201
     );
     await call('get', '/api/operations/feedbacks', null, admin);
+    const demoTrip = (
+      await call(
+        'post',
+        '/api/trips',
+        {
+          route_id: route,
+          bus_plate: '20A-54321',
+          departure_time: '2099-01-02T08:00:00+07:00',
+          arrival_time: '2099-01-02T09:00:00+07:00',
+          base_price: 15000,
+        },
+        admin,
+        201
+      )
+    ).data.id;
+    const demoReservation = await call(
+      'post',
+      '/api/ticketing/bookings',
+      { tripId: demoTrip, seatNumber: 'A01', paymentMethod: 'QR' },
+      other,
+      201
+    );
+    await call(
+      'post',
+      `/api/ticketing/bookings/${demoReservation.ticketId}/demo-complete`,
+      {},
+      passenger,
+      403
+    );
+    const demoCompletion = await call(
+      'post',
+      `/api/ticketing/bookings/${demoReservation.ticketId}/demo-complete`,
+      {},
+      other
+    );
+    assert.equal(demoCompletion.data.tripStatus, 'COMPLETED');
+    assert.equal(
+      (
+        await db.query('SELECT status FROM trips WHERE id=$1', [demoTrip])
+      ).rows[0].status,
+      'COMPLETED'
+    );
+    assert.equal(
+      (
+        await db.query(
+          'SELECT t.status AS ticket_status,p.status AS payment_status FROM tickets t JOIN payment_transactions p ON p.ticket_id=t.id WHERE t.id=$1',
+          [demoReservation.ticketId]
+        )
+      ).rows[0].ticket_status,
+      'BOOKED'
+    );
+    assert.equal(
+      (
+        await db.query(
+          'SELECT status FROM payment_transactions WHERE ticket_id=$1',
+          [demoReservation.ticketId]
+        )
+      ).rows[0].status,
+      'SUCCESS'
+    );
+    const eligibleDemoTrips = await call('get', '/api/ticketing/completed-trips', null, other);
+    assert.ok(eligibleDemoTrips.data.some(item => item.tripId === demoTrip));
     const dashboard = await call('get', '/api/operations/dashboard/summary', null, admin);
-    assert.equal(Number(dashboard.summary.totalRoutes), 1);
+    assert.equal(Number(dashboard.summary.totalRoutes), 2);
     assert.equal(dashboard.tripOccupancy[0].routeCode, 'TEST');
+    assert.equal(
+      dashboard.tripOccupancy.find(item => item.id === demoTrip).status,
+      'COMPLETED'
+    );
     await call(
       'patch',
       `/api/users/${second.data.user.id}/discount-approval`,
@@ -407,6 +646,7 @@ async function main() {
       14
     );
     await call('delete', `/api/routes/${route}`, null, admin);
+    await call('delete', `/api/routes/${routeWithStops}`, null, admin);
     assert.equal((await call('get', '/api/routes')).data.length, 0);
     console.log(`PASS: ${checks} API/database checks against embedded PostgreSQL`);
   } finally {

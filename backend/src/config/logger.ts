@@ -74,7 +74,12 @@ export interface Logger {
   child(scope: string): Logger;
 }
 
-function write(level: LogLevel, scope: string, message: string, context?: Record<string, unknown>): void {
+function write(
+  level: LogLevel,
+  scope: string,
+  message: string,
+  context?: Record<string, unknown>
+): void {
   if (!enabled(level)) return;
   const pairs = Object.entries(context || {}).map(([key, value]) => field(key, value));
   const line = [

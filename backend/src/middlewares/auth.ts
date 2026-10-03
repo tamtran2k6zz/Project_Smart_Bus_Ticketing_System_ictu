@@ -47,4 +47,3 @@ export const authenticateJWT = (
 };
 
 export const authenticateJwt = authenticateJWT;
-

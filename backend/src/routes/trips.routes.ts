@@ -1,14 +1,6 @@
 import { Router } from 'express';
-import {
-  searchTrips,
-  getTrips,
-  createTrip,
-} from '../controllers/trips.controller';
-import {
-  getSeatsByTrip,
-  lockSeat,
-  unlockSeat,
-} from '../controllers/seats.controller';
+import { searchTrips, getTrips, createTrip } from '../controllers/trips.controller';
+import { getSeatsByTrip, lockSeat, unlockSeat } from '../controllers/seats.controller';
 import { authenticateJwt } from '../middlewares/auth';
 import { requireRoles } from '../middlewares/rbac';
 

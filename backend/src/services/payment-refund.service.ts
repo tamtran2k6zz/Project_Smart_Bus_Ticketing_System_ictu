@@ -73,8 +73,7 @@ export class PaymentRefundService {
       .update(fields.map(field => request[field]).join('|'))
       .digest('hex');
     const response = await this.postJson(
-      readEnv('VNPAY_REFUND_URL') ||
-        'https://sandbox.vnpayment.vn/merchant_webapi/api/transaction',
+      readEnv('VNPAY_REFUND_URL') || 'https://sandbox.vnpayment.vn/merchant_webapi/api/transaction',
       request
     );
     if (response.vnp_ResponseCode !== '00') {

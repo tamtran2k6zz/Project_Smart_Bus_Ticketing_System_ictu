@@ -48,6 +48,13 @@ function stringQuery(params: Request['query']): Record<string, string> {
   );
 }
 
+function vnpayParams(req: Request): Record<string, string> {
+  return {
+    ...stringQuery(req.body ?? {}),
+    ...stringQuery(req.query),
+  };
+}
+
 async function confirmPayment(
   orderId: string,
   method: OnlinePaymentMethod,
@@ -167,7 +174,7 @@ async function recordFailedPayment(orderId: string, method: OnlinePaymentMethod)
 }
 
 async function handleVnpayCallback(req: Request, res: Response, redirect: boolean): Promise<void> {
-  const params = stringQuery(req.query);
+  const params = vnpayParams(req);
   const orderId = params.vnp_TxnRef;
   const entrypoint = redirect ? 'return' : 'ipn';
   logger.info('vnpay_callback_received', {
@@ -276,18 +283,172 @@ export async function releaseExpiredReservations(): Promise<number> {
 
 router.get('/trips/:tripId/seats', getSeatsByTrip);
 
+router.get(
+  '/completed-trips',
+  authenticateJWT,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const rows = await query<any[]>(
+        `SELECT DISTINCT tr.id AS "tripId", r.code AS "routeCode", r.name AS "routeName",
+                tr.departure_time AS "departureTime", tr.arrival_time AS "arrivalTime"
+         FROM tickets t
+         JOIN trips tr ON tr.id=t.trip_id
+         JOIN routes r ON r.id=tr.route_id
+         LEFT JOIN payment_transactions p ON p.ticket_id=t.id
+         WHERE t.user_id=$1 AND t.status IN ('BOOKED','CHECKED_IN')
+           AND (tr.status='COMPLETED' OR tr.arrival_time <= NOW())
+           AND (p.ticket_id IS NULL OR p.status='SUCCESS')
+         ORDER BY tr.arrival_time DESC`,
+        [req.user!.id]
+      );
+      res.json({ success: true, data: rows });
+    } catch (error) {
+      logger.error('completed_trips_lookup_failed', {
+        table: 'tickets/trips/payment_transactions',
+        user_id: req.user?.id,
+        error,
+      });
+      res.status(500).json({ success: false, message: 'Không thể tải chuyến đã hoàn thành.' });
+    }
+  }
+);
+
+router.post(
+  '/bookings/:ticketId/demo-complete',
+  authenticateJWT,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const completed = await transaction(async client => {
+        const {
+          rows: [reservation],
+        } = await client.query(
+          `SELECT t.id AS ticket_id,t.trip_id,t.user_id,t.seat_number,t.status AS ticket_status,
+                  t.reservation_expires_at,p.payment_method,p.status AS payment_status,
+                  p.redis_lock_id,tr.status AS trip_status
+           FROM tickets t
+           JOIN payment_transactions p ON p.ticket_id=t.id
+           JOIN trips tr ON tr.id=t.trip_id
+           WHERE t.id=$1
+           FOR UPDATE OF t,p,tr`,
+          [req.params.ticketId]
+        );
+        if (!reservation) {
+          throw Object.assign(new Error('Không tìm thấy giao dịch QR.'), { status: 404 });
+        }
+        if (reservation.user_id !== req.user!.id) {
+          throw Object.assign(new Error('Bạn không có quyền hoàn tất giao dịch này.'), {
+            status: 403,
+          });
+        }
+        if (
+          reservation.payment_method !== 'QR' ||
+          reservation.payment_status !== 'PENDING' ||
+          reservation.ticket_status !== 'RESERVED'
+        ) {
+          throw Object.assign(new Error('Giao dịch không còn ở trạng thái QR demo chờ xác nhận.'), {
+            status: 409,
+          });
+        }
+        if (
+          !reservation.reservation_expires_at ||
+          new Date(reservation.reservation_expires_at).getTime() <= Date.now()
+        ) {
+          throw Object.assign(new Error('Thời gian giữ ghế đã hết. Vui lòng đặt vé lại.'), {
+            status: 409,
+          });
+        }
+        if (!['SCHEDULED', 'IN_TRANSIT', 'COMPLETED'].includes(reservation.trip_status)) {
+          throw Object.assign(new Error('Không thể hoàn thành chuyến đã hủy.'), { status: 409 });
+        }
+
+        await client.query(
+          `UPDATE payment_transactions SET status='SUCCESS',paid_at=NOW()
+           WHERE ticket_id=$1 AND status='PENDING'`,
+          [reservation.ticket_id]
+        );
+        await client.query(
+          `UPDATE tickets SET status='BOOKED',reservation_expires_at=NULL
+           WHERE id=$1 AND status='RESERVED'`,
+          [reservation.ticket_id]
+        );
+        await client.query(
+          `UPDATE trips SET status='COMPLETED'
+           WHERE id=$1 AND status IN ('SCHEDULED','IN_TRANSIT')`,
+          [reservation.trip_id]
+        );
+        await client.query(
+          `UPDATE trip_seats SET status='BOOKED',locked_at=NULL,lock_expires_at=NULL,
+           locked_by_user_id=NULL,redis_lock_id=NULL WHERE ticket_id=$1`,
+          [reservation.ticket_id]
+        );
+        return {
+          ticketId: reservation.ticket_id,
+          tripId: reservation.trip_id,
+          seatNumber: reservation.seat_number,
+          redisLockId: reservation.redis_lock_id,
+        };
+      });
+
+      try {
+        await releaseSeatLock(
+          completed.tripId,
+          completed.seatNumber,
+          completed.redisLockId || undefined
+        );
+      } catch (error) {
+        logger.error('demo_completed_seat_lock_release_failed', {
+          trip_id: completed.tripId,
+          ticket_id: completed.ticketId,
+          error,
+        });
+      }
+
+      res.json({
+        success: true,
+        message:
+          'Đã mô phỏng thanh toán QR, xác nhận vé và hoàn thành chuyến. Không có khoản tiền thật được chuyển.',
+        data: {
+          ticketId: completed.ticketId,
+          tripId: completed.tripId,
+          paymentStatus: 'SUCCESS',
+          ticketStatus: 'BOOKED',
+          tripStatus: 'COMPLETED',
+        },
+      });
+    } catch (error) {
+      const status = Number((error as { status?: number }).status) || 500;
+      if (status === 500) {
+        logger.error('demo_trip_completion_failed', {
+          table: 'tickets/payment_transactions/trips/trip_seats',
+          ticket_id: req.params.ticketId,
+          user_id: req.user?.id,
+          error,
+        });
+      }
+      res.status(status).json({
+        success: false,
+        message: status === 500 ? 'Không thể hoàn tất chuyến demo.' : (error as Error).message,
+      });
+    }
+  }
+);
+
 router.post(
   '/bookings',
   authenticateJWT,
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-    const { tripId, seatNumber, paymentMethod } = req.body;
+    const { tripId, seatNumber } = req.body;
+    const requestedPaymentMethod = req.body.paymentMethod;
+    const paymentMethod = requestedPaymentMethod ?? 'QR';
     const userId = req.user!.id;
     if (!tripId || typeof seatNumber !== 'string' || !seatNumber.trim()) {
       res.status(400).json({ success: false, message: 'Vui lòng chọn chuyến xe và ghế.' });
       return;
     }
-    if (paymentMethod !== undefined && !['VNPAY', 'MOMO'].includes(paymentMethod)) {
-      res.status(400).json({ success: false, message: 'Chỉ hỗ trợ thanh toán VNPay hoặc MoMo.' });
+    if (!['VNPAY', 'MOMO', 'QR'].includes(paymentMethod)) {
+      res
+        .status(400)
+        .json({ success: false, message: 'Phương thức thanh toán không được hỗ trợ.' });
       return;
     }
 
@@ -313,13 +474,11 @@ router.post(
     let reservationTicketId: string | undefined;
     let keepReservationLock = false;
     try {
-      if (!paymentMethod) {
+      if (requestedPaymentMethod === undefined) {
         const ticket = await bookSeat(String(tripId), seatNumber, userId);
-        const qrCode = `SMARTBUS-QR-${ticket.ticket_code}`;
         const data = {
           ticket,
-          qrCode,
-          qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrCode)}`,
+          qrCode: `SMARTBUS-QR-${ticket.ticket_code}`,
           ticketId: ticket.id,
           ticketCode: ticket.ticket_code,
           seatNumber: ticket.seat_number,
@@ -334,16 +493,19 @@ router.post(
         String(tripId),
         seatNumber,
         userId,
-        paymentMethod as OnlinePaymentMethod,
+        paymentMethod as OnlinePaymentMethod | 'QR',
         lockId
       );
       reservationTicketId = ticket.id;
-      const paymentUrl = await gateway.createPaymentUrl(
-        paymentMethod as OnlinePaymentMethod,
-        ticket.id,
-        Number(ticket.fare_amount),
-        clientIp(req)
-      );
+      const paymentUrl =
+        paymentMethod === 'QR'
+          ? null
+          : await gateway.createPaymentUrl(
+              paymentMethod as OnlinePaymentMethod,
+              ticket.id,
+              Number(ticket.fare_amount),
+              clientIp(req)
+            );
       const data = {
         booking: {
           id: ticket.id,
@@ -364,9 +526,9 @@ router.post(
           amount: Number(ticket.fare_amount),
           method: paymentMethod,
           status: 'PENDING',
-          paymentUrl,
+          ...(paymentUrl ? { paymentUrl } : {}),
         },
-        paymentUrl,
+        ...(paymentUrl ? { paymentUrl } : {}),
         ticketId: ticket.id,
         ticketCode: ticket.ticket_code,
         seatNumber: ticket.seat_number,
@@ -375,7 +537,10 @@ router.post(
       };
       res.status(201).json({
         success: true,
-        message: 'Đã giữ ghế. Hoàn tất thanh toán trong 10 phút.',
+        message:
+          paymentMethod === 'QR'
+            ? 'Đã lưu thông tin giao dịch QR và giữ ghế trong 10 phút. Giao dịch chưa được xác nhận thanh toán.'
+            : 'Đã giữ ghế. Hoàn tất thanh toán trong 10 phút.',
         data,
         ...data,
       });
@@ -409,7 +574,7 @@ router.post(
         trip_id: String(tripId),
         seat_number: seatNumber,
         user_id: userId,
-        payment_method: String(paymentMethod ?? 'CASH'),
+        payment_method: String(paymentMethod),
         error,
       });
       const status =
