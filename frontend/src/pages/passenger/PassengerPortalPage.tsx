@@ -256,9 +256,9 @@ export const PassengerPortalPage: React.FC = () => {
     void loadPayment();
   }, []);
 
-  // Xử lý đặt vé
   const handleBook = async () => {
-    if (!selectedSeat) {
+    const trip = trips.find((t) => t.id === selectedTripId);
+    if (!selectedSeat || !trip) {
       alert('Vui lòng chọn 1 vị trí ghế trên xe!');
       return;
     }
@@ -651,16 +651,16 @@ export const PassengerPortalPage: React.FC = () => {
               <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
                 <button
                   onClick={handleBook}
-                  disabled={!selectedSeat || isBooking}
+                  disabled={!selectedSeat}
                   className="primary-button"
                   style={{
                     padding: '12px 28px',
                     fontSize: '14px',
-                    cursor: !selectedSeat || isBooking ? 'not-allowed' : 'pointer',
-                    opacity: !selectedSeat || isBooking ? 0.5 : 1,
+                    cursor: !selectedSeat ? 'not-allowed' : 'pointer',
+                    opacity: !selectedSeat ? 0.5 : 1,
                   }}
                 >
-                  {isBooking ? 'Đang ghi nhận cơ sở dữ liệu...' : `Xác nhận Đặt Ghế ${selectedSeat || ''} & Nhận Vé QR →`}
+                  {`Tiếp tục thanh toán ghế ${selectedSeat || ''} →`}
                 </button>
                 {bookingMsg && (
                   <span style={{ color: '#34d399', fontSize: '14px', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: '8px' }}>

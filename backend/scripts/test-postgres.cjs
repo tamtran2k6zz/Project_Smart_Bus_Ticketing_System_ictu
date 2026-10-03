@@ -310,6 +310,33 @@ async function main() {
       passenger,
       201
     );
+    const [{ ticket_code: bookedTicketCode }] = (
+      await db.query('SELECT ticket_code FROM tickets WHERE id=$1', [booked.ticketId])
+    ).rows;
+    await call(
+      'get',
+      `/api/v1/tickets/${encodeURIComponent(bookedTicketCode)}`,
+      null,
+      null,
+      401
+    );
+    const ticketDetails = await call(
+      'get',
+      `/api/v1/tickets/${encodeURIComponent(bookedTicketCode)}`,
+      null,
+      passenger
+    );
+    assert.equal(ticketDetails.ticket_code, bookedTicketCode);
+    assert.equal(ticketDetails.seat_code, 'A01');
+    assert.equal(ticketDetails.route_name, 'Tuyến cập nhật');
+    assert.match(ticketDetails.qr_code_base64, /^data:image\/png;base64,/);
+    await call(
+      'get',
+      `/api/v1/tickets/${encodeURIComponent(bookedTicketCode)}`,
+      null,
+      other,
+      403
+    );
     assert.equal(
       (await db.query('SELECT user_id FROM tickets WHERE id=$1', [booked.ticketId])).rows[0]
         .user_id,

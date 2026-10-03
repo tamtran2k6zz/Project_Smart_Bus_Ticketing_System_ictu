@@ -9,6 +9,7 @@ import operationsRoutes from './routes/operations.routes';
 import ticketingRoutes from './routes/ticketing.routes';
 import seatsRoutes from './routes/seats.routes';
 import usersRoutes from './routes/users.routes';
+import ticketDetailsRoutes from './routes/ticket-details.routes';
 import { query } from './config/database';
 import { getJwtSecret } from './config/auth';
 import { redisStatus, redisSeatLockEnabled } from './config/redis';
@@ -87,6 +88,7 @@ app.use('/api/operations', operationsRoutes);
 app.use('/api/v1/operations', operationsRoutes);
 app.use('/api/ticketing', ticketingRoutes);
 app.use('/api/v1/ticketing', ticketingRoutes);
+app.use('/api/v1/tickets', ticketDetailsRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/v1/users', usersRoutes);
 
