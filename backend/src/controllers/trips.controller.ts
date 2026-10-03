@@ -48,8 +48,7 @@ export const searchTrips = async (req: Request, res: Response): Promise<void> =>
       JOIN route_stops origin_rs ON origin_rs.route_id = r.id AND origin_rs.stop_id = $1
       JOIN route_stops dest_rs ON dest_rs.route_id = r.id AND dest_rs.stop_id = $2
       JOIN bus_stops origin_s ON origin_rs.stop_id = origin_s.id JOIN bus_stops dest_s ON dest_rs.stop_id = dest_s.id
-      WHERE origin_rs.stop_order < dest_rs.stop_order
-        AND r.status = 'ACTIVE'
+      WHERE r.status = 'ACTIVE'
         AND t.status = 'SCHEDULED'
         AND t.departure_time >= NOW()
     `;

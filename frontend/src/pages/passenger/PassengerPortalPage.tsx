@@ -106,12 +106,12 @@ export const PassengerPortalPage: React.FC = () => {
     navigate('/login');
   };
 
-  // Nạp chuyến xe từ cơ sở dữ liệu
+  // Nạp chuyến xe từ cơ sở dữ liệu (chỉ lấy chuyến xuất phát trong tương lai)
   const fetchTrips = useCallback(async () => {
     try {
-      let dashRes = await apiFetch(getApiUrl('/api/v1/trips?bookable=true'));
-      let dashJson = await dashRes.json();
-      let rawOccupancy: TripOccupancy[] = Array.isArray(dashJson?.data)
+      const dashRes = await apiFetch(getApiUrl('/api/v1/trips?bookable=true'));
+      const dashJson = await dashRes.json();
+      const rawOccupancy: TripOccupancy[] = Array.isArray(dashJson?.data)
         ? dashJson.data
         : Array.isArray(dashJson?.tripOccupancy)
         ? dashJson.tripOccupancy
@@ -119,26 +119,17 @@ export const PassengerPortalPage: React.FC = () => {
         ? dashJson.data.tripOccupancy
         : [];
 
-      if (rawOccupancy.length === 0) {
-        dashRes = await apiFetch(getApiUrl('/api/v1/trips'));
-        dashJson = await dashRes.json();
-        rawOccupancy = Array.isArray(dashJson?.data)
-          ? dashJson.data
-          : Array.isArray(dashJson?.tripOccupancy)
-          ? dashJson.tripOccupancy
-          : Array.isArray(dashJson?.data?.tripOccupancy)
-          ? dashJson.data.tripOccupancy
-          : [];
-      }
-
-      const tripList: TripItem[] = rawOccupancy.map(t => ({
-        id: String(t.id),
-        code: t.routeCode || '',
-        routeName: t.routeName || '',
-        plateNumber: t.busPlate || '',
-        departureTime: t.departureTime || '',
-        basePrice: Number(t.basePrice),
-      }));
+      const now = Date.now();
+      const tripList: TripItem[] = rawOccupancy
+        .map(t => ({
+          id: String(t.id),
+          code: t.routeCode || '',
+          routeName: t.routeName || '',
+          plateNumber: t.busPlate || '',
+          departureTime: t.departureTime || '',
+          basePrice: Number(t.basePrice),
+        }))
+        .filter(t => new Date(t.departureTime).getTime() > now);
 
       setTrips(tripList);
       if (tripList.length > 0) {
@@ -147,10 +138,13 @@ export const PassengerPortalPage: React.FC = () => {
             ? requestedTripId
             : tripList[0].id
         );
+      } else {
+        setSelectedTripId('');
       }
     } catch (e) {
       console.error(e);
       setTrips([]);
+      setSelectedTripId('');
     }
   }, [requestedTripId]);
 
@@ -560,18 +554,24 @@ export const PassengerPortalPage: React.FC = () => {
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'rgba(255, 255, 255, 0.75)', marginBottom: '8px' }}>
                     Chọn chuyến xe xuất bến:
                   </label>
-                  <select
-                    className="filter-select"
-                    value={selectedTripId}
-                    onChange={(e) => setSelectedTripId(e.target.value)}
-                    style={{ width: '100%', borderRadius: '12px', height: '46px' }}
-                  >
-                    {(Array.isArray(trips) ? trips : []).map((t) => (
-                      <option key={t.id} value={t.id}>
-                        [{t.code}] {t.routeName} - Xe {t.plateNumber} ({new Date(t.departureTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })})
-                      </option>
-                    ))}
-                  </select>
+                  {trips.length === 0 ? (
+                    <div style={{ padding: '12px 16px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#fca5a5', fontSize: '13px', height: '46px', display: 'flex', alignItems: 'center' }}>
+                      ⚠️ Hiện không có chuyến xe nào xuất phát trong tương lai để đặt vé.
+                    </div>
+                  ) : (
+                    <select
+                      className="filter-select"
+                      value={selectedTripId}
+                      onChange={(e) => setSelectedTripId(e.target.value)}
+                      style={{ width: '100%', borderRadius: '12px', height: '46px' }}
+                    >
+                      {trips.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          [{t.code}] {t.routeName} - Xe {t.plateNumber} ({new Date(t.departureTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - {new Date(t.departureTime).toLocaleDateString('vi-VN')})
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
                 <div>
