@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getApiUrl } from '../../api/client';
+import { getApiUrl, apiFetch } from '../../api/client';
 
 interface SeatInfo {
   id: string;
@@ -7,6 +7,7 @@ interface SeatInfo {
   rowPosition: string;
   isPriority: boolean;
   isAvailable: boolean;
+  status?: string; // Trạng thái ghế từ API: AVAILABLE, LOCKED, BOOKED, CHECKED_IN
 }
 
 interface TripItem {
@@ -32,11 +33,47 @@ export const TicketBookingView: React.FC = () => {
   const [verifyCode, setVerifyCode] = useState<string>('');
   const [verifyResult, setVerifyResult] = useState<any>(null);
 
-  // 1. Nạp danh sách chuyến xe từ MySQL
+  // =========================================================
+  // HÀM QUY ĐỊNH MÀU SẮC GHẾ (Xanh, Cam, Xám) THEO TASK 2
+  // =========================================================
+  const getSeatStyles = (seat: SeatInfo, isSelected: boolean) => {
+    // 1. Đang chọn (bởi bạn) hoặc Đang bị giữ (bởi người khác) -> MÀU CAM
+    if (isSelected || seat.status === 'LOCKED') {
+      return {
+        border: '1px solid #f97316',
+        backgroundColor: 'rgba(249, 115, 22, 0.25)',
+        color: '#fdba74',
+        boxShadow: '0 0 16px rgba(249, 115, 22, 0.4)',
+        cursor: 'pointer'
+      };
+    }
+    
+    // 2. Trống (AVAILABLE) -> MÀU XANH
+    if (seat.status === 'AVAILABLE' || seat.isAvailable) {
+      return {
+        border: '1px solid #10b981',
+        backgroundColor: 'rgba(16, 185, 129, 0.08)',
+        color: '#34d399',
+        boxShadow: 'none',
+        cursor: 'pointer'
+      };
+    }
+
+    // 3. Đã bán (BOOKED, CHECKED_IN) -> MÀU XÁM
+    return {
+      border: '1px solid rgba(255, 255, 255, 0.2)',
+      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+      color: 'rgba(255, 255, 255, 0.3)',
+      boxShadow: 'none',
+      cursor: 'not-allowed'
+    };
+  };
+
+  // 1. Nạp danh sách chuyến xe từ cơ sở dữ liệu
   useEffect(() => {
     const fetchTrips = async () => {
       try {
-        const dashRes = await fetch(getApiUrl('/api/v1/operations/dashboard/summary'));
+        const dashRes = await apiFetch(getApiUrl('/api/v1/operations/dashboard/summary'));
         const dashJson = await dashRes.json();
         const rawOccupancy = Array.isArray(dashJson?.tripOccupancy)
           ? dashJson.tripOccupancy
@@ -64,14 +101,19 @@ export const TicketBookingView: React.FC = () => {
     fetchTrips();
   }, []);
 
-  // 2. Nạp sơ đồ ghế thực tế từ MySQL cho chuyến đã chọn
+  // Xóa trắng ghế đang chọn nếu đổi sang chuyến xe khác
+  useEffect(() => {
+    setSelectedSeat('');
+  }, [selectedTripId]);
+
+  // 2. Nạp sơ đồ ghế thực tế từ CSDL & Cập nhật Thời Gian Thực (Polling)
   useEffect(() => {
     if (!selectedTripId) return;
 
-    const fetchSeats = async () => {
-      setIsLoading(true);
+    const fetchSeats = async (showLoading = false) => {
+      if (showLoading) setIsLoading(true);
       try {
-        const res = await fetch(getApiUrl(`/api/v1/ticketing/trips/${selectedTripId}/seats`));
+        const res = await apiFetch(getApiUrl(`/api/v1/ticketing/trips/${selectedTripId}/seats`));
         const json = await res.json();
         const rawSeats = Array.isArray(json?.data?.seats)
           ? json.data.seats
@@ -79,18 +121,25 @@ export const TicketBookingView: React.FC = () => {
           ? json.seats
           : [];
         setSeats(rawSeats);
-        setSelectedSeat('');
       } catch (err) {
         console.error(err);
       } finally {
-        setIsLoading(false);
+        if (showLoading) setIsLoading(false);
       }
     };
 
-    fetchSeats();
+    // Lần đầu tải có hiện xoay vòng Loading
+    fetchSeats(true);
+
+    // Chạy ngầm (polling): tự động gọi lại API sau mỗi 3 giây để cập nhật trạng thái ghế
+    const intervalId = setInterval(() => {
+      fetchSeats(false); // Gọi API ngầm, không hiện Loading để tránh giật màn hình
+    }, 3000);
+
+    return () => clearInterval(intervalId);
   }, [selectedTripId]);
 
-  // 3. Xử lý đặt vé và lưu vào MySQL (US 2, 3, 4, 6)
+  // 3. Xử lý đặt vé và lưu vào cơ sở dữ liệu (US 2, 3, 4, 6)
   const handleBookTicket = async () => {
     if (!selectedSeat) {
       alert('Vui lòng chọn vị trí ghế trên sơ đồ!');
@@ -104,7 +153,7 @@ export const TicketBookingView: React.FC = () => {
       const userStr = localStorage.getItem('smartbus_user');
       const currentUser = userStr ? JSON.parse(userStr) : null;
 
-      const res = await fetch(getApiUrl('/api/v1/ticketing/bookings'), {
+      const res = await apiFetch(getApiUrl('/api/v1/ticketing/bookings'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -121,14 +170,14 @@ export const TicketBookingView: React.FC = () => {
 
       const json = await res.json();
       if (!res.ok) {
-        throw new Error(json.message || 'Đặt vé thất bại trong MySQL!');
+        throw new Error(json.message || 'Đặt vé thất bại trong cơ sở dữ liệu!');
       }
 
       setBookingResult(json.data || json);
-      setStatusMessage('🎉 Đặt vé và giữ chỗ 10 phút thành công! Mã QR đã được lưu trong MySQL.');
+      setStatusMessage('🎉 Đặt vé và giữ chỗ 10 phút thành công! Mã QR đã được lưu trong cơ sở dữ liệu.');
 
-      // Tải lại sơ đồ ghế
-      const seatsRes = await fetch(getApiUrl(`/api/v1/ticketing/trips/${selectedTripId}/seats`));
+      // Tải lại sơ đồ ghế ngay lập tức sau khi đặt vé
+      const seatsRes = await apiFetch(getApiUrl(`/api/v1/ticketing/trips/${selectedTripId}/seats`));
       const seatsJson = await seatsRes.json();
       const rawSeats = Array.isArray(seatsJson?.data?.seats)
         ? seatsJson.data.seats
@@ -151,7 +200,7 @@ export const TicketBookingView: React.FC = () => {
     }
 
     try {
-      const res = await fetch(getApiUrl('/api/v1/ticketing/verify'), {
+      const res = await apiFetch(getApiUrl('/api/v1/ticketing/verify'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: verifyCode.trim() }),
@@ -159,7 +208,7 @@ export const TicketBookingView: React.FC = () => {
 
       const json = await res.json();
       if (!res.ok) {
-        throw new Error(json.message || 'Mã vé không hợp lệ trong CSDL MySQL!');
+        throw new Error(json.message || 'Mã vé không hợp lệ trong CSDL cơ sở dữ liệu!');
       }
 
       setVerifyResult(json.data || json);
@@ -176,7 +225,7 @@ export const TicketBookingView: React.FC = () => {
           Đặt vé Trực tuyến & Sơ đồ ghế (US 1, 2, 3, 4)
         </h3>
         <p style={{ fontSize: '13.5px', color: 'rgba(255, 255, 255, 0.55)', marginBottom: '24px' }}>
-          Mọi giao dịch giữ chỗ 10 phút, tạo mã QR và lưu hóa đơn được đồng bộ trực tiếp vào cơ sở dữ liệu MySQL.
+          Mọi giao dịch giữ chỗ 10 phút, tạo mã QR và lưu hóa đơn được đồng bộ trực tiếp vào cơ sở dữ liệu cơ sở dữ liệu.
         </p>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '24px' }}>
@@ -222,15 +271,15 @@ export const TicketBookingView: React.FC = () => {
             <div style={{ display: 'flex', gap: '16px', fontSize: '12px' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ width: '14px', height: '14px', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10b981', borderRadius: '4px' }} />
-                Ghế trống
+                Ghế trống (Xanh)
               </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ width: '14px', height: '14px', background: '#38bdf8', borderRadius: '4px', boxShadow: '0 0 10px #38bdf8' }} />
-                Đang chọn ({selectedSeat || 'Chưa chọn'})
+                <span style={{ width: '14px', height: '14px', background: 'rgba(249, 115, 22, 0.25)', border: '1px solid #f97316', borderRadius: '4px', boxShadow: '0 0 10px #f97316' }} />
+                Đang chọn/Giữ
               </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ width: '14px', height: '14px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '4px' }} />
-                Đã đặt
+                <span style={{ width: '14px', height: '14px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '4px' }} />
+                Đã bán (Xám)
               </span>
             </div>
           </div>
@@ -248,35 +297,28 @@ export const TicketBookingView: React.FC = () => {
           >
             {(Array.isArray(seats) ? seats : []).map((s) => {
               const isSelected = selectedSeat === s.seatNumber;
+              
+              // Áp dụng hàm tính màu sắc vào từng ghế
+              const seatStyle = getSeatStyles(s, isSelected);
+
               return (
                 <button
                   key={s.id}
-                  disabled={!s.isAvailable}
-                  onClick={() => setSelectedSeat(s.seatNumber)}
+                  disabled={s.status !== 'AVAILABLE' && !s.isAvailable && !isSelected}
+                  onClick={() => {
+                    // Chỉ cho click chọn khi ghế AVAILABLE
+                    if (s.status === 'AVAILABLE' || s.isAvailable) {
+                      setSelectedSeat(s.seatNumber);
+                    }
+                  }}
                   style={{
                     padding: '14px 6px',
                     borderRadius: '12px',
                     fontSize: '13px',
                     fontWeight: 600,
-                    cursor: s.isAvailable ? 'pointer' : 'not-allowed',
-                    border: isSelected
-                      ? '1px solid #38bdf8'
-                      : s.isAvailable
-                      ? '1px solid rgba(16, 185, 129, 0.4)'
-                      : '1px solid rgba(255, 255, 255, 0.06)',
-                    backgroundColor: isSelected
-                      ? 'rgba(56, 189, 248, 0.25)'
-                      : s.isAvailable
-                      ? 'rgba(16, 185, 129, 0.08)'
-                      : 'rgba(255, 255, 255, 0.02)',
-                    color: isSelected ? '#ffffff' : s.isAvailable ? '#34d399' : 'rgba(255, 255, 255, 0.25)',
-                    boxShadow: isSelected
-                      ? '0 0 16px rgba(56, 189, 248, 0.4)'
-                      : s.isAvailable
-                      ? '0 0 8px rgba(16, 185, 129, 0.15)'
-                      : 'none',
                     backdropFilter: 'blur(8px)',
                     transition: 'all 0.18s ease',
+                    ...seatStyle // Truyền màu vào
                   }}
                 >
                   <div style={{ fontSize: '15px' }}>{s.seatNumber}</div>
@@ -301,7 +343,7 @@ export const TicketBookingView: React.FC = () => {
               opacity: !selectedSeat || isLoading ? 0.5 : 1,
             }}
           >
-            {isLoading ? 'Đang ghi nhận vào MySQL...' : `Xác nhận Đặt Ghế ${selectedSeat || ''} & Nhận mã QR →`}
+            {isLoading ? 'Đang ghi nhận vào cơ sở dữ liệu...' : `Xác nhận Đặt Ghế ${selectedSeat || ''} & Nhận mã QR →`}
           </button>
           {statusMessage && (
             <span style={{ color: '#34d399', fontSize: '14px', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
@@ -334,7 +376,7 @@ export const TicketBookingView: React.FC = () => {
               }}
             >
               <h4 style={{ color: '#38bdf8', fontSize: '20px', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                🎟️ Vé điện tử SmartBus (Lưu trong MySQL)
+                🎟️ Vé điện tử SmartBus (Lưu trong cơ sở dữ liệu)
               </h4>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '28px', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ fontSize: '14px', lineHeight: 2, color: 'rgba(255, 255, 255, 0.9)' }}>
@@ -418,7 +460,7 @@ export const TicketBookingView: React.FC = () => {
           Soát vé bằng mã QR / Mã vé (US 15 - Tài xế & Phụ xe)
         </h3>
         <p style={{ fontSize: '13.5px', color: 'rgba(255, 255, 255, 0.55)', marginBottom: '20px' }}>
-          Quét hoặc dán chuỗi mã QR của hành khách để kiểm tra tính hợp lệ trực tiếp trong cơ sở dữ liệu MySQL.
+          Quét hoặc dán chuỗi mã QR của hành khách để kiểm tra tính hợp lệ trực tiếp trong cơ sở dữ liệu cơ sở dữ liệu.
         </p>
 
         <div style={{ display: 'flex', gap: '12px', maxWidth: '640px', marginBottom: '20px' }}>

@@ -1,87 +1,60 @@
 services:
-  # =============================================================================
-  # 1. DỊCH VỤ CƠ SỞ DỮ LIỆU MYSQL 8.0
-  # =============================================================================
-  mysql:
-    image: mysql:8.0
-    container_name: smartbus_mysql
+  redis:
+    image: redis:7-alpine
     restart: unless-stopped
-    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
-    environment:
-      MYSQL_DATABASE: smartbus_db
-      MYSQL_USER: smartbus_user
-      MYSQL_PASSWORD: smartbus_pass
-      MYSQL_ROOT_PASSWORD: root_pass
-    ports:
-      - "${MYSQL_PORT:-3308}:3306"
+    command: ["redis-server", "--appendonly", "yes"]
     volumes:
-      - mysql_data:/var/lib/mysql
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - redis_data:/data
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_pass"]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
-      timeout: 5s
+      timeout: 3s
       retries: 10
-
-  # =============================================================================
-  # 2. DỊCH VỤ QUẢN TRỊ TRỰC QUAN PHPMYADMIN (CỔNG 8080)
-  # =============================================================================
-  phpmyadmin:
-    image: phpmyadmin/phpmyadmin:latest
-    container_name: smartbus_phpmyadmin
-    restart: unless-stopped
-    ports:
-      - "8080:80"
-    environment:
-      PMA_HOST: mysql
-      PMA_PORT: 3306
-      PMA_USER: root
-      PMA_PASSWORD: root_pass
-      UPLOAD_LIMIT: 64M
-    depends_on:
-      mysql:
-        condition: service_healthy
-
-  # =============================================================================
-  # 3. DỊCH VỤ BACKEND API (NODE.JS / TYPESCRIPT / EXPRESS / CỔNG 5000)
-  # =============================================================================
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: smartbus_backend
+    build: ./backend
     restart: unless-stopped
     ports:
       - "5000:5000"
     environment:
       PORT: 5000
-      DB_HOST: mysql
-      DB_PORT: 3306
-      DB_USER: smartbus_user
-      DB_PASSWORD: smartbus_pass
-      DB_NAME: smartbus_db
-      JWT_SECRET: smartbus_jwt_secret_key_sprint1_2026
-      JWT_EXPIRES_IN: 86400
+      NODE_ENV: ${NODE_ENV:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env to the Supabase transaction pooler URL}
+      DB_POOL_MAX: ${DB_POOL_MAX:-2}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000,http://localhost:5173}
+      # Redis is optional. Empty REDIS_URL => PostgreSQL row locks only.
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      # Public HTTPS origin the payment gateways call back into. Without a
+      # tunnel or a deployed domain, VNPay/MoMo cannot reach this service.
+      PAYMENT_PUBLIC_BASE_URL: ${PAYMENT_PUBLIC_BASE_URL:-}
+      VNPAY_TMN_CODE: ${VNPAY_TMN_CODE:-}
+      VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET:-}
+      VNPAY_PAYMENT_URL: ${VNPAY_PAYMENT_URL:-https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+      VNPAY_RETURN_URL: ${VNPAY_RETURN_URL:-}
+      VNPAY_IPN_URL: ${VNPAY_IPN_URL:-}
+      VNPAY_REFUND_URL: ${VNPAY_REFUND_URL:-https://sandbox.vnpayment.vn/merchant_webapi/api/transaction}
+      MOMO_PARTNER_CODE: ${MOMO_PARTNER_CODE:-}
+      MOMO_ACCESS_KEY: ${MOMO_ACCESS_KEY:-}
+      MOMO_SECRET_KEY: ${MOMO_SECRET_KEY:-}
+      MOMO_CREATE_URL: ${MOMO_CREATE_URL:-https://test-payment.momo.vn/v2/gateway/api/create}
+      MOMO_IPN_URL: ${MOMO_IPN_URL:-}
+      MOMO_REDIRECT_URL: ${MOMO_REDIRECT_URL:-http://localhost:3000/passenger/booking}
+      MOMO_REFUND_URL: ${MOMO_REFUND_URL:-https://test-payment.momo.vn/v2/gateway/api/refund}
+      PAYMENT_RESULT_URL: ${PAYMENT_RESULT_URL:-http://localhost:3000/passenger/booking}
+      PAYMENT_CLIENT_IP: ${PAYMENT_CLIENT_IP:-}
+      PAYMENT_REFUND_OPERATOR: ${PAYMENT_REFUND_OPERATOR:-smartbus-system}
+      PAYMENT_REFUND_IP: ${PAYMENT_REFUND_IP:-127.0.0.1}
+      PAYMENT_CRON_SECRET: ${PAYMENT_CRON_SECRET:-}
     depends_on:
-      mysql:
+      redis:
         condition: service_healthy
-
-  # =============================================================================
-  # 4. DỊCH VỤ FRONTEND CLIENT (REACT / TYPESCRIPT / VITE / CỔNG 3000)
-  # =============================================================================
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: smartbus_frontend
+    build: ./frontend
     restart: unless-stopped
     ports:
-      - "3000:3000"
-    environment:
-      VITE_API_URL: http://localhost:5000
+      - "${FRONTEND_PORT:-3000}:3000"
     depends_on:
       - backend
-
 volumes:
-  mysql_data:
-    driver: local
+  redis_data:

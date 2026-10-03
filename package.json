@@ -3,11 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-   "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
-    "build": "npm --prefix frontend install && npm --prefix frontend run build",
-    "start": "node dist/main.ts",
-    "lint": "eslint \"src/**/*.{js,ts}\"",
-    "test": "npm --prefix backend run test"
+    "dev": "npm --prefix backend run start:express",
+    "build": "npm --prefix backend install",
+    "build:frontend": "npm --prefix frontend install && npm --prefix frontend run build",
+    "build:backend": "npm --prefix backend install",
+    "start": "npm --prefix backend run start:express",
+    "lint": "eslint \"backend/src/**/*.{js,ts}\"",
+    "test": "jest"
   },
   "devDependencies": {
     "husky": "^8.0.3",

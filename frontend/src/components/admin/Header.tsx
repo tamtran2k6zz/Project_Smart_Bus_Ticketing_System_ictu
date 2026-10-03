@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
-function Header() {
+function Header({ title = 'Quản trị tuyến & trạm', subtitle = 'Hệ thống bán vé & điều hành xe buýt thông minh SmartBus' }: { title?: string; subtitle?: string }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -21,8 +21,8 @@ function Header() {
   return (
     <header className="header">
       <div>
-        <h1>Quản trị tuyến & trạm</h1>
-        <p>Hệ thống bán vé & điều hành xe buýt thông minh SmartBus</p>
+        <h1>{title}</h1>
+        <p>{subtitle}</p>
       </div>
 
       <div className="admin-profile" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>

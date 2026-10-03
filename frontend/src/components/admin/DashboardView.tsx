@@ -25,7 +25,7 @@ interface SummaryData {
   }>;
 }
 
-import { getApiUrl } from '../../api/client';
+import { getApiUrl, apiFetch } from '../../api/client';
 
 export const DashboardView: React.FC = () => {
   const [data, setData] = useState<SummaryData | null>(null);
@@ -34,7 +34,7 @@ export const DashboardView: React.FC = () => {
   const fetchSummary = async () => {
     setLoading(true);
     try {
-      const res = await fetch(getApiUrl('/api/v1/operations/dashboard/summary'));
+      const res = await apiFetch(getApiUrl('/api/v1/operations/dashboard/summary'));
       const json = await res.json();
       setData(json.data || json);
     } catch (e) {
@@ -51,7 +51,7 @@ export const DashboardView: React.FC = () => {
   if (loading) {
     return (
       <div className="liquid-glass" style={{ padding: '48px', textAlign: 'center', color: 'rgba(255, 255, 255, 0.6)' }}>
-        Đang tổng hợp dữ liệu thời gian thực từ MySQL...
+        Đang tổng hợp dữ liệu thời gian thực từ cơ sở dữ liệu...
       </div>
     );
   }
@@ -80,7 +80,7 @@ export const DashboardView: React.FC = () => {
             {overview?.totalRevenue?.toLocaleString('vi-VN')} đ
           </div>
           <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.45)', marginTop: '6px' }}>
-            Cập nhật từ bảng payments MySQL
+            Cập nhật từ bảng payments cơ sở dữ liệu
           </div>
         </div>
 
@@ -154,7 +154,7 @@ export const DashboardView: React.FC = () => {
           <div>
             <h3 style={{ fontSize: '24px', margin: 0 }}>Thống kê Tỷ lệ lấp đầy chỗ theo Chuyến xe (US 20)</h3>
             <p style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.5)', marginTop: '4px' }}>
-              Dữ liệu tổng hợp theo thời gian thực trực tiếp từ cơ sở dữ liệu MySQL
+              Dữ liệu tổng hợp theo thời gian thực trực tiếp từ cơ sở dữ liệu cơ sở dữ liệu
             </p>
           </div>
           <button

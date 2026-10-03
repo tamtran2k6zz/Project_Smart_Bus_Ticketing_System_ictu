@@ -11,6 +11,8 @@ import UnauthorizedPage from '../pages/error/UnauthorizedPage';
 import RouteManagementPage from '../pages/admin/RouteManagementPage';
 import DriverPortalPage from '../pages/driver/DriverPortalPage';
 import PassengerPortalPage from '../pages/passenger/PassengerPortalPage';
+import DriverTripDetailPage from '../pages/driver/DriverTripDetailPage';
+import PaymentPage from '../pages/payment/PaymentPage';
 
 export const AppRoutes: React.FC = () => {
   return (
@@ -18,8 +20,10 @@ export const AppRoutes: React.FC = () => {
       {/* US 01: Trang chủ với thanh tra cứu chuyến xe (Công khai) */}
       <Route path="/" element={<HomePage />} />
 
+
       {/* US 01: Trang kết quả tìm kiếm chuyến xe theo điểm đi, điểm đến, ngày */}
       <Route path="/search" element={<SearchResultsPage />} />
+      <Route path="/payment" element={<PaymentPage />} />
 
       {/* US 22: Trang xác thực / Đăng nhập: PublicRoute chỉ cho phép khi chưa đăng nhập */}
       <Route
@@ -61,6 +65,7 @@ export const AppRoutes: React.FC = () => {
       >
         <Route index element={<Navigate to="/driver/portal" replace />} />
         <Route path="portal" element={<DriverPortalPage />} />
+        <Route path="trip-detail" element={<DriverTripDetailPage />} />
       </Route>
 
       {/* Phân hệ Hành khách (Passenger Portal): Đặt vé & Sơ đồ ghế */}

@@ -22,6 +22,7 @@ const apiClient: AxiosInstance = axios.create({
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
   },
 });
 
@@ -32,8 +33,11 @@ apiClient.interceptors.request.use(
       localStorage.getItem('smartbus_access_token') ||
       localStorage.getItem('token');
 
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (config.headers) {
+      config.headers['ngrok-skip-browser-warning'] = 'true';
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     }
     return config;
   },
@@ -50,7 +54,7 @@ apiClient.interceptors.response.use(
       typeof response.data === 'string' &&
       (response.data.trim().startsWith('<!doctype') ||
        response.data.trim().startsWith('<html') ||
-       response.headers['content-type']?.includes('text/html'))
+       String(response.headers['content-type'] || '').includes('text/html'))
     ) {
       return Promise.reject(new Error('Phản hồi từ máy chủ không phải định dạng JSON hợp lệ (HTML SPA rewrite)'));
     }
@@ -70,3 +74,11 @@ apiClient.interceptors.response.use(
 );
 
 export default apiClient;
+
+// Fetch-based screens share the same authentication as the Axios client.
+export const apiFetch = (input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> => {
+  const headers = new Headers(init.headers);
+  const token = localStorage.getItem('smartbus_access_token') || localStorage.getItem('token');
+  if (token) headers.set('Authorization', 'Bearer ' + token);
+  return fetch(input, { ...init, headers });
+};

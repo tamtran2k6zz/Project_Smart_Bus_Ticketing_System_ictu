@@ -34,7 +34,7 @@ export const HomePage: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Nạp danh sách trạm dừng và tuyến xe trực tiếp từ MySQL
+  // Nạp danh sách trạm dừng và tuyến xe trực tiếp từ cơ sở dữ liệu
   useEffect(() => {
     let isMounted = true;
     const fetchData = async () => {
@@ -75,9 +75,9 @@ export const HomePage: React.FC = () => {
           setDestStopId(String(finalStops[1].id));
         }
       } catch (err: any) {
-        console.error('Lỗi nạp dữ liệu từ MySQL:', err);
+        console.error('Lỗi nạp dữ liệu từ cơ sở dữ liệu:', err);
         if (!isMounted) return;
-        setErrorMsg('Đang hoạt động ở chế độ dữ liệu mặc định (Chưa kết nối CSDL MySQL).');
+        setErrorMsg('Đang hoạt động ở chế độ dữ liệu mặc định (Chưa kết nối CSDL cơ sở dữ liệu).');
         setStops(DEFAULT_STOPS);
         setRoutes(DEFAULT_ROUTES);
         setOriginStopId(String(DEFAULT_STOPS[0].id));
@@ -143,7 +143,7 @@ export const HomePage: React.FC = () => {
             marginBottom: '20px',
           }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#38bdf8' }} />
-            Sprint 1: Trực tiếp MySQL 8.0 • 100% Zero Mock Data
+            Sprint 1: Trực tiếp cơ sở dữ liệu 8.0 • 100% Zero Mock Data
           </div>
 
           <h1 style={{
@@ -197,7 +197,7 @@ export const HomePage: React.FC = () => {
                 </h3>
               </div>
               <span style={{ fontSize: '12px', color: '#10b981', background: 'rgba(16, 185, 129, 0.1)', padding: '4px 10px', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-                ● Truy vấn CSDL MySQL
+                ● Truy vấn CSDL cơ sở dữ liệu
               </span>
             </div>
 
@@ -361,7 +361,7 @@ export const HomePage: React.FC = () => {
               Mạng Lưới Tuyến Xe Thực Tế (US 12)
             </h2>
             <p style={{ fontSize: '13px', color: '#94a3b8', margin: '4px 0 0' }}>
-              Dữ liệu lưu trữ trong bảng `routes` & `route_stops` của MySQL
+              Dữ liệu lưu trữ trong bảng `routes` & `route_stops` của cơ sở dữ liệu
             </p>
           </div>
           <span style={{ fontSize: '13px', color: '#38bdf8' }}>
