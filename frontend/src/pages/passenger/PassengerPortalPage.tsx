@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import type { BusRoute } from '../../types/route';
 import { getApiUrl, apiFetch } from '../../api/client';
@@ -38,6 +38,7 @@ interface CompletedTrip {
 export const PassengerPortalPage: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const requestedTripId = searchParams.get('trip_id');
 
@@ -237,30 +238,43 @@ export const PassengerPortalPage: React.FC = () => {
     fetchOtherData();
   }, [fetchTrips, fetchOtherData]);
 
+  // Cổng VNPay/MoMo redirect về đây kèm ?paymentOrder= → chuyển sang màn hình kết quả giao dịch.
+  const paymentOrderId = searchParams.get('paymentOrder');
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const orderId = params.get('paymentOrder');
-    if (!orderId) return;
-    const loadPayment = async () => {
+    if (paymentOrderId) {
+      navigate(`/payment/result?orderId=${encodeURIComponent(paymentOrderId)}`, { replace: true });
+    }
+  }, [paymentOrderId, navigate]);
+
+  // Màn hình kết quả giao dịch truyền viewOrderId (nút "Xem vé") hoặc openTab (nút "Đánh giá chuyến đi").
+  const navState = location.state as { viewOrderId?: string; openTab?: 'feedback' } | null;
+  const viewOrderId = navState?.viewOrderId;
+  useEffect(() => {
+    if (navState?.openTab === 'feedback') {
+      setActiveTab('feedback');
+      navigate(location.pathname + location.search, { replace: true, state: null });
+    }
+  }, [navState?.openTab, navigate, location.pathname, location.search]);
+
+  useEffect(() => {
+    if (!viewOrderId) return;
+    navigate(location.pathname + location.search, { replace: true, state: null });
+    const loadTicket = async () => {
       try {
-        const token = localStorage.getItem('smartbus_access_token');
-        const response = await apiFetch(getApiUrl(`/api/v1/ticketing/payments/${orderId}`), {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
+        const response = await apiFetch(getApiUrl(`/api/v1/ticketing/payments/${encodeURIComponent(viewOrderId)}`));
         const result = await response.json();
-        if (!response.ok) throw new Error(result.message || 'Không thể tải trạng thái thanh toán.');
-        setBookingResult(result.data);
-        setBookingMsg(result.data.paymentStatus === 'SUCCESS'
-          ? 'Thanh toán thành công, vé đã được xác nhận.'
-          : `Trạng thái thanh toán: ${result.data.paymentStatus}.`);
+        if (!response.ok) throw new Error(result.message || 'Không thể tải vé.');
+        const data = result.data;
+        setBookingResult({
+          ...data,
+          payment: { orderId: data.orderId, amount: data.amount, method: data.paymentMethod, status: data.paymentStatus },
+        });
       } catch (error) {
-        setBookingMsg(error instanceof Error ? error.message : 'Không thể tải trạng thái thanh toán.');
-      } finally {
-        window.history.replaceState({}, '', window.location.pathname);
+        setBookingMsg(getErrorMessage(error, 'Không thể tải vé.'));
       }
     };
-    void loadPayment();
-  }, []);
+    void loadTicket();
+  }, [viewOrderId, navigate, location.pathname, location.search]);
 
   const handleBook = async () => {
     const trip = trips.find((t) => t.id === selectedTripId);
@@ -361,24 +375,9 @@ export const PassengerPortalPage: React.FC = () => {
         throw new Error(result?.message || 'Không thể hoàn tất chuyến demo.');
       }
 
-      setBookingResult(current =>
-        current
-          ? {
-              ...current,
-              status: 'BOOKED',
-              paymentStatus: 'SUCCESS',
-              payment: current.payment ? { ...current.payment, status: 'SUCCESS' } : current.payment,
-              ticket: current.ticket
-                ? { ...current.ticket, status: 'BOOKED', reservationExpiresAt: undefined }
-                : current.ticket,
-            }
-          : current,
-      );
-      setBookingMsg(result.message);
-      setFeedbackMsg(result.message);
-      await fetchTrips();
-      await fetchOtherData();
-      setActiveTab('feedback');
+      // order_id của giao dịch trùng tickets.id nên ticketId dùng được khi phản hồi đặt vé thiếu orderId.
+      const orderId = bookingResult?.payment?.orderId || bookingResult?.orderId || ticketId;
+      navigate(`/payment/result?orderId=${encodeURIComponent(orderId)}`);
     } catch (error) {
       setBookingMsg(getErrorMessage(error, 'Không thể hoàn tất chuyến demo.'));
     } finally {
@@ -763,7 +762,7 @@ export const PassengerPortalPage: React.FC = () => {
                             onClick={handleDemoTripComplete}
                             disabled={isBooking}
                           >
-                            {isBooking ? 'Đang cập nhật dữ liệu...' : 'Hoàn thành chuyến đi (demo) → Đánh giá chuyến đi'}
+                            {isBooking ? 'Đang cập nhật dữ liệu...' : 'Hoàn thành chuyến đi (demo) → Xem kết quả giao dịch'}
                           </button>
                           <p style={{ color: '#fbbf24', fontSize: '12px', margin: '8px 0 0' }}>
                             Thao tác demo cập nhật thanh toán/vé/chuyến lên dữ liệu chung nhưng không chuyển tiền thật.
