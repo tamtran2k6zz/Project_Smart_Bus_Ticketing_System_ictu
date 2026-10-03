@@ -33,7 +33,7 @@ Hệ thống đã được đóng gói và xuất bản chính thức trên Clou
 ## 📌 Bảng mục lục
 1. [Kiến trúc hệ thống & Hạ tầng triển khai](#-1-kiến-trúc-hệ-thống--hạ-tầng-triển-khai)
 2. [Các phân hệ & Tính năng hoàn chỉnh](#-2-các-phân-hệ--tính-năng-hoàn-chỉnh)
-3. [Tài khoản Demo kiểm thử hệ thống](#-3-tài-khoản-demo-kiểm-thử-hệ-thống)
+3. [Tạo tài khoản quản trị](#-3-tạo-tài-khoản-quản-trị)
 4. [Hướng dẫn cài đặt & Khởi chạy cục bộ](#-4-hướng-dẫn-cài-đặt--khởi-chạy-cục-bộ)
 5. [Cấu trúc thư mục mã nguồn](#-5-cấu-trúc-thư-mục-mã-nguồn)
 6. [Danh mục RESTful API Backend](#-6-danh-mục-restful-api-backend)
@@ -47,7 +47,7 @@ Hệ thống đã được đóng gói và xuất bản chính thức trên Clou
 Hệ thống sử dụng mô hình kiến trúc Serverless Micro-Architecture kết hợp Single-Page Application (SPA):
 * **Frontend:** Ứng dụng React 19 / Vite SPA phục vụ qua mạng phân phối toàn cầu Vercel Edge Network.
 * **Backend API:** Entrypoint `api/index.ts` điều hướng toàn bộ yêu cầu `/api/*` tới Express Engine (Node.js Serverless Function).
-* **Database:** **Supabase PostgreSQL** kết nối qua Transaction Pooler (PgBouncer cổng `6543`) tối ưu tài nguyên kết nối serverless; bảo mật toàn diện qua **Row-Level Security (RLS)** trên 13 bảng.
+* **Database:** **Supabase PostgreSQL** kết nối qua Transaction Pooler (PgBouncer cổng `6543`) tối ưu tài nguyên kết nối serverless; bảo mật toàn diện qua **Row-Level Security (RLS)** trên 14 bảng.
 
 ```
                               [ Người dùng / Trình duyệt ]
@@ -75,7 +75,7 @@ Hệ thống sử dụng mô hình kiến trúc Serverless Micro-Architecture k�
                                                    ┌───────────────────────────┐
                                                    │    Supabase PostgreSQL    │
                                                    │ (Transaction Pooler 6543) │
-                                                   │ 13 Tables • RLS Protected │
+                                                   │ 14 Tables • RLS Protected │
                                                    └───────────────────────────┘
 ```
 
@@ -124,18 +124,11 @@ Docker Compose chạy frontend, Express API và Redis cục bộ; API kết nố
 
 ---
 
-## 🔑 3. Tài khoản Demo kiểm thử hệ thống
+## 🔑 3. Tạo tài khoản quản trị
 
-Hệ thống đã khởi tạo sẵn 4 tài khoản mẫu thực tế trên cơ sở dữ liệu Supabase PostgreSQL:
-
-| Vai trò (Role) | Tài khoản / Email | Mật khẩu | Phân hệ trải nghiệm mặc định |
-| :--- | :--- | :--- | :--- |
-| **Quản trị viên (Admin)** | `admin@smartbus.ictu.vn` | `Admin@12345` | `/admin/routes` (Toàn quyền hệ thống & Báo cáo) |
-| **Quản lý điều phối (Manager)** | `manager@smartbus.ictu.vn` | `Manager@123` | `/admin/routes` (Quản trị tuyến xe, trạm dừng & nhân sự) |
-| **Tài xế (Driver)** | `driver@smartbus.ictu.vn`<br>*(SĐT: `0987654321`)* | `Driver@123` | `/driver/portal` (Soát vé QR & Báo cáo sự cố) |
-| **Hành khách (Passenger)** | `khachhang@gmail.com` | `User@123` | `/passenger/booking` (Đặt vé, QR & Đánh giá chuyến xe) |
-
-*(Mẹo: Trên trang [Đăng nhập](https://smart-bus-ticketing-system.vercel.app/login), bạn có thể click trực tiếp vào một trong 4 nút tài khoản mẫu ở cuối form để tự động điền thông tin và trải nghiệm).*
+Không công bố hoặc cài sẵn tài khoản/mật khẩu demo. Khi khởi tạo database trống, tạo admin bằng
+`ADMIN_EMAIL` và `ADMIN_PASSWORD` riêng theo hướng dẫn tại [docs/supabase-vercel.md](docs/supabase-vercel.md).
+Nếu môi trường đã từng dùng tài khoản mẫu, hãy đổi mật khẩu hoặc vô hiệu hóa các tài khoản đó trong database.
 
 ---
 
@@ -186,7 +179,7 @@ Mỗi backend cần có `JWT_SECRET` riêng tư tối thiểu 32 ký tự để 
 
 Backend được publish ở cổng `5000` để máy host và callback dịch vụ thanh toán có thể truy cập trực tiếp; frontend vẫn gọi API qua Nginx. Redis chỉ được expose trong mạng Docker. Nếu cổng `3000` đã được dùng, đặt `FRONTEND_PORT=3001` (hoặc cổng trống khác) trong `.env` rồi truy cập `http://localhost:3001`.
 
-Mọi máy dùng chung dữ liệu Supabase. Chỉ cấp `DATABASE_URL` cho người đáng tin cậy; backend dùng tài khoản database có quyền truy cập, vì vậy không commit URL/mật khẩu vào GitHub. Sao chép nguyên Transaction pooler URL từ Supabase và percent-encode ký tự đặc biệt trong mật khẩu. Chạy migration Supabase một lần bởi người quản lý database, không chạy lại từ từng máy clone.
+Mọi máy dùng chung dữ liệu Supabase. Chỉ cấp `DATABASE_URL` cho người đáng tin cậy; backend dùng tài khoản database có quyền truy cập, vì vậy không commit URL/mật khẩu vào GitHub. Sao chép nguyên Transaction pooler URL từ Supabase và percent-encode ký tự đặc biệt trong mật khẩu. Chạy migration Supabase một lần bởi người quản lý database, không chạy lại từ từng máy clone. Sau khi cập nhật mã nguồn có migration mới, người quản lý chạy `npm run db:migrate` trong thư mục `backend` trước khi bật luồng QR.
 
 Redis mặc định chạy riêng trên từng máy. Điều này phù hợp để chạy độc lập, nhưng Redis seat-lock không đồng bộ giữa các máy; nếu cần khóa ghế tạm thời dùng chung, cấu hình cùng một Redis URL riêng tư qua `REDIS_URL` trên các máy. Không đưa thông tin Redis bí mật vào repository.
 
@@ -224,7 +217,7 @@ npm run dev
 
 ### 🧪 Bộ Kiểm thử Tự động (Automated Test Suite)
 
-Dự án tích hợp bộ kiểm thử 54 kịch bản tự động mô phỏng môi trường PostgreSQL nhúng (**PGlite**), không cần kết nối mạng:
+Dự án tích hợp bộ kiểm thử 61 kiểm tra tự động mô phỏng môi trường PostgreSQL nhúng (**PGlite**), không cần kết nối mạng:
 
 ```bash
 npm --prefix backend run test:postgres
@@ -327,15 +320,17 @@ Tất cả các API hỗ trợ đồng thời cả hai tiền tố định tuy�
 * `POST /seats/unlock`: Hủy khóa ghế đã giữ chỗ.
 
 ### 5. Phân hệ Đặt vé & Soát vé QR (`/api/v1/ticketing`)
-* `POST /bookings`: Đặt vé, lưu vào CSDL PostgreSQL, sinh mã vé và QR điện tử.
-  Thêm `"paymentMethod": "VNPAY"` hoặc `"MOMO"` để giữ ghế 10 phút và nhận URL thanh toán.
-  Response trả về `data.payment.orderId` — đây chính là **UUID** dùng làm `vnp_TxnRef`/`orderId`.
+* `POST /bookings`: Đặt vé, lưu giao dịch/giá vé vào PostgreSQL và giữ ghế 10 phút. Mặc định
+  `paymentMethod` là `"QR"`; frontend tự sinh QR cục bộ chứa mã đơn, chuyến, ghế và số tiền.
+  QR hiện tại chỉ lưu/trình bày dữ liệu, không chuyển tiền và không tự xác nhận đã thanh toán.
+  Response trả về `data.payment.orderId` — UUID của giao dịch.
 * `POST /verify`: Soát vé điện tử bằng chuỗi mã QR hoặc mã vé, đổi trạng thái `CHECKED_IN`.
 
-### 6. Phân hệ Thanh toán trực tuyến (`/api/v1/ticketing`)
+### 6. Phân hệ Thanh toán (`/api/v1/ticketing`)
 
-> **Lưu ý:** VNPay và MoMo gọi webhook từ máy chủ của họ, nên `localhost` **không** dùng được.
-> Hãy mở tunnel (`ngrok http 5000`) và đặt `PAYMENT_PUBLIC_BASE_URL` trong `.env`.
+Mặc định, booking dùng QR nội bộ để hiển thị dữ liệu chuyến/giá vé; đây chưa phải QR ngân hàng,
+không phát sinh thanh toán và giao dịch vẫn `PENDING`. Không cần cấu hình MoMo/VNPay để chạy luồng này.
+Các callback gateway bên dưới chỉ dành cho tích hợp merchant cũ/sandbox.
 
 | Phương thức | Endpoint | Mục đích |
 | :--- | :--- | :--- |
@@ -373,9 +368,8 @@ Nhóm biến chính:
 * `JWT_SECRET` — bắt buộc, tối thiểu 32 ký tự.
 * `REDIS_URL` — *tuỳ chọn*. Để trống nghĩa là chỉ dùng khoá dòng PostgreSQL (đây là hành vi đúng,
   không phải lỗi). Cũng chấp nhận bộ ba `REDIS_HOST`/`REDIS_PORT`/`REDIS_PASSWORD`.
-* `PAYMENT_PUBLIC_BASE_URL` — gốc public cho webhook (ngrok/cloudflared hoặc domain Vercel).
-* `VNPAY_*` và `MOMO_*` — thông tin merchant sandbox. Tên chuẩn được ưu tiên; các bí danh cũ
-  `VNP_*` vẫn chạy được nhưng sẽ ghi cảnh báo `deprecated_env_alias_used`.
+* `PAYMENT_PUBLIC_BASE_URL`, `VNPAY_*`, `MOMO_*` — chỉ cần nếu bật tích hợp gateway cũ; không cần
+  cho QR nội bộ tạm thời.
 
 Log ứng dụng dùng định dạng `key=value` và không bắt đầu bằng dấu `[`, nên có thể dán trực tiếp
 vào PowerShell mà không bị lỗi cú pháp:

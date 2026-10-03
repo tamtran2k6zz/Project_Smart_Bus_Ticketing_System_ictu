@@ -30,10 +30,9 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     }
 
     // Kiểm tra email trùng lặp trong PostgreSQL
-    const existingUsers = await query<any[]>(
-      'SELECT id FROM users WHERE email = $1 LIMIT 1',
-      [email.trim().toLowerCase()]
-    );
+    const existingUsers = await query<any[]>('SELECT id FROM users WHERE email = $1 LIMIT 1', [
+      email.trim().toLowerCase(),
+    ]);
 
     if (existingUsers.length > 0) {
       res.status(409).json({
@@ -73,11 +72,23 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       const insertResult: any = await query(
         `INSERT INTO users (full_name, email, phone_number, password_hash, role_id, role, status, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, 'ACTIVE', NOW()) RETURNING id`,
-        [full_name.trim(), email.trim().toLowerCase(), phone_number ? phone_number.trim() : null, passwordHash, roleId, roleName]
+        [
+          full_name.trim(),
+          email.trim().toLowerCase(),
+          phone_number ? phone_number.trim() : null,
+          passwordHash,
+          roleId,
+          roleName,
+        ]
       );
       newUserId = insertResult[0].id;
     } catch (insertErr: any) {
-      logger.error('user_insert_failed', { table: 'users', operation: 'insert', email: String(email ?? ''), error: insertErr });
+      logger.error('user_insert_failed', {
+        table: 'users',
+        operation: 'insert',
+        email: String(email ?? ''),
+        error: insertErr,
+      });
       throw insertErr;
     }
 
@@ -114,7 +125,12 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       },
     });
   } catch (err: any) {
-    logger.error('register_failed', { table: 'users', operation: 'insert', email: String(req.body?.email ?? ''), error: err });
+    logger.error('register_failed', {
+      table: 'users',
+      operation: 'insert',
+      email: String(req.body?.email ?? ''),
+      error: err,
+    });
     res.status(500).json({
       statusCode: 500,
       success: false,
@@ -227,7 +243,12 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       },
     });
   } catch (err: any) {
-    logger.error('login_failed', { table: 'users', operation: 'select', email: String(req.body?.email ?? ''), error: err });
+    logger.error('login_failed', {
+      table: 'users',
+      operation: 'select',
+      email: String(req.body?.email ?? ''),
+      error: err,
+    });
     res.status(500).json({
       statusCode: 500,
       success: false,
@@ -297,7 +318,12 @@ export const getMe = async (req: AuthenticatedRequest, res: Response): Promise<v
       },
     });
   } catch (err: any) {
-    logger.error('profile_lookup_failed', { table: 'users', operation: 'select', user_id: (req as AuthenticatedRequest).user?.id ?? '', error: err });
+    logger.error('profile_lookup_failed', {
+      table: 'users',
+      operation: 'select',
+      user_id: (req as AuthenticatedRequest).user?.id ?? '',
+      error: err,
+    });
     res.status(500).json({
       statusCode: 500,
       success: false,

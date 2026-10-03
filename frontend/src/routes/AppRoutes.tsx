@@ -24,7 +24,7 @@ export const AppRoutes: React.FC = () => {
       {/* US 01: Trang kết quả tìm kiếm chuyến xe theo điểm đi, điểm đến, ngày */}
       <Route path="/search" element={<SearchResultsPage />} />
 
-      {/* FE 3: Chọn cổng thanh toán và chuyển hướng sang VNPay / MoMo (cần đăng nhập) */}
+      {/* Chọn cổng thanh toán VNPay / MoMo (cần đăng nhập) */}
       <Route element={<ProtectedRoute allowedRoles={['PASSENGER', 'ADMIN', 'MANAGER']} />}>
         <Route path="/payment" element={<PaymentPage />} />
       </Route>

@@ -26,8 +26,8 @@ jobs:
         run: |
           npm ci
           npm run ci:validate
-          npm run lint || true
-          npm run test -- --passWithNoTests
+          npm run lint
+          npm run test -- --runInBand
           npm run build
           npm run test:postgres
 
@@ -36,6 +36,6 @@ jobs:
         working-directory: ./frontend
         run: |
           npm ci
-          npm run lint || true
-          npm run test -- --passWithNoTests
+          npm run lint
+          npm run test
           npm run build

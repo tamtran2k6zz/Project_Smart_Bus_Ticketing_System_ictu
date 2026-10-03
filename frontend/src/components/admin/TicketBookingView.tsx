@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { getApiUrl, apiFetch } from '../../api/client';
+import { PaymentQrCode } from '../PaymentQrCode';
+import type { BookingResult } from '../../types/booking';
+import type { TicketVerificationResult, TripOccupancy } from '../../types/api';
+import { getErrorMessage } from '../../utils/errorMessage';
 
 interface SeatInfo {
   id: string;
@@ -19,19 +23,51 @@ interface TripItem {
   basePrice: number;
 }
 
+interface RouteOption {
+  id: string;
+  code: string;
+  name: string;
+  status: string;
+  stops: Array<{ stopId: string; name: string; stopOrder: number }>;
+  basePrice: number;
+}
+
+function toDateTimeLocalValue(date: Date): string {
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return localDate.toISOString().slice(0, 16);
+}
+
 export const TicketBookingView: React.FC = () => {
   const [trips, setTrips] = useState<TripItem[]>([]);
+  const [routes, setRoutes] = useState<RouteOption[]>([]);
+  const [showCreateTrip, setShowCreateTrip] = useState(false);
+  const [isCreatingTrip, setIsCreatingTrip] = useState(false);
+  const [createTripError, setCreateTripError] = useState<string | null>(null);
+  const [createTripMessage, setCreateTripMessage] = useState<string | null>(null);
+  const [newTrip, setNewTrip] = useState(() => {
+    const departure = new Date(Date.now() + 2 * 60 * 60 * 1000);
+    departure.setMinutes(0, 0, 0);
+    const arrival = new Date(departure.getTime() + 60 * 60 * 1000);
+    return {
+      routeId: '',
+      busPlate: '',
+      departureTime: toDateTimeLocalValue(departure),
+      arrivalTime: toDateTimeLocalValue(arrival),
+      totalSeats: 40,
+      basePrice: 10000,
+    };
+  });
   const [selectedTripId, setSelectedTripId] = useState<string>('');
   const [seats, setSeats] = useState<SeatInfo[]>([]);
   const [selectedSeat, setSelectedSeat] = useState<string>('');
   const [voucherCode, setVoucherCode] = useState<string>('');
-  const [bookingResult, setBookingResult] = useState<any>(null);
+  const [bookingResult, setBookingResult] = useState<BookingResult | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   // Soát vé QR
   const [verifyCode, setVerifyCode] = useState<string>('');
-  const [verifyResult, setVerifyResult] = useState<any>(null);
+  const [verifyResult, setVerifyResult] = useState<TicketVerificationResult | null>(null);
 
   // =========================================================
   // HÀM QUY ĐỊNH MÀU SẮC GHẾ (Xanh, Cam, Xám) THEO TASK 2
@@ -69,37 +105,131 @@ export const TicketBookingView: React.FC = () => {
     };
   };
 
-  // 1. Nạp danh sách chuyến xe từ cơ sở dữ liệu
+  const fetchTrips = async () => {
+    const dashRes = await apiFetch(getApiUrl('/api/v1/operations/dashboard/summary'));
+    const dashJson = await dashRes.json();
+    if (!dashRes.ok) {
+      throw new Error(dashJson?.message || 'Không thể tải danh sách chuyến.');
+    }
+    const rawOccupancy: TripOccupancy[] = Array.isArray(dashJson?.tripOccupancy)
+      ? dashJson.tripOccupancy
+      : Array.isArray(dashJson?.data?.tripOccupancy)
+      ? dashJson.data.tripOccupancy
+      : [];
+
+    const tripList = rawOccupancy.map(t => ({
+      id: String(t.id),
+      code: t.routeCode || '',
+      routeName: t.routeName || '',
+      plateNumber: t.busPlate || '',
+      departureTime: t.departureTime || '',
+      basePrice: Number(t.basePrice) || 10000,
+    }));
+    setTrips(tripList);
+    return tripList;
+  };
+
+  // Nạp danh sách tuyến và chuyến xe từ cơ sở dữ liệu.
   useEffect(() => {
-    const fetchTrips = async () => {
-      try {
-        const dashRes = await apiFetch(getApiUrl('/api/v1/operations/dashboard/summary'));
-        const dashJson = await dashRes.json();
-        const rawOccupancy = Array.isArray(dashJson?.tripOccupancy)
-          ? dashJson.tripOccupancy
-          : Array.isArray(dashJson?.data?.tripOccupancy)
-          ? dashJson.data.tripOccupancy
-          : [];
-
-        const tripList = rawOccupancy.map((t: any) => ({
-          id: t.id,
-          code: t.routeCode,
-          routeName: t.routeName,
-          plateNumber: t.busPlate,
-          departureTime: t.departureTime,
-          basePrice: 10000,
-        }));
-
-        setTrips(tripList);
-        if (tripList.length > 0) {
-          setSelectedTripId(tripList[0].id);
+    let active = true;
+    Promise.all([
+      fetchTrips(),
+      apiFetch(getApiUrl('/api/v1/routes')).then(async response => {
+        const body = await response.json();
+        if (!response.ok) {
+          throw new Error(body?.message || 'Không thể tải danh sách tuyến.');
         }
-      } catch (err) {
-        console.error(err);
-      }
+        const routeList = Array.isArray(body?.data) ? body.data : [];
+        return routeList
+          .filter((route: RouteOption) => route.status === 'ACTIVE')
+          .map((route: RouteOption) => ({
+            ...route,
+            stops: Array.isArray(route.stops) ? route.stops : [],
+            basePrice: Number(route.basePrice) || 10000,
+          }));
+      }),
+    ])
+      .then(([tripList, routeList]) => {
+        if (!active) return;
+        setRoutes(routeList);
+        if (tripList.length > 0) setSelectedTripId(tripList[0].id);
+        setNewTrip(current => ({
+          ...current,
+          routeId: routeList[0]?.id ?? '',
+          basePrice: routeList[0]?.basePrice ?? current.basePrice,
+        }));
+      })
+      .catch((err: unknown) => {
+        if (active) {
+          console.error(err);
+          setCreateTripError(getErrorMessage(err, 'Không thể tải dữ liệu chuyến xe.'));
+        }
+      });
+    return () => {
+      active = false;
     };
-    fetchTrips();
   }, []);
+
+  const handleCreateTrip = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setCreateTripError(null);
+    setCreateTripMessage(null);
+    const departure = new Date(newTrip.departureTime);
+    const arrival = new Date(newTrip.arrivalTime);
+    if (Number.isNaN(departure.getTime()) || departure.getTime() <= Date.now()) {
+      setCreateTripError('Giờ xuất bến phải ở trong tương lai.');
+      return;
+    }
+    if (Number.isNaN(arrival.getTime()) || arrival <= departure) {
+      setCreateTripError('Giờ đến phải sau giờ xuất bến.');
+      return;
+    }
+    const selectedRoute = routes.find(route => route.id === newTrip.routeId);
+    if (!selectedRoute) {
+      setCreateTripError('Vui lòng chọn tuyến xe.');
+      return;
+    }
+    if (selectedRoute.stops.length < 2) {
+      setCreateTripError(
+        `Tuyến ${selectedRoute.code} hiện có ${selectedRoute.stops.length} trạm. Hãy thêm ít nhất hai trạm rồi tạo chuyến để hành khách có thể tìm tuyến.`,
+      );
+      return;
+    }
+
+    setIsCreatingTrip(true);
+    try {
+      const response = await apiFetch(getApiUrl('/api/v1/trips'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          route_id: selectedRoute.id,
+          bus_plate: newTrip.busPlate.trim(),
+          departure_time: departure.toISOString(),
+          arrival_time: arrival.toISOString(),
+          total_seats: Number(newTrip.totalSeats),
+          base_price: Number(newTrip.basePrice),
+          status: 'SCHEDULED',
+        }),
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        throw new Error(body?.message || 'Không thể tạo chuyến xuất bến.');
+      }
+
+      const tripList = await fetchTrips();
+      const createdTripId = String(body?.data?.id ?? '');
+      if (createdTripId && tripList.some(trip => trip.id === createdTripId)) {
+        setSelectedTripId(createdTripId);
+      }
+      setCreateTripMessage(`Đã tạo chuyến ${selectedRoute.code}; chuyến đã được thêm vào danh sách.`);
+      setShowCreateTrip(false);
+      setNewTrip(current => ({ ...current, busPlate: '' }));
+    } catch (err: unknown) {
+      setCreateTripError(getErrorMessage(err, 'Không thể tạo chuyến xuất bến.'));
+    } finally {
+      setIsCreatingTrip(false);
+    }
+  };
 
   // Xóa trắng ghế đang chọn nếu đổi sang chuyến xe khác
   useEffect(() => {
@@ -185,8 +315,8 @@ export const TicketBookingView: React.FC = () => {
         ? seatsJson.seats
         : [];
       setSeats(rawSeats);
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, 'Không thể đặt vé.'));
     } finally {
       setIsLoading(false);
     }
@@ -212,13 +342,146 @@ export const TicketBookingView: React.FC = () => {
       }
 
       setVerifyResult(json.data || json);
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, 'Không thể soát vé.'));
     }
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+      <div className="liquid-glass" style={{ padding: '24px 32px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+          <div>
+            <h3 style={{ fontSize: '20px', margin: '0 0 6px' }}>Lịch chuyến xuất bến</h3>
+            <p style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.6)', margin: 0 }}>
+              Tuyến như R10 chỉ xuất hiện trong bộ chọn sau khi tạo chuyến xuất bến tương lai.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="primary-button"
+            onClick={() => {
+              setCreateTripError(null);
+              setCreateTripMessage(null);
+              setShowCreateTrip(value => !value);
+            }}
+          >
+            {showCreateTrip ? 'Đóng tạo chuyến' : '+ Tạo chuyến xuất bến'}
+          </button>
+        </div>
+
+        {createTripError && (
+          <div className="form-error" role="alert" style={{ marginTop: '16px' }}>
+            {createTripError}
+          </div>
+        )}
+        {createTripMessage && (
+          <div role="status" style={{ color: '#34d399', marginTop: '16px' }}>
+            {createTripMessage}
+          </div>
+        )}
+
+        {showCreateTrip && (
+          <form
+            onSubmit={handleCreateTrip}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: '16px',
+              marginTop: '20px',
+            }}
+          >
+            <label>
+              Tuyến xe
+              <select
+                className="filter-select"
+                required
+                value={newTrip.routeId}
+                onChange={event => {
+                  const route = routes.find(item => item.id === event.target.value);
+                  setNewTrip(current => ({
+                    ...current,
+                    routeId: event.target.value,
+                    basePrice: route?.basePrice ?? current.basePrice,
+                  }));
+                }}
+                style={{ width: '100%', marginTop: '8px' }}
+              >
+                <option value="" disabled>Chọn tuyến</option>
+                {routes.map(route => (
+                  <option key={route.id} value={route.id}>
+                    [{route.code}] {route.name} — {route.stops.length} trạm
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Biển số xe
+              <input
+                className="search-input"
+                required
+                value={newTrip.busPlate}
+                onChange={event => setNewTrip(current => ({ ...current, busPlate: event.target.value }))}
+                placeholder="Ví dụ: 29A-12345"
+                style={{ width: '100%', marginTop: '8px' }}
+              />
+            </label>
+            <label>
+              Giờ xuất bến
+              <input
+                className="search-input"
+                type="datetime-local"
+                required
+                value={newTrip.departureTime}
+                onChange={event => setNewTrip(current => ({ ...current, departureTime: event.target.value }))}
+                style={{ width: '100%', marginTop: '8px' }}
+              />
+            </label>
+            <label>
+              Giờ đến
+              <input
+                className="search-input"
+                type="datetime-local"
+                required
+                value={newTrip.arrivalTime}
+                onChange={event => setNewTrip(current => ({ ...current, arrivalTime: event.target.value }))}
+                style={{ width: '100%', marginTop: '8px' }}
+              />
+            </label>
+            <label>
+              Số ghế
+              <input
+                className="search-input"
+                type="number"
+                min={1}
+                max={100}
+                required
+                value={newTrip.totalSeats}
+                onChange={event => setNewTrip(current => ({ ...current, totalSeats: Number(event.target.value) }))}
+                style={{ width: '100%', marginTop: '8px' }}
+              />
+            </label>
+            <label>
+              Giá vé cơ sở (VND)
+              <input
+                className="search-input"
+                type="number"
+                min={0}
+                required
+                value={newTrip.basePrice}
+                onChange={event => setNewTrip(current => ({ ...current, basePrice: Number(event.target.value) }))}
+                style={{ width: '100%', marginTop: '8px' }}
+              />
+            </label>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <button type="submit" className="primary-button" disabled={isCreatingTrip}>
+                {isCreatingTrip ? 'Đang tạo chuyến...' : 'Lưu chuyến xuất bến'}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+
       {/* Phân hệ 1: Đặt vé & Sơ đồ ghế */}
       <div className="liquid-glass" style={{ padding: '32px' }}>
         <h3 style={{ fontSize: '26px', margin: '0 0 6px' }}>
@@ -354,15 +617,14 @@ export const TicketBookingView: React.FC = () => {
 
         {/* Kết quả đặt vé & Mã QR hiển thị */}
         {bookingResult && (() => {
-          const tCode = bookingResult.ticket?.ticketCode || bookingResult.ticketCode || 'TKT-ICTU-8888';
-          const sNumber = bookingResult.ticket?.seatNumber || bookingResult.seatNumber || selectedSeat || 'A01';
-          const payAmount = bookingResult.payment?.amount || bookingResult.ticket?.fareAmount || bookingResult.fareAmount || 10000;
+          const tCode = bookingResult.ticket?.ticketCode || bookingResult.ticketCode || '';
+          const sNumber = bookingResult.ticket?.seatNumber || bookingResult.seatNumber || selectedSeat || '';
+          const payAmount = bookingResult.payment?.amount || bookingResult.ticket?.fareAmount || bookingResult.fareAmount || 0;
           const expRaw = bookingResult.ticket?.reservationExpiresAt || bookingResult.expiresAt;
           const expTime = (expRaw && !isNaN(new Date(expRaw).getTime()))
             ? new Date(expRaw).toLocaleTimeString('vi-VN')
-            : new Date(Date.now() + 10 * 60000).toLocaleTimeString('vi-VN');
+            : '—';
           const qrVal = bookingResult.qrCode || `SMARTBUS-QR-${tCode}`;
-          const qrImg = bookingResult.qrCodeUrl || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrVal)}`;
 
           return (
             <div
@@ -420,18 +682,7 @@ export const TicketBookingView: React.FC = () => {
                     MÃ QR SOÁT VÉ (US 4)
                   </div>
                   <div style={{ background: '#ffffff', padding: '10px', borderRadius: '12px', display: 'inline-block', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)' }}>
-                    <img
-                      src={qrImg}
-                      alt="Mã QR Soát Vé"
-                      style={{
-                        width: '140px',
-                        height: '140px',
-                        display: 'block',
-                      }}
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
-                    />
+                    <PaymentQrCode value={qrVal} size={140} alt="Mã QR soát vé" />
                   </div>
                   <div
                     style={{

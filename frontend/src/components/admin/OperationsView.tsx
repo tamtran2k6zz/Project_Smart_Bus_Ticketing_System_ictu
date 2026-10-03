@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { getApiUrl, apiFetch } from '../../api/client';
+import type { FeedbackRecord, IncidentRecord } from '../../types/api';
+import { getErrorMessage } from '../../utils/errorMessage';
 
 export const OperationsView: React.FC = () => {
-  const [incidents, setIncidents] = useState<any[]>([]);
-  const [feedbacks, setFeedbacks] = useState<any[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [incidents, setIncidents] = useState<IncidentRecord[]>([]);
+  const [feedbacks, setFeedbacks] = useState<FeedbackRecord[]>([]);
 
   // Form báo cáo sự cố tài xế
   const [incidentDescription, setIncidentDescription] = useState('');
@@ -18,7 +19,6 @@ export const OperationsView: React.FC = () => {
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
-    setLoading(true);
     try {
       const [incRes, fbRes] = await Promise.all([
         apiFetch(getApiUrl('/api/v1/operations/incidents')),
@@ -32,8 +32,6 @@ export const OperationsView: React.FC = () => {
       console.error(err);
       setIncidents([]);
       setFeedbacks([]);
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -76,8 +74,8 @@ export const OperationsView: React.FC = () => {
       setIncidentDescription('');
       await fetchData();
       setTimeout(() => setIncidentMsg(null), 3000);
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, 'Không thể gửi báo cáo sự cố.'));
     }
   };
 
@@ -119,8 +117,8 @@ export const OperationsView: React.FC = () => {
       setFeedbackContent('');
       await fetchData();
       setTimeout(() => setFeedbackMsg(null), 3000);
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, 'Không thể gửi đánh giá.'));
     }
   };
 

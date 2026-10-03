@@ -86,8 +86,26 @@ function RouteModal({ open, mode, route, onClose, onSave }: RouteModalProps) {
       return;
     }
 
-    if (stations.length === 0) {
-      setError('Vui lòng thêm ít nhất một trạm dừng.');
+    const hasPendingStation = stationName.trim() !== '' || stationAddress.trim() !== '';
+    if (hasPendingStation && (!stationName.trim() || !stationAddress.trim())) {
+      setError('Vui lòng nhập cả tên và địa chỉ trạm trước khi lưu.');
+      return;
+    }
+
+    const stationsToSave = hasPendingStation
+      ? [
+          ...stations,
+          {
+            id: `station-${Date.now()}`,
+            name: stationName.trim(),
+            address: stationAddress.trim(),
+            order: stations.length + 1,
+          },
+        ]
+      : stations;
+
+    if (stationsToSave.length === 0) {
+      setError('Vui lòng thêm ít nhất một trạm dừng cho tuyến.');
       return;
     }
 
@@ -98,7 +116,7 @@ function RouteModal({ open, mode, route, onClose, onSave }: RouteModalProps) {
       code: code.trim(),
       name: name.trim(),
       status,
-      stations: (Array.isArray(stations) ? stations : []).map((station, index) => ({
+      stations: (Array.isArray(stationsToSave) ? stationsToSave : []).map((station, index) => ({
         ...station,
         order: index + 1,
       })),
@@ -181,7 +199,7 @@ function RouteModal({ open, mode, route, onClose, onSave }: RouteModalProps) {
               <div>
                 <h3>Trạm dừng</h3>
 
-                <p>Kéo thả để thay đổi thứ tự trạm</p>
+                <p>Nhập tên và địa chỉ rồi bấm “+ Thêm trạm”, hoặc lưu trực tiếp để thêm trạm đang nhập. Kéo thả để đổi thứ tự.</p>
               </div>
 
               <span className="station-count">{stations.length} trạm</span>

@@ -15,7 +15,7 @@ export const authorizeRoles = (...allowedRoles: string[]) => {
 
     const userRole = req.user.role?.toUpperCase();
 
-    if (!allowedRoles.map((r) => r.toUpperCase()).includes(userRole)) {
+    if (!allowedRoles.map(r => r.toUpperCase()).includes(userRole)) {
       res.status(403).json({
         statusCode: 403,
         success: false,

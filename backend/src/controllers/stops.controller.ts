@@ -20,7 +20,7 @@ export const getStops = async (req: Request, res: Response): Promise<void> => {
     res.status(200).json({
       statusCode: 200,
       success: true,
-      data: stops.map((s) => ({
+      data: stops.map(s => ({
         id: s.id,
         code: s.code,
         name: s.name,
@@ -55,7 +55,9 @@ export const createStop = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    const existing = await query<any[]>('SELECT id FROM bus_stops WHERE code = $1 LIMIT 1', [code.trim().toUpperCase()]);
+    const existing = await query<any[]>('SELECT id FROM bus_stops WHERE code = $1 LIMIT 1', [
+      code.trim().toUpperCase(),
+    ]);
 
     if (existing.length > 0) {
       res.status(409).json({
@@ -98,7 +100,12 @@ export const createStop = async (req: Request, res: Response): Promise<void> => 
       },
     });
   } catch (err: any) {
-    logger.error('stop_create_failed', { table: 'bus_stops', operation: 'insert', code: String(req.body?.code ?? ''), error: err });
+    logger.error('stop_create_failed', {
+      table: 'bus_stops',
+      operation: 'insert',
+      code: String(req.body?.code ?? ''),
+      error: err,
+    });
     res.status(500).json({
       statusCode: 500,
       success: false,
@@ -124,7 +131,7 @@ export const updateStop = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    const isActive = status !== undefined ? (status === 'ACTIVE' || status === true) : null;
+    const isActive = status !== undefined ? status === 'ACTIVE' || status === true : null;
 
     await query(
       `UPDATE bus_stops
@@ -152,7 +159,12 @@ export const updateStop = async (req: Request, res: Response): Promise<void> => 
       message: 'Cập nhật trạm dừng thành công trong CSDL!',
     });
   } catch (err: any) {
-    logger.error('stop_update_failed', { table: 'bus_stops', operation: 'update', stop_id: req.params.id ?? '', error: err });
+    logger.error('stop_update_failed', {
+      table: 'bus_stops',
+      operation: 'update',
+      stop_id: req.params.id ?? '',
+      error: err,
+    });
     res.status(500).json({
       statusCode: 500,
       success: false,
@@ -178,13 +190,17 @@ export const deleteStop = async (req: Request, res: Response): Promise<void> => 
     }
 
     // Kiểm tra xem trạm có đang được gán vào tuyến nào không
-    const routeStopCheck = await query<any[]>('SELECT route_id FROM route_stops WHERE stop_id = $1 LIMIT 1', [id]);
+    const routeStopCheck = await query<any[]>(
+      'SELECT route_id FROM route_stops WHERE stop_id = $1 LIMIT 1',
+      [id]
+    );
 
     if (routeStopCheck.length > 0) {
       res.status(400).json({
         statusCode: 400,
         success: false,
-        message: 'Trạm dừng đang thuộc một hoặc nhiều tuyến xe. Hãy gỡ trạm khỏi tuyến trước khi xóa!',
+        message:
+          'Trạm dừng đang thuộc một hoặc nhiều tuyến xe. Hãy gỡ trạm khỏi tuyến trước khi xóa!',
       });
       return;
     }
@@ -197,7 +213,12 @@ export const deleteStop = async (req: Request, res: Response): Promise<void> => 
       message: 'Xóa trạm dừng thành công khỏi CSDL PostgreSQL!',
     });
   } catch (err: any) {
-    logger.error('stop_delete_failed', { table: 'bus_stops', operation: 'delete', stop_id: req.params.id ?? '', error: err });
+    logger.error('stop_delete_failed', {
+      table: 'bus_stops',
+      operation: 'delete',
+      stop_id: req.params.id ?? '',
+      error: err,
+    });
     res.status(500).json({
       statusCode: 500,
       success: false,

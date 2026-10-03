@@ -12,13 +12,30 @@ export class BookingError extends Error {
   }
 }
 
+function assertBookableTrip(trip: {
+  status: string;
+  route_status: string;
+  departure_time: Date | string;
+}) {
+  if (
+    trip.status !== 'SCHEDULED' ||
+    trip.route_status !== 'ACTIVE' ||
+    new Date(trip.departure_time).getTime() <= Date.now()
+  ) {
+    throw new BookingError(409, 'Chuyến xe không còn nhận đặt vé.');
+  }
+}
+
 // The trip row serializes initialization, locks, and sales for the same trip.
 export async function prepareSeats(client: PoolClient, tripId: string) {
   const {
     rows: [trip],
   } = await client.query(
-    `SELECT t.*, b.plate_number, b.total_seats AS capacity, b.bus_type
-     FROM trips t JOIN buses b ON b.id = t.bus_id WHERE t.id = $1 FOR UPDATE OF t`,
+    `SELECT t.*, b.plate_number, b.total_seats AS capacity, b.bus_type,
+            r.status AS route_status
+     FROM trips t JOIN buses b ON b.id = t.bus_id
+     JOIN routes r ON r.id = t.route_id
+     WHERE t.id = $1 FOR UPDATE OF t`,
     [tripId]
   );
   if (!trip) throw new BookingError(404, 'Không tìm thấy chuyến xe hoặc xe buýt.');
@@ -40,6 +57,18 @@ export async function prepareSeats(client: PoolClient, tripId: string) {
     [tripId, trip.bus_id]
   );
   await client.query(
+    `UPDATE payment_transactions p SET status='FAILED'
+     FROM tickets t
+     WHERE p.ticket_id=t.id AND t.trip_id=$1 AND t.status='RESERVED'
+       AND t.reservation_expires_at <= NOW() AND p.status='PENDING'`,
+    [tripId]
+  );
+  await client.query(
+    `UPDATE tickets SET status='CANCELLED',reservation_expires_at=NULL
+     WHERE trip_id=$1 AND status='RESERVED' AND reservation_expires_at <= NOW()`,
+    [tripId]
+  );
+  await client.query(
     `UPDATE trip_seats SET status='AVAILABLE',locked_at=NULL,locked_by_user_id=NULL,
      lock_expires_at=NULL,redis_lock_id=NULL
      WHERE trip_id=$1 AND status='LOCKED' AND lock_expires_at <= NOW()`,
@@ -51,8 +80,7 @@ export async function prepareSeats(client: PoolClient, tripId: string) {
 export async function bookSeat(tripId: string, seatNumber: string, userId: string) {
   return transaction(async client => {
     const trip = await prepareSeats(client, tripId);
-    if (trip.status !== 'SCHEDULED')
-      throw new BookingError(409, 'Chuyến xe không còn nhận đặt vé.');
+    assertBookableTrip(trip);
     const {
       rows: [seat],
     } = await client.query(
@@ -89,14 +117,12 @@ export async function reserveSeatForPayment(
   tripId: string,
   seatNumber: string,
   userId: string,
-  paymentMethod: 'VNPAY' | 'MOMO',
+  paymentMethod: 'VNPAY' | 'MOMO' | 'QR',
   redisLockId: string
 ) {
   return transaction(async client => {
     const trip = await prepareSeats(client, tripId);
-    if (trip.status !== 'SCHEDULED') {
-      throw new BookingError(409, 'Chuyến xe không còn nhận đặt vé.');
-    }
+    assertBookableTrip(trip);
     const {
       rows: [seat],
     } = await client.query(
@@ -144,8 +170,7 @@ export async function holdSeat(tripId: string, seatNumber: string, userId: strin
   try {
     return await transaction(async client => {
       const trip = await prepareSeats(client, tripId);
-      if (trip.status !== 'SCHEDULED')
-        throw new BookingError(409, 'Chuyến xe không còn nhận đặt vé.');
+      assertBookableTrip(trip);
       const {
         rows: [seat],
       } = await client.query(

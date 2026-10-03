@@ -25,8 +25,8 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000,http://localhost:5173}
       # Redis is optional. Empty REDIS_URL => PostgreSQL row locks only.
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
-      # Public HTTPS origin the payment gateways call back into. Without a
-      # tunnel or a deployed domain, VNPay/MoMo cannot reach this service.
+      # Legacy gateway callback origin. The internal QR booking flow needs no
+      # public callback URL or gateway merchant configuration.
       PAYMENT_PUBLIC_BASE_URL: ${PAYMENT_PUBLIC_BASE_URL:-}
       VNPAY_TMN_CODE: ${VNPAY_TMN_CODE:-}
       VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET:-}

@@ -80,7 +80,13 @@ export const unlockSeat = async (req: AuthenticatedRequest, res: Response): Prom
       );
     res.status(rows.length ? 200 : 409).json({ success: !!rows.length });
   } catch (error) {
-    logger.error('seat_unlock_failed', { table: 'trip_seats', operation: 'update', trip_id: req.params.tripId ?? '', seat_number: String(req.body?.seatNumber ?? ''), error });
+    logger.error('seat_unlock_failed', {
+      table: 'trip_seats',
+      operation: 'update',
+      trip_id: req.params.tripId ?? '',
+      seat_number: String(req.body?.seatNumber ?? ''),
+      error,
+    });
     res.status(500).json({ success: false, message: 'Không thể mở khóa ghế.' });
   }
 };

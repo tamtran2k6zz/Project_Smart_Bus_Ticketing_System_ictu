@@ -39,11 +39,13 @@ Use the repository-root `.env.example` as a template. Set `DATABASE_URL` to the 
 | `VNPAY_RETURN_URL`, `VNPAY_IPN_URL` | VNPay callbacks. Defaults derive from `PAYMENT_PUBLIC_BASE_URL` | Required for sandbox/live gateway tests |
 | `MOMO_PARTNER_CODE`, `MOMO_ACCESS_KEY`, `MOMO_SECRET_KEY` | MoMo merchant credentials for signed payment and refund requests | Required to enable MoMo |
 | `MOMO_IPN_URL`, `MOMO_REDIRECT_URL` | MoMo IPN and browser redirect. `MOMO_IPN_URL` must be public | Required for sandbox/live gateway tests |
-| `PAYMENT_RESULT_URL` | Frontend page that displays the payment result | Required |
+| `PAYMENT_RESULT_URL` | Frontend result page for legacy gateway callbacks | Required only for legacy gateway flows |
 | `PAYMENT_CLIENT_IP`, `PAYMENT_REFUND_IP` | IP sent to the gateway; gateways reject `127.0.0.1` | Optional |
 | `PAYMENT_CRON_SECRET` or `CRON_SECRET` | Bearer token shared with the external expired-reservation scheduler | Required in Production |
 
-No Supabase service key, publishable key, or `VITE_SUPABASE_*` variable is needed for this architecture. Never put database credentials or JWT secrets in `VITE_*` variables. Rotate the old repository's demo JWT secret; this requires users to sign in again.
+The current QR booking flow does not require MoMo/VNPay credentials or a bank account. Its QR encodes the pending order, trip, seat, and amount for display/record keeping only; it does not transfer money or confirm payment. A bank QR and payment reconciliation must be added before accepting real payments.
+
+No Supabase service key, publishable key, or `VITE_SUPABASE_*` variable is needed for this architecture. Never put database credentials or JWT secrets in `VITE_*` variables. Rotate the old repository's demo JWT secret; this requires users to sign in again. Rotate or disable any existing demo users whose credentials were previously published.
 
 ### 2.1 One variable name per setting
 
@@ -150,7 +152,7 @@ Back up MySQL and stop application writes during the final import/cutover. Keep 
 npm run db:import:mysql
 ```
 
-The importer supports the deployed 13-table `init.sql` model. It reads a consistent MySQL snapshot, writes a single PostgreSQL transaction, retains IDs and bcrypt hashes, converts booleans/timestamps, and verifies row counts. It requires empty destination application tables (the four seeded roles are allowed). Unknown source tables/columns, conflicting emails, duplicate active seat sales, orphaned references, or a different role mapping abort the import. It never deletes or updates source data. The separate Prisma schema needs an explicit mapping and will be rejected rather than silently losing its extra tables.
+The importer supports the legacy MySQL tables listed in `backend/scripts/import-mysql.cjs` (plus the four standard roles). It reads a consistent MySQL snapshot, writes a single PostgreSQL transaction, retains IDs and bcrypt hashes, converts booleans/timestamps, and verifies row counts. It requires empty destination application tables (the four seeded roles are allowed). Unknown source tables/columns, conflicting emails, duplicate active seat sales, orphaned references, or a different role mapping abort the import. It never deletes or updates source data. The separate Prisma schema needs an explicit mapping and will be rejected rather than silently losing its extra tables.
 
 If starting empty, skip import. Set private `ADMIN_EMAIL` and `ADMIN_PASSWORD` (12+ characters) locally, then run:
 

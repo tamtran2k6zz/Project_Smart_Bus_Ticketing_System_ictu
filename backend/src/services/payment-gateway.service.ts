@@ -1,5 +1,5 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
-import { getGatewayCallbacks, readGatewayEnv, readEnv } from '../config/env';
+import { getGatewayCallbacks, readGatewayEnv } from '../config/env';
 import { appLogger } from '../config/logger';
 
 const logger = appLogger.child('gateway');
@@ -110,12 +110,12 @@ export class PaymentGatewayService {
     const partnerCode = this.requiredEnv('MOMO_PARTNER_CODE');
     const accessKey = this.requiredEnv('MOMO_ACCESS_KEY');
     const secretKey = this.requiredEnv('MOMO_SECRET_KEY');
-    const { momoIpnUrl, paymentResultUrl } = getGatewayCallbacks();
+    const { momoIpnUrl, momoRedirectUrl } = getGatewayCallbacks();
     const requestId = randomUUID();
     const orderInfo = `Thanh toan ve xe ${orderId}`;
     const extraData = '';
     const requestType = 'captureWallet';
-    const redirectUrl = new URL(paymentResultUrl);
+    const redirectUrl = new URL(momoRedirectUrl);
     redirectUrl.searchParams.set('paymentOrder', orderId);
     const rawSignature = [
       `accessKey=${accessKey}`,

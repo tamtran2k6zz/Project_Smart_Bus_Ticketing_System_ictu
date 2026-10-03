@@ -3,6 +3,21 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import type { BusRoute } from '../../types/route';
 import { getApiUrl, apiFetch } from '../../api/client';
+import type {
+  ApiRoute,
+  IncidentRecord,
+  TicketVerificationResult,
+  TripOccupancy,
+} from '../../types/api';
+import { getErrorMessage } from '../../utils/errorMessage';
+
+interface VerifiedTicketSummary {
+  code: string;
+  passenger: string;
+  seat: string;
+  time: string;
+  status: string;
+}
 
 export const DriverPortalPage: React.FC = () => {
   const { user, logout } = useAuth();
@@ -13,16 +28,16 @@ export const DriverPortalPage: React.FC = () => {
 
   // 1. Soát vé QR (US 15)
   const [verifyCode, setVerifyCode] = useState('');
-  const [verifyResult, setVerifyResult] = useState<any>(null);
+  const [verifyResult, setVerifyResult] = useState<TicketVerificationResult | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
-  const [verifiedList, setVerifiedList] = useState<any[]>([]);
+  const [verifiedList, setVerifiedList] = useState<VerifiedTicketSummary[]>([]);
 
   // 2. Báo cáo sự cố đường sá (US 11)
   const [incidentType, setIncidentType] = useState('TRAFFIC_JAM');
   const [delayMinutes, setDelayMinutes] = useState(15);
   const [incidentDescription, setIncidentDescription] = useState('');
   const [incidentMsg, setIncidentMsg] = useState<string | null>(null);
-  const [incidents, setIncidents] = useState<any[]>([]);
+  const [incidents, setIncidents] = useState<IncidentRecord[]>([]);
   const [isSubmittingIncident, setIsSubmittingIncident] = useState(false);
 
   // 3. Danh sách tuyến xe
@@ -53,17 +68,17 @@ export const DriverPortalPage: React.FC = () => {
     try {
       const res = await apiFetch(getApiUrl('/api/v1/routes'));
       const json = await res.json();
-      const rawList = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
-      const mapped: BusRoute[] = rawList.map((r: any) => ({
-        id: r.id,
+      const rawList: ApiRoute[] = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
+      const mapped: BusRoute[] = rawList.map(r => ({
+        id: String(r.id),
         code: r.code,
         name: r.name,
-        status: r.status,
-        stations: (Array.isArray(r.stops) ? r.stops : Array.isArray(r.routeStops) ? r.routeStops : []).map((rs: any) => ({
-          id: rs.stop?.id || rs.stopId || rs.id || `st-${rs.stopOrder}`,
+        status: r.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE',
+        stations: (Array.isArray(r.stops) ? r.stops : Array.isArray(r.routeStops) ? r.routeStops : []).map(rs => ({
+          id: String(rs.stop?.id || rs.stopId || rs.id || `st-${rs.stopOrder ?? 0}`),
           name: rs.stop?.name || rs.name || 'Trạm đón trả',
           address: rs.stop?.address || rs.address || '',
-          order: rs.stopOrder,
+          order: rs.stopOrder ?? 0,
         })),
       }));
       setRoutes(mapped);
@@ -117,8 +132,8 @@ export const DriverPortalPage: React.FC = () => {
         ]);
       }
       setVerifyCode('');
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, 'Không thể soát vé.'));
     } finally {
       setIsVerifying(false);
     }
@@ -138,7 +153,9 @@ export const DriverPortalPage: React.FC = () => {
       const dashRes = await apiFetch(getApiUrl('/api/v1/trips'));
       const dashJson = await dashRes.json();
       dashJson.tripOccupancy = dashJson.data;
-      const firstTripId = dashJson.tripOccupancy?.[0]?.id || 'trip-1';
+      const tripOccupancy: TripOccupancy[] = Array.isArray(dashJson?.data) ? dashJson.data : [];
+      const firstTripId = tripOccupancy[0]?.id;
+      if (!firstTripId) throw new Error('Không có chuyến xe để gắn báo cáo sự cố.');
 
       const res = await apiFetch(getApiUrl('/api/v1/operations/incidents'), {
         method: 'POST',
@@ -161,8 +178,8 @@ export const DriverPortalPage: React.FC = () => {
       setIncidentDescription('');
       await fetchIncidents();
       setTimeout(() => setIncidentMsg(null), 4000);
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, 'Không thể gửi báo cáo sự cố.'));
     } finally {
       setIsSubmittingIncident(false);
     }

@@ -2,24 +2,30 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Navbar } from '../../components/layout/Navbar';
 import apiClient from '../../api/client';
+import { getVietnamDateString } from '../../utils/date';
 
 import { DEFAULT_STOPS, DEFAULT_ROUTES } from '../../constants/defaultData';
 
 interface StopItem {
-  id: number;
+  id: string | number;
   code: string;
   name: string;
   address: string;
 }
 
+interface RouteStopItem {
+  stopId: string | number;
+  name: string;
+}
+
 interface RouteItem {
-  id: number;
+  id: string | number;
   code: string;
   name: string;
   distanceKm: number;
   basePrice: number;
   status: string;
-  stops?: any[];
+  stops?: RouteStopItem[];
 }
 
 export const HomePage: React.FC = () => {
@@ -28,9 +34,7 @@ export const HomePage: React.FC = () => {
   const [routes, setRoutes] = useState<RouteItem[]>(DEFAULT_ROUTES);
   const [originStopId, setOriginStopId] = useState<string>(String(DEFAULT_STOPS[0].id));
   const [destStopId, setDestStopId] = useState<string>(String(DEFAULT_STOPS[1].id));
-  const [departureDate, setDepartureDate] = useState<string>(
-    new Date().toISOString().split('T')[0]
-  );
+  const [departureDate, setDepartureDate] = useState<string>(getVietnamDateString());
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -50,13 +54,13 @@ export const HomePage: React.FC = () => {
         const rawStops = stopsRes?.data;
         const rawRoutes = routesRes?.data;
 
-        const stopsData = Array.isArray(rawStops?.data)
+        const stopsData: StopItem[] = Array.isArray(rawStops?.data)
           ? rawStops.data
           : Array.isArray(rawStops)
           ? rawStops
           : [];
 
-        const routesData = Array.isArray(rawRoutes?.data)
+        const routesData: RouteItem[] = Array.isArray(rawRoutes?.data)
           ? rawRoutes.data
           : Array.isArray(rawRoutes)
           ? rawRoutes
@@ -74,7 +78,7 @@ export const HomePage: React.FC = () => {
           setOriginStopId(String(finalStops[0].id));
           setDestStopId(String(finalStops[1].id));
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Lỗi nạp dữ liệu từ cơ sở dữ liệu:', err);
         if (!isMounted) return;
         setErrorMsg('Đang hoạt động ở chế độ dữ liệu mặc định (Chưa kết nối CSDL cơ sở dữ liệu).');
@@ -480,9 +484,6 @@ export const HomePage: React.FC = () => {
       }}>
         <p style={{ margin: 0 }}>
           Smart Bus Ticketing System • Dự án Thực tập Cơ sở 2026 - Nhóm 5 (ICTU)
-        </p>
-        <p style={{ margin: '6px 0 0', fontSize: '12px' }}>
-          Quản trị CSDL trực tiếp qua phpMyAdmin: <a href="http://localhost:8080" target="_blank" rel="noreferrer" style={{ color: '#38bdf8' }}>http://localhost:8080</a>
         </p>
       </footer>
     </div>

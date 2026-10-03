@@ -1,4 +1,4 @@
-// Copies the deployed init.sql schema. Never modifies the source database.
+// Imports supported legacy MySQL tables into PostgreSQL. Never modifies the source database.
 require('dotenv/config');
 const mysql=require('mysql2/promise');
 const {Client}=require('pg');

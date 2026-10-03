@@ -4,12 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "npm --prefix backend run start:express",
-    "build": "npm --prefix backend install",
-    "build:frontend": "npm --prefix frontend install && npm --prefix frontend run build",
-    "build:backend": "npm --prefix backend install",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:frontend": "npm --prefix frontend run build",
+    "build:backend": "npm --prefix backend run build",
     "start": "npm --prefix backend run start:express",
-    "lint": "eslint \"backend/src/**/*.{js,ts}\"",
-    "test": "jest"
+    "lint": "npm --prefix backend run lint && npm --prefix frontend run lint",
+    "test": "npm --prefix backend test -- --runInBand && npm --prefix frontend test"
   },
   "devDependencies": {
     "husky": "^8.0.3",

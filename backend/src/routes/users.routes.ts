@@ -6,7 +6,7 @@ import { appLogger } from '../config/logger';
 
 const logger = appLogger.child('users');
 const router = Router();
-router.use(authenticateJWT, authorizeRoles('ADMIN','MANAGER'));
+router.use(authenticateJWT, authorizeRoles('ADMIN', 'MANAGER'));
 
 // 1. Danh sách người dùng (US 17, US 22)
 router.get('/', async (_req: Request, res: Response): Promise<void> => {
@@ -49,10 +49,10 @@ router.patch('/:id/discount-approval', async (req: Request, res: Response): Prom
       return;
     }
 
-    await query(
-      'UPDATE users SET discount_status = $1, updated_at = NOW() WHERE id = $2',
-      [status, id]
-    );
+    await query('UPDATE users SET discount_status = $1, updated_at = NOW() WHERE id = $2', [
+      status,
+      id,
+    ]);
 
     res.status(200).json({
       statusCode: 200,
@@ -60,7 +60,12 @@ router.patch('/:id/discount-approval', async (req: Request, res: Response): Prom
       message: `Đã cập nhật trạng thái duyệt ưu đãi thành ${status}`,
     });
   } catch (err: any) {
-    logger.error('discount_approval_failed', { table: 'users', operation: 'update', user_id: req.params.id ?? '', error: err });
+    logger.error('discount_approval_failed', {
+      table: 'users',
+      operation: 'update',
+      user_id: req.params.id ?? '',
+      error: err,
+    });
     res.status(500).json({
       statusCode: 500,
       success: false,

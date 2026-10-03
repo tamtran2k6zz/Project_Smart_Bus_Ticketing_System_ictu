@@ -21,6 +21,11 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const TOKEN_KEY = 'smartbus_access_token';
 const USER_KEY = 'smartbus_user';
 
+function normalizeUserStatus(status: unknown): User['status'] {
+  if (status === 'INACTIVE' || status === 'SUSPENDED') return status;
+  return 'ACTIVE';
+}
+
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [tokens, setTokens] = useState<AuthTokens | null>(null);
@@ -90,7 +95,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         phone: apiUser.phoneNumber || '',
         fullName: apiUser.fullName,
         avatarUrl: null,
-        status: (apiUser.status || 'ACTIVE') as any,
+        status: normalizeUserStatus(apiUser.status),
         roles: [role],
         permissions:
           role === 'ADMIN'
@@ -162,7 +167,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         phone: apiUser.phoneNumber || credentials.phone || '',
         fullName: apiUser.fullName,
         avatarUrl: null,
-        status: (apiUser.status || 'ACTIVE') as any,
+        status: normalizeUserStatus(apiUser.status),
         roles: [role],
         permissions: ['ticket:book', 'route:view'],
         createdAt: new Date().toISOString(),

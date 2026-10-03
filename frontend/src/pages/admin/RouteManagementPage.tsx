@@ -9,6 +9,8 @@ import UserManagementView from '../../components/admin/UserManagementView';
 import OperationsView from '../../components/admin/OperationsView';
 import type { BusRoute } from '../../types/route';
 import { getApiUrl, apiFetch } from '../../api/client';
+import type { ApiRoute } from '../../types/api';
+import { getErrorMessage } from '../../utils/errorMessage';
 
 function RouteManagementPage() {
   const [activeTab, setActiveTab] = useState<AdminTab>('routes');
@@ -36,22 +38,22 @@ function RouteManagementPage() {
       }
 
       const json = await res.json();
-      const rawList = Array.isArray(json?.data)
+      const rawList: ApiRoute[] = Array.isArray(json?.data)
         ? json.data
         : Array.isArray(json)
         ? json
         : [];
 
-      const mapped: BusRoute[] = rawList.map((r: any) => ({
-        id: r.id,
+      const mapped: BusRoute[] = rawList.map(r => ({
+        id: String(r.id),
         code: r.code,
         name: r.name,
-        status: (r.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE') as any,
-        stations: (Array.isArray(r.stops) ? r.stops : Array.isArray(r.routeStops) ? r.routeStops : []).map((rs: any) => ({
-          id: rs.stopId || rs.stop?.id || rs.id || `rs-${rs.stopOrder}`,
+        status: r.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE',
+        stations: (Array.isArray(r.stops) ? r.stops : Array.isArray(r.routeStops) ? r.routeStops : []).map(rs => ({
+          id: String(rs.stopId || rs.stop?.id || rs.id || `rs-${rs.stopOrder ?? 0}`),
           name: rs.name || rs.stop?.name || 'Trạm đón trả',
           address: rs.address || rs.stop?.address || '',
-          order: rs.stopOrder,
+          order: rs.stopOrder ?? 0,
         })),
       }));
 
@@ -116,8 +118,8 @@ function RouteManagementPage() {
       }
 
       await fetchRoutesFromDatabase();
-    } catch (err: any) {
-      alert(`Lỗi xóa tuyến: ${err.message}`);
+    } catch (err: unknown) {
+      alert(`Lỗi xóa tuyến: ${getErrorMessage(err, 'Không thể xóa tuyến.')}`);
     }
   };
 
@@ -147,6 +149,11 @@ function RouteManagementPage() {
             description: `Tuyến xe ${route.name}`,
             distanceKm: 15.0,
             estimatedDurationMin: 40,
+            stations: route.stations.map(({ name, address, order }) => ({
+              name,
+              address,
+              order,
+            })),
           }),
         });
 
@@ -163,6 +170,12 @@ function RouteManagementPage() {
             code: route.code,
             name: route.name,
             status: route.status,
+            stations: route.stations.map(({ id, name, address, order }) => ({
+              id,
+              name,
+              address,
+              order,
+            })),
           }),
         });
 
@@ -175,8 +188,8 @@ function RouteManagementPage() {
       setModalOpen(false);
       setSelectedRoute(null);
       await fetchRoutesFromDatabase();
-    } catch (err: any) {
-      alert(`Thao tác cơ sở dữ liệu thất bại: ${err.message}`);
+    } catch (err: unknown) {
+      alert(`Thao tác cơ sở dữ liệu thất bại: ${getErrorMessage(err, 'Không thể lưu tuyến.')}`);
     }
   };
 
