@@ -24,8 +24,31 @@ router.get(
        ORDER BY t.departure_time ASC`
       );
 
+      const [{ totalRevenue }] = await query<any[]>(
+        `SELECT COALESCE(SUM(tk.fare_amount), 0) AS "totalRevenue"
+         FROM tickets tk
+         JOIN trips t ON tk.trip_id = t.id
+         WHERE t.status = 'COMPLETED' AND tk.status IN ('BOOKED', 'CHECKED_IN')`
+      );
+
+      const [{ totalTicketsBooked }] = await query<any[]>(
+        `SELECT COUNT(tk.id) AS "totalTicketsBooked"
+         FROM tickets tk
+         JOIN trips t ON tk.trip_id = t.id
+         WHERE t.status = 'COMPLETED' AND tk.status IN ('BOOKED', 'CHECKED_IN')`
+      );
+
       const [{ totalRoutes }] = await query<any[]>(
         'SELECT COUNT(*) AS "totalRoutes" FROM routes WHERE status = \'ACTIVE\''
+      );
+      const [{ totalBuses }] = await query<any[]>(
+        'SELECT COUNT(*) AS "totalBuses" FROM buses'
+      );
+      const [{ totalBusStops }] = await query<any[]>(
+        'SELECT COUNT(*) AS "totalBusStops" FROM bus_stops'
+      );
+      const [{ totalUsers }] = await query<any[]>(
+        'SELECT COUNT(*) AS "totalUsers" FROM users'
       );
       const [{ totalIncidents }] = await query<any[]>(
         'SELECT COUNT(*) AS "totalIncidents" FROM incidents'
@@ -42,6 +65,16 @@ router.get(
 
       res.status(200).json({
         success: true,
+        overview: {
+          totalRevenue: Number(totalRevenue) || 0,
+          totalTicketsBooked: Number(totalTicketsBooked) || 0,
+          totalRoutes: Number(totalRoutes) || 0,
+          totalBusStops: Number(totalBusStops) || 0,
+          totalBuses: Number(totalBuses) || 0,
+          totalTrips: trips.length,
+          totalUsers: Number(totalUsers) || 0,
+          activeIncidents: Number(totalIncidents) || 0,
+        },
         tripOccupancy: trips,
         summary: {
           totalTrips: trips.length,
@@ -49,6 +82,11 @@ router.get(
           totalIncidents,
           averageOccupancy,
           totalBooked,
+          totalRevenue: Number(totalRevenue) || 0,
+          totalTicketsBooked: Number(totalTicketsBooked) || 0,
+          totalUsers: Number(totalUsers) || 0,
+          totalBuses: Number(totalBuses) || 0,
+          totalBusStops: Number(totalBusStops) || 0,
         },
       });
     } catch (err: any) {
