@@ -35,6 +35,37 @@ interface CompletedTrip {
   arrivalTime: string;
 }
 
+const ReservationCountdown: React.FC<{ expiresAt: string; onExpired: () => void }> = ({ expiresAt, onExpired }) => {
+  const [timeLeft, setTimeLeft] = useState<number>(() => {
+    const diff = new Date(expiresAt).getTime() - Date.now();
+    return Math.max(0, Math.floor(diff / 1000));
+  });
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const diff = new Date(expiresAt).getTime() - Date.now();
+      const secs = Math.max(0, Math.floor(diff / 1000));
+      setTimeLeft(secs);
+      if (secs <= 0) {
+        clearInterval(timer);
+        onExpired();
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [expiresAt, onExpired]);
+
+  const minutes = Math.floor(timeLeft / 60);
+  const seconds = timeLeft % 60;
+  const formatted = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  const isUrgent = timeLeft < 60;
+
+  return (
+    <span style={{ color: isUrgent ? '#f87171' : '#fbbf24', fontWeight: 700, fontFamily: 'monospace', fontSize: '14px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+      ⏱️ {timeLeft > 0 ? `Hết hạn sau: ${formatted}` : 'ĐÃ HẾT HẠN (10 PHÚT)'}
+    </span>
+  );
+};
+
 export const PassengerPortalPage: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -732,7 +763,14 @@ export const PassengerPortalPage: React.FC = () => {
                         <p style={{ margin: 0 }}><strong>Số ghế:</strong> <span style={{ color: '#34d399', fontWeight: 600 }}>{sNumber}</span></p>
                         <p style={{ margin: 0 }}><strong>Số tiền:</strong> {Number(payAmount).toLocaleString('vi-VN')} VNĐ</p>
                         <p style={{ margin: 0 }}><strong>Trạng thái thanh toán:</strong> {paymentStatus || (isPaid ? 'SUCCESS' : 'PENDING')}</p>
-                        {expTime && !isPaid && <p style={{ margin: 0 }}><strong>Giữ chỗ đến:</strong> {expTime}</p>}
+                        {expRaw && !isPaid && (
+                          <div style={{ margin: '4px 0' }}>
+                            <strong>Giữ chỗ đến:</strong> {expTime} ({<ReservationCountdown expiresAt={expRaw} onExpired={() => {
+                              alert('⚠️ Thời gian giữ chỗ 10 phút đã hết hạn. Ghế đã được tự động giải phóng về trạng thái trống.');
+                              setBookingResult(null);
+                            }} />})
+                          </div>
+                        )}
                         <div style={{ marginTop: '10px', fontSize: '12.5px', color: isPaid ? '#34d399' : '#fbbf24', display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <span>{isPaid ? '✓' : '…'}</span> {isPaid ? 'Vé đã được xác nhận' : 'Mã QR chỉ lưu thông tin giao dịch; chưa ghi nhận đã thanh toán'}
                         </div>
