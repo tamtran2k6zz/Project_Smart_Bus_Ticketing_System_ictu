@@ -13,6 +13,7 @@ import DriverPortalPage from '../pages/driver/DriverPortalPage';
 import PassengerPortalPage from '../pages/passenger/PassengerPortalPage';
 import DriverTripDetailPage from '../pages/driver/DriverTripDetailPage';
 import PaymentPage from '../pages/payment/PaymentPage';
+import PaymentResultPage from '../pages/payment/PaymentResultPage';
 
 export const AppRoutes: React.FC = () => {
   return (
@@ -27,6 +28,8 @@ export const AppRoutes: React.FC = () => {
       {/* Chọn cổng thanh toán VNPay / MoMo (cần đăng nhập) */}
       <Route element={<ProtectedRoute allowedRoles={['PASSENGER', 'ADMIN', 'MANAGER']} />}>
         <Route path="/payment" element={<PaymentPage />} />
+        {/* Kết quả giao dịch: trạng thái đọc từ API theo orderId, không tin tham số URL */}
+        <Route path="/payment/result" element={<PaymentResultPage />} />
       </Route>
 
       {/* US 22: Trang xác thực / Đăng nhập: PublicRoute chỉ cho phép khi chưa đăng nhập */}
