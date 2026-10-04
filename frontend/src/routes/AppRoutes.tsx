@@ -27,6 +27,7 @@ export const AppRoutes: React.FC = () => {
       {/* Chọn cổng thanh toán VNPay / MoMo (cần đăng nhập) */}
       <Route element={<ProtectedRoute allowedRoles={['PASSENGER', 'ADMIN', 'MANAGER']} />}>
         <Route path="/payment" element={<PaymentPage />} />
+        <Route path="/payment/result" element={<PassengerPortalPage />} />
       </Route>
 
       {/* US 22: Trang xác thực / Đăng nhập: PublicRoute chỉ cho phép khi chưa đăng nhập */}

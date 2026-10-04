@@ -327,7 +327,7 @@ export const PassengerPortalPage: React.FC = () => {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const orderId = params.get('paymentOrder');
+    const orderId = params.get('paymentOrder') || params.get('orderId');
     if (!orderId) return;
     const loadPayment = async () => {
       try {
@@ -341,6 +341,7 @@ export const PassengerPortalPage: React.FC = () => {
         setBookingMsg(result.data.paymentStatus === 'SUCCESS'
           ? 'Thanh toán thành công, vé đã được xác nhận.'
           : `Trạng thái thanh toán: ${result.data.paymentStatus}.`);
+        await fetchMyTickets();
       } catch (error) {
         setBookingMsg(error instanceof Error ? error.message : 'Không thể tải trạng thái thanh toán.');
       } finally {
@@ -348,7 +349,7 @@ export const PassengerPortalPage: React.FC = () => {
       }
     };
     void loadPayment();
-  }, []);
+  }, [fetchMyTickets]);
 
   const handleBook = async () => {
     const trip = trips.find((t) => t.id === selectedTripId);
