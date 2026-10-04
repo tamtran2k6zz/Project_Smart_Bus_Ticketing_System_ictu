@@ -141,14 +141,13 @@ export interface GatewayCallbacks {
  */
 export function getGatewayCallbacks(): GatewayCallbacks {
   const base = getPublicBaseUrl();
-  const frontendBase = readEnv('FRONTEND_URL') || (isProduction() ? base : 'http://localhost:3000');
   return {
     vnpayReturnUrl:
       readGatewayEnv('VNPAY_RETURN_URL') || `${base}/api/v1/ticketing/payments/vnpay/return`,
     vnpayIpnUrl: readGatewayEnv('VNPAY_IPN_URL') || `${base}/api/v1/ticketing/payments/vnpay/ipn`,
-    momoRedirectUrl: readGatewayEnv('MOMO_REDIRECT_URL') || `${frontendBase}/passenger/booking`,
+    momoRedirectUrl: readGatewayEnv('MOMO_REDIRECT_URL') || `${base}/passenger/booking`,
     momoIpnUrl: readGatewayEnv('MOMO_IPN_URL') || `${base}/api/v1/ticketing/payments/momo/ipn`,
-    paymentResultUrl: readGatewayEnv('PAYMENT_RESULT_URL') || `${frontendBase}/passenger/booking`,
+    paymentResultUrl: readGatewayEnv('PAYMENT_RESULT_URL') || `${base}/passenger/booking`,
   };
 }
 
