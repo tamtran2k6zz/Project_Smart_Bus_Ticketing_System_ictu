@@ -35,6 +35,26 @@ interface CompletedTrip {
   arrivalTime: string;
 }
 
+interface MyTicketItem {
+  ticket_id: string;
+  ticket_code: string;
+  seat_number: string;
+  fare_amount: number;
+  ticket_status: string;
+  reservation_expires_at?: string;
+  trip_id: string;
+  departure_time: string;
+  arrival_time: string;
+  route_code: string;
+  route_name: string;
+  bus_plate?: string;
+  order_id?: string;
+  payment_method?: string;
+  payment_amount?: number;
+  payment_status?: string;
+  paid_at?: string;
+}
+
 const ReservationCountdown: React.FC<{ expiresAt: string; onExpired: () => void }> = ({ expiresAt, onExpired }) => {
   const [timeLeft, setTimeLeft] = useState<number>(() => {
     const diff = new Date(expiresAt).getTime() - Date.now();
@@ -73,7 +93,7 @@ export const PassengerPortalPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const requestedTripId = searchParams.get('trip_id');
 
-  const [activeTab, setActiveTab] = useState<'booking' | 'discount' | 'feedback' | 'routes'>('booking');
+  const [activeTab, setActiveTab] = useState<'booking' | 'my-tickets' | 'discount' | 'feedback' | 'routes'>('booking');
 
   // Đặt vé
   const [trips, setTrips] = useState<TripItem[]>([]);
@@ -82,8 +102,45 @@ export const PassengerPortalPage: React.FC = () => {
   const [selectedSeat, setSelectedSeat] = useState<string>('');
   const [voucherCode, setVoucherCode] = useState<string>('');
   const [bookingResult, setBookingResult] = useState<BookingResult | null>(null);
+  const [myTickets, setMyTickets] = useState<MyTicketItem[]>([]);
   const [isBooking, setIsBooking] = useState<boolean>(false);
   const [bookingMsg, setBookingMsg] = useState<string | null>(null);
+
+  const fetchMyTickets = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('smartbus_access_token');
+      const res = await apiFetch(getApiUrl('/api/v1/ticketing/my-tickets'), {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const json = await res.json();
+      if (res.ok && Array.isArray(json?.data)) {
+        setMyTickets(json.data);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchMyTickets();
+  }, [fetchMyTickets]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('smartbus_last_booking');
+    if (saved) {
+      try {
+        setBookingResult(JSON.parse(saved));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (bookingResult) {
+      localStorage.setItem('smartbus_last_booking', JSON.stringify(bookingResult));
+    }
+  }, [bookingResult]);
 
   // Hồ sơ ưu đãi HSSV
   const [discountStatus, setDiscountStatus] = useState<string>('APPROVED');
@@ -544,28 +601,70 @@ export const PassengerPortalPage: React.FC = () => {
       </header>
 
       {/* Navigation Pills Bar */}
-      <div style={{ padding: '16px 36px 0', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-        <button
-          className={`menu-item ${activeTab === 'booking' ? 'active' : ''}`}
-          onClick={() => setActiveTab('booking')}
-          style={{ width: 'auto', padding: '9px 20px', borderRadius: '9999px' }}
-        >
-          🎫 Đặt vé & Sơ đồ ghế (US 1, 2, 3, 4)
-        </button>
-        <button
-          className={`menu-item ${activeTab === 'discount' ? 'active' : ''}`}
-          onClick={() => setActiveTab('discount')}
-          style={{ width: 'auto', padding: '9px 20px', borderRadius: '9999px' }}
-        >
-          🎓 Ưu đãi HSSV (US 17)
-        </button>
-        <button
-          className={`menu-item ${activeTab === 'routes' ? 'active' : ''}`}
-          onClick={() => setActiveTab('routes')}
-          style={{ width: 'auto', padding: '9px 20px', borderRadius: '9999px' }}
-        >
-          🚌 Lộ trình & Giá vé
-        </button>
+      <div style={{ padding: '16px 36px 0', display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            className={`menu-item ${activeTab === 'booking' ? 'active' : ''}`}
+            onClick={() => setActiveTab('booking')}
+            style={{ width: 'auto', padding: '9px 20px', borderRadius: '9999px' }}
+          >
+            🎫 Đặt vé & Sơ đồ ghế (US 1, 2, 3, 4)
+          </button>
+          <button
+            className={`menu-item ${activeTab === 'my-tickets' ? 'active' : ''}`}
+            onClick={() => setActiveTab('my-tickets')}
+            style={{ width: 'auto', padding: '9px 20px', borderRadius: '9999px' }}
+          >
+            🎟️ Vé Của Tôi & Lịch sử
+          </button>
+          <button
+            className={`menu-item ${activeTab === 'discount' ? 'active' : ''}`}
+            onClick={() => setActiveTab('discount')}
+            style={{ width: 'auto', padding: '9px 20px', borderRadius: '9999px' }}
+          >
+            🎓 Ưu đãi HSSV (US 17)
+          </button>
+          <button
+            className={`menu-item ${activeTab === 'routes' ? 'active' : ''}`}
+            onClick={() => setActiveTab('routes')}
+            style={{ width: 'auto', padding: '9px 20px', borderRadius: '9999px' }}
+          >
+            🚌 Lộ trình & Giá vé
+          </button>
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            type="button"
+            onClick={() => setActiveTab('booking')}
+            style={{
+              padding: '8px 16px',
+              fontSize: '12.5px',
+              borderRadius: '9999px',
+              background: 'rgba(56, 189, 248, 0.15)',
+              border: '1px solid rgba(56, 189, 248, 0.4)',
+              color: '#38bdf8',
+              cursor: 'pointer',
+              fontWeight: 600,
+            }}
+          >
+            ← Đặt vé tiếp / Quay lại
+          </button>
+          <a
+            href="/landing.html"
+            style={{
+              padding: '8px 16px',
+              fontSize: '12.5px',
+              borderRadius: '9999px',
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              color: '#ffffff',
+              textDecoration: 'none',
+              fontWeight: 600,
+            }}
+          >
+            🏠 Về Trang Chủ
+          </a>
+        </div>
       </div>
 
       {/* Main Tab Content */}
@@ -574,10 +673,24 @@ export const PassengerPortalPage: React.FC = () => {
         {activeTab === 'booking' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <div className="liquid-glass" style={{ padding: '32px' }}>
-              <h2 style={{ fontSize: '28px', margin: '0 0 6px' }}>Đặt Vé Xe Buýt Trực Tuyến & Giữ Chỗ</h2>
-              <p style={{ fontSize: '13.5px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '24px' }}>
-                Chọn chuyến xe xuất bến, chọn vị trí ngồi và nhận vé điện tử QR lưu trữ trực tiếp trong cơ sở dữ liệu.
-              </p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                  <h2 style={{ fontSize: '28px', margin: '0 0 6px' }}>Đặt Vé Xe Buýt Trực Tuyến & Giữ Chỗ</h2>
+                  <p style={{ fontSize: '13.5px', color: 'rgba(255, 255, 255, 0.6)' }}>
+                    Chọn chuyến xe xuất bến, chọn vị trí ngồi và nhận vé điện tử QR lưu trữ trực tiếp trong cơ sở dữ liệu.
+                  </p>
+                </div>
+                {bookingResult && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('my-tickets')}
+                    className="primary-button"
+                    style={{ padding: '10px 20px', fontSize: '13px', background: '#0284c7' }}
+                  >
+                    🎫 Xem lại vé đã đặt →
+                  </button>
+                )}
+              </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '24px' }}>
                 <div>
@@ -787,7 +900,7 @@ export const PassengerPortalPage: React.FC = () => {
                         <div style={{ fontSize: '12px', marginBottom: '8px', fontWeight: 700 }}>
                           QR THÔNG TIN GIAO DỊCH (CHƯA PHẢI QR CHUYỂN KHOẢN)
                         </div>
-                        <PaymentQrCode value={paymentQrValue} size={220} alt="QR thông tin giao dịch SmartBus" />
+                        <PaymentQrCode value={paymentQrValue} size={220} alt="QR thông tin giao dịch SmartBus" showDownload={true} downloadFileName={`smartbus-booking-${tCode}.png`} />
                         <div style={{ maxWidth: '240px', marginTop: '8px', fontSize: '11px', lineHeight: 1.4 }}>
                           Quét mã để xem mã vé, chuyến xe, ghế và số tiền. Mã này không chuyển tiền và không tự xác nhận thanh toán.
                         </div>
@@ -821,7 +934,7 @@ export const PassengerPortalPage: React.FC = () => {
                           MÃ QR ĐƯA CHO TÀI XẾ SOÁT VÉ
                         </div>
                         <div style={{ background: '#ffffff', padding: '10px', borderRadius: '12px', display: 'inline-block', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)' }}>
-                          <PaymentQrCode value={ticketQrValue} size={140} alt="Mã QR vé xe buýt" />
+                          <PaymentQrCode value={ticketQrValue} size={140} alt="Mã QR vé xe buýt" showDownload={true} downloadFileName={`smartbus-ticket-${tCode}.png`} />
                         </div>
                         <div
                           style={{
@@ -838,16 +951,137 @@ export const PassengerPortalPage: React.FC = () => {
                           {ticketQrValue}
                         </div>
                       </div>}
-                      {ticketStatus === 'BOOKED' && (
-                        <button type="button" onClick={handleCancelTicket} className="primary-button" style={{ marginTop: '20px', background: '#b91c1c' }}>
-                          Hủy vé / yêu cầu hoàn tiền
-                        </button>
-                      )}
+                      <div style={{ flexBasis: '100%', display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
+                        <div style={{ fontSize: '13px', color: '#34d399', background: 'rgba(52, 211, 153, 0.1)', padding: '10px 14px', borderRadius: '10px', border: '1px solid rgba(52, 211, 153, 0.3)' }}>
+                          ✓ Đã tự động gửi hóa đơn điện tử và ảnh QR vé qua email tới: <strong>{user?.email || 'khachhang@gmail.com'}</strong>
+                        </div>
+                        {ticketStatus && ['BOOKED', 'RESERVED'].includes(ticketStatus) && (
+                          <button type="button" onClick={handleCancelTicket} className="primary-button" style={{ background: '#b91c1c' }}>
+                            Hủy vé / yêu cầu hoàn tiền
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
               })()}
             </div>
+          </div>
+        )}
+
+        {activeTab === 'booking' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {/* ... booking content ... */}
+          </div>
+        )}
+
+        {/* TAB: VÉ CỦA TÔI & LỊCH SỬ ĐẶT VÉ */}
+        {activeTab === 'my-tickets' && (
+          <div className="liquid-glass" style={{ padding: '32px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+              <div>
+                <h2 style={{ fontSize: '28px', margin: '0 0 6px' }}>Vé Của Tôi & Lịch Sử Đặt Vé</h2>
+                <p style={{ fontSize: '13.5px', color: 'rgba(255, 255, 255, 0.6)' }}>
+                  Quản lý tất cả vé điện tử đã đặt và mã QR soát vé trong cơ sở dữ liệu.
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => { fetchMyTickets(); setActiveTab('booking'); }}
+                  className="primary-button"
+                  style={{ padding: '10px 20px', fontSize: '13px' }}
+                >
+                  ← Đặt vé chuyến mới
+                </button>
+                <a
+                  href="/landing.html"
+                  style={{
+                    padding: '10px 20px',
+                    fontSize: '13px',
+                    borderRadius: '9999px',
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    border: '1px solid rgba(255, 255, 255, 0.25)',
+                    color: '#ffffff',
+                    textDecoration: 'none',
+                    fontWeight: 600,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                  }}
+                >
+                  🏠 Về Trang Chủ
+                </a>
+              </div>
+            </div>
+
+            {myTickets.length === 0 && !bookingResult ? (
+              <div style={{ padding: '48px 24px', textAlign: 'center', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '16px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                <div style={{ fontSize: '42px', marginBottom: '16px' }}>🎟️</div>
+                <h3 style={{ fontSize: '20px', color: '#ffffff', margin: '0 0 8px' }}>Bạn chưa có lịch sử vé nào trong hệ thống</h3>
+                <p style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '24px' }}>
+                  Hãy chọn chuyến xe và tiến hành đặt vé trực tuyến ngay để nhận mã QR và vé điện tử.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('booking')}
+                  className="primary-button"
+                  style={{ padding: '12px 28px' }}
+                >
+                  Đến trang đặt vé ngay →
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {myTickets.map((t) => {
+                  const isPaid = t.ticket_status === 'BOOKED' || t.payment_status === 'SUCCESS';
+                  const qrVal = `SMARTBUS-QR-${t.ticket_code}`;
+                  return (
+                    <div
+                      key={t.ticket_id}
+                      className="liquid-glass-strong"
+                      style={{
+                        padding: '24px',
+                        borderRadius: '18px',
+                        border: '1px solid rgba(56, 189, 248, 0.4)',
+                        boxShadow: '0 0 30px rgba(56, 189, 248, 0.2)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                        <h3 style={{ color: '#38bdf8', fontSize: '20px', margin: 0 }}>
+                          [{t.route_code}] {t.route_name}
+                        </h3>
+                        <span style={{
+                          padding: '4px 12px',
+                          borderRadius: '9999px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          background: isPaid ? 'rgba(52, 211, 153, 0.15)' : 'rgba(251, 191, 36, 0.15)',
+                          color: isPaid ? '#34d399' : '#fbbf24',
+                          border: `1px solid ${isPaid ? 'rgba(52, 211, 153, 0.4)' : 'rgba(251, 191, 36, 0.4)'}`,
+                        }}>
+                          {t.ticket_status} ({t.payment_status || 'PENDING'})
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '28px', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ fontSize: '14px', lineHeight: 2, color: 'rgba(255, 255, 255, 0.9)' }}>
+                          <p style={{ margin: 0 }}><strong>Mã vé:</strong> <span style={{ color: '#38bdf8', fontWeight: 700 }}>{t.ticket_code}</span></p>
+                          <p style={{ margin: 0 }}><strong>Số ghế:</strong> <span style={{ color: '#34d399', fontWeight: 600 }}>{t.seat_number}</span></p>
+                          <p style={{ margin: 0 }}><strong>Biển số xe:</strong> {t.bus_plate || 'Xe buýt tuyến'}</p>
+                          <p style={{ margin: 0 }}><strong>Khởi hành:</strong> {new Date(t.departure_time).toLocaleString('vi-VN')}</p>
+                          <p style={{ margin: 0 }}><strong>Số tiền:</strong> {Number(t.fare_amount || t.payment_amount || 0).toLocaleString('vi-VN')} VNĐ</p>
+                        </div>
+
+                        <div style={{ background: '#ffffff', padding: '12px', borderRadius: '14px', display: 'inline-block', textAlign: 'center', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+                          <PaymentQrCode value={qrVal} size={140} alt="Mã QR vé xe buýt" showDownload={true} downloadFileName={`smartbus-ticket-${t.ticket_code}.png`} />
+                          <div style={{ fontSize: '11px', color: '#0f172a', fontWeight: 600, marginTop: '6px', fontFamily: 'monospace' }}>{t.ticket_code}</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
