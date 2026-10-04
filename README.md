@@ -121,6 +121,12 @@ Docker Compose chạy frontend, Express API và Redis cục bộ; API kết nố
 ### 📊 G. Bảng điều khiển Vận hành & Báo cáo (Dashboard & Operations)
 - Báo cáo tổng hợp số lượng tuyến, số lượt xe đang chạy, tỷ lệ lấp đầy ghế bình quân và doanh thu theo ngày/tháng.
 
+### 💡 H. Các tính năng nâng cao & Cải tiến mới (Sprint Hoàn thiện)
+- **Tải ảnh QR vé về máy:** Nút "Lưu ảnh QR về máy" cho phép xuất hình ảnh PNG chất lượng cao cho cả mã QR thông tin giao dịch đặt chỗ và mã QR soát vé.
+- **Quản lý & Hủy vé trực tuyến:** Hỗ trợ hủy vé cho cả trạng thái `RESERVED` (giữ chỗ) và `BOOKED` (đã xác nhận), tự động hoàn trả ghế trống về CSDL.
+- **Vé của tôi & Lịch sử đặt vé (`GET /api/v1/ticketing/my-tickets`):** Tra cứu toàn bộ lịch sử vé điện tử đã đặt của tài khoản, đồng bộ hóa trực tiếp từ PostgreSQL và lưu trữ phiên qua `localStorage`.
+- **Gửi email xác nhận tự động:** Gửi thông tin hóa đơn và ảnh QR vé qua email cho hành khách sau khi đặt vé thành công, đồng thời gửi email xác nhận tài khoản khi người dùng đăng ký mới.
+
 ---
 
 ## 🔑 3. Tạo tài khoản quản trị

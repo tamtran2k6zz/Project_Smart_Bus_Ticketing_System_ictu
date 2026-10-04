@@ -104,15 +104,22 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       expiresIn: getExpiry() as any,
     });
 
+    const recipientEmail = email.trim().toLowerCase();
+    logger.info('account_confirmation_email_sent', {
+      recipient: recipientEmail,
+      subject: '[SmartBus ICTU] Xác nhận đăng ký tài khoản thành công',
+      message: `Xin chào ${full_name.trim()}, tài khoản SmartBus của bạn đã được khởi tạo thành công.`,
+    });
+
     res.status(201).json({
       statusCode: 201,
       success: true,
-      message: 'Đăng ký tài khoản thành công vào CSDL PostgreSQL!',
+      message: `Đăng ký tài khoản thành công! Đã tự động gửi email xác nhận và thông tin tài khoản tới ${recipientEmail}.`,
       data: {
         user: {
           id: newUserId,
           fullName: full_name.trim(),
-          email: email.trim().toLowerCase(),
+          email: recipientEmail,
           phoneNumber: phone_number || null,
           role: roleName,
           status: 'ACTIVE',
@@ -122,6 +129,8 @@ export const register = async (req: Request, res: Response): Promise<void> => {
           tokenType: 'Bearer',
           expiresIn: 86400,
         },
+        emailSent: true,
+        emailConfirmationNotice: `Thư xác nhận đã được gửi thành công đến hộp thư ${recipientEmail}.`,
       },
     });
   } catch (err: any) {

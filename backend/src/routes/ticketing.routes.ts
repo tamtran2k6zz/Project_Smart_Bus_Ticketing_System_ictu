@@ -302,6 +302,37 @@ export async function releaseExpiredReservations(): Promise<number> {
 router.get('/trips/:tripId/seats', getSeatsByTrip);
 
 router.get(
+  '/my-tickets',
+  authenticateJWT,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const rows = await query<any[]>(
+        `SELECT t.id AS ticket_id, t.ticket_code, t.seat_number, t.fare_amount, t.status AS ticket_status,
+                t.reservation_expires_at, tr.id AS trip_id, tr.departure_time, tr.arrival_time,
+                r.code AS route_code, r.name AS route_name, bus.plate_number AS bus_plate,
+                p.order_id, p.payment_method, p.amount AS payment_amount, p.status AS payment_status, p.paid_at
+         FROM tickets t
+         JOIN trips tr ON tr.id = t.trip_id
+         JOIN routes r ON r.id = tr.route_id
+         LEFT JOIN buses bus ON bus.id = tr.bus_id
+         LEFT JOIN payment_transactions p ON p.ticket_id = t.id
+         WHERE t.user_id = $1
+         ORDER BY t.created_at DESC`,
+        [req.user!.id]
+      );
+      res.json({ success: true, data: rows });
+    } catch (error) {
+      logger.error('my_tickets_lookup_failed', {
+        table: 'tickets/trips/routes/payment_transactions',
+        user_id: req.user?.id,
+        error,
+      });
+      res.status(500).json({ success: false, message: 'Không thể tải lịch sử vé của bạn.' });
+    }
+  }
+);
+
+router.get(
   '/completed-trips',
   authenticateJWT,
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
