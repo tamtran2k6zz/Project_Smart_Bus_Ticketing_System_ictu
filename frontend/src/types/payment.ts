@@ -21,6 +21,22 @@ export interface CreateBookingResult {
   paymentUrl: string;
 }
 
+// Phản hồi GET /api/v1/ticketing/payments/:orderId (trạng thái lấy từ DB, không tin query URL)
+export interface PaymentStatusDetail {
+  orderId: string;
+  paymentMethod: string;
+  amount: number;
+  paymentStatus: string;
+  paidAt: string | null;
+  ticket: {
+    id: string;
+    ticketCode: string;
+    seatNumber: string;
+    tripId: string;
+    status: string;
+  };
+}
+
 // Phiên đặt chỗ lưu trong LocalStorage trước khi chuyển sang cổng thanh toán
 export interface BookingSession {
   orderId: string;

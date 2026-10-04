@@ -385,7 +385,17 @@ vào PowerShell mà không bị lỗi cú pháp:
 
 ---
 
-## 👥 8. Đội ngũ phát triển (Team 5 - N5 Innovators)
+## 🚀 8. Các tính năng nâng cao & Hoàn thiện hệ thống (Sprint cuối)
+
+* **Tải ảnh QR vé (`Lưu ảnh QR về máy`)**: Tích hợp tính năng xuất tệp PNG chất lượng cao cho mã QR thông tin giao dịch đặt chỗ và mã QR vé điện tử đưa cho tài xế soát vé.
+* **Hủy vé & Hoàn tiền trực tuyến**: Cho phép hành khách chủ động hủy vé/yêu cầu hoàn tiền đối với các vé đang ở trạng thái `RESERVED` (giữ chỗ) hoặc `BOOKED` (đã xác nhận), tự động hoàn trả ghế về trạng thái trống.
+* **Lịch sử vé của tôi (`GET /api/v1/ticketing/my-tickets`)**: Quản lý toàn bộ vé điện tử đã đặt của tài khoản, đồng bộ trực tiếp từ cơ sở dữ liệu PostgreSQL và lưu trữ phiên qua `localStorage`.
+* **Gửi email xác nhận & hóa đơn tự động**: Tự động thông báo hóa đơn điện tử và ảnh QR vé qua email cho hành khách sau khi đặt vé, đồng thời gửi email xác nhận và thông tin tài khoản khi người dùng đăng ký mới.
+* **Định tuyến kết quả thanh toán (`/payment/result`)**: Đồng bộ hóa trải nghiệm giữa Local (Docker/Vite) và Vercel (Production) với route xử lý kết quả thanh toán mượt mà.
+
+---
+
+## 👥 9. Đội ngũ phát triển (Team 5 - N5 Innovators)
 
 | STT | Họ và tên | Vai trò trong dự án | Phân hệ phụ trách chính |
 | :---: | :--- | :--- | :--- |
