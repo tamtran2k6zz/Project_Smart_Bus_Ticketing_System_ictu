@@ -83,6 +83,14 @@ export const PassengerPortalPage: React.FC = () => {
   const [bookingResult, setBookingResult] = useState<BookingResult | null>(null);
   const [isBooking, setIsBooking] = useState<boolean>(false);
   const [bookingMsg, setBookingMsg] = useState<string | null>(null);
+  //error message
+  const [tripError, setTripError] = useState<string | null>(null);
+  const [seatError, setSeatError] = useState<string | null>(null);
+  const [otherDataError, setOtherDataError] = useState<string | null>(null);
+  const [networkStatus, setNetworkStatus] = useState<'online' | 'offline' | null>(() => {
+    if (typeof navigator === 'undefined') return null;
+    return navigator.onLine ? null : 'offline';
+  });
 
   // Hồ sơ ưu đãi HSSV
   const [discountStatus, setDiscountStatus] = useState<string>('APPROVED');
@@ -103,7 +111,7 @@ export const PassengerPortalPage: React.FC = () => {
   // 2. HÀM ĐỔI MÀU CHO GHẾ HÀNH KHÁCH
   // =========================================================
   const getSeatStyles = (seat: SeatInfo, isSelected: boolean) => {
-    if (isSelected || seat.status === 'LOCKED') {
+    if (isSelected) {
       return {
         border: '1px solid #f97316',
         backgroundColor: 'rgba(249, 115, 22, 0.25)',
@@ -113,6 +121,26 @@ export const PassengerPortalPage: React.FC = () => {
       };
     }
     
+    if (seat.status === 'HELD') {
+      return {
+        border: '1px solid #f97316',
+        backgroundColor: 'rgba(249, 115, 22, 0.18)',
+        color: '#fdba74',
+        boxShadow: 'none',
+        cursor: 'not-allowed',
+      };
+    }
+
+    if (seat.status === 'BLOCKED' || seat.status === 'LOCKED' || seat.status === 'BOOKED') {
+      return {
+        border: '1px solid rgba(255, 255, 255, 0.2)',
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        color: 'rgba(255, 255, 255, 0.3)',
+        boxShadow: 'none',
+        cursor: 'not-allowed',
+      };
+    }
+
     if (seat.status === 'AVAILABLE' || seat.isAvailable) {
       return {
         border: '1px solid #10b981',
@@ -163,6 +191,7 @@ export const PassengerPortalPage: React.FC = () => {
         .filter(t => new Date(t.departureTime).getTime() > now);
 
       setTrips(tripList);
+      setTripError(null);
       if (tripList.length > 0) {
         setSelectedTripId(
           requestedTripId && tripList.some((trip: TripItem) => trip.id === requestedTripId)
@@ -174,8 +203,9 @@ export const PassengerPortalPage: React.FC = () => {
       }
     } catch (e) {
       console.error(e);
-      setTrips([]);
-      setSelectedTripId('');
+      setTripError(
+        'Không thể tải danh sách chuyến. Vui lòng kiểm tra kết nối mạng và thử lại.',
+      );
     }
   }, [requestedTripId]);
 
@@ -187,32 +217,51 @@ export const PassengerPortalPage: React.FC = () => {
   // =========================================================
   // 3. Nạp sơ đồ ghế & Thời gian thực (Polling mỗi 3 giây)
   // =========================================================
+  const fetchSeats = useCallback(async () => {
+    if (!selectedTripId) return;
+
+    try {
+      const res = await apiFetch(
+        getApiUrl(
+          `/api/v1/ticketing/trips/${selectedTripId}/seats`,
+        ),
+      );
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        throw new Error(
+          json?.message || 'Không thể tải trạng thái ghế',
+        );
+      }
+
+      const rawSeats = Array.isArray(json?.data?.seats)
+        ? json.data.seats
+        : Array.isArray(json?.seats)
+        ? json.seats
+        : [];
+
+      setSeats(rawSeats);
+      setSeatError(null);
+    } catch (e) {
+      console.error(e);
+      setSeatError(
+        'Không thể cập nhật trạng thái ghế. Đang giữ dữ liệu gần nhất.',
+      );
+    }
+  }, [selectedTripId]);
+
   useEffect(() => {
     if (!selectedTripId) return;
-    
-    const fetchSeats = async () => {
-      try {
-        const res = await apiFetch(getApiUrl(`/api/v1/ticketing/trips/${selectedTripId}/seats`));
-        const json = await res.json();
-        const rawSeats = Array.isArray(json?.data?.seats)
-          ? json.data.seats
-          : Array.isArray(json?.seats)
-          ? json.seats
-          : [];
-        setSeats(rawSeats);
-      } catch (e) {
-        console.error(e);
-      }
-    };
 
-    fetchSeats(); // Gọi lần đầu tiên
+    void fetchSeats();
 
-    const intervalId = setInterval(() => {
-      fetchSeats(); // Gọi tự động mỗi 3 giây
+    const intervalId = window.setInterval(() => {
+      void fetchSeats();
     }, 3000);
 
-    return () => clearInterval(intervalId);
-  }, [selectedTripId]);
+    return () => window.clearInterval(intervalId);
+  }, [selectedTripId, fetchSeats]);
 
   // Nạp phản ánh & lộ trình
   const fetchOtherData = useCallback(async () => {
@@ -255,11 +304,12 @@ export const PassengerPortalPage: React.FC = () => {
         })),
       }));
       setRoutes(mapped);
+      setOtherDataError(null);
     } catch (e) {
       console.error(e);
-      setFeedbacks([]);
-      setRoutes([]);
-      setCompletedTrips([]);
+      setOtherDataError(
+        'Không thể cập nhật một số dữ liệu. Vui lòng thử lại sau.',
+      );
     }
   }, []);
 
@@ -267,6 +317,33 @@ export const PassengerPortalPage: React.FC = () => {
     fetchTrips();
     fetchOtherData();
   }, [fetchTrips, fetchOtherData]);
+
+  useEffect(() => {
+    const handleOffline = () => {
+      setNetworkStatus('offline');
+    };
+
+    const handleOnline = () => {
+      setNetworkStatus('online');
+      void fetchTrips();
+      void fetchOtherData();
+      void fetchSeats();
+
+      const timer = window.setTimeout(() => {
+        setNetworkStatus(null);
+      }, 3000);
+
+      return () => window.clearTimeout(timer);
+    };
+
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnline);
+
+    return () => {
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [fetchTrips, fetchOtherData, fetchSeats]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -468,9 +545,9 @@ export const PassengerPortalPage: React.FC = () => {
   const initial = displayName.charAt(0).toUpperCase();
 
   return (
-    <div className="admin-layout" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="admin-layout passenger-portal" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* Header Liquid-Glass */}
-      <header className="header" style={{ position: 'sticky', top: 0, zIndex: 30 }}>
+      <header className="header passenger-header" style={{ position: 'sticky', top: 0, zIndex: 30 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           <div className="logo-icon">🚌</div>
           <div>
@@ -545,7 +622,7 @@ export const PassengerPortalPage: React.FC = () => {
       </header>
 
       {/* Navigation Pills Bar */}
-      <div style={{ padding: '16px 36px 0', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+      <div className="passenger-nav" style={{ padding: '16px 36px 0', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
         <button
           className={`menu-item ${activeTab === 'booking' ? 'active' : ''}`}
           onClick={() => setActiveTab('booking')}
@@ -570,7 +647,210 @@ export const PassengerPortalPage: React.FC = () => {
       </div>
 
       {/* Main Tab Content */}
-      <main className="content" style={{ padding: '24px 36px 48px' }}>
+      <main className="content passenger-content" style={{ padding: '24px 36px 48px' }}>
+        {networkStatus === 'offline' && (
+          <div className="network-status-banner network-status-offline" role="alert">
+            <div>
+              <strong>⚠️ Mất kết nối mạng</strong>
+              <span>Một số dữ liệu có thể chưa được cập nhật.</span>
+            </div>
+            <button
+              type="button"
+              className="network-retry-button"
+              onClick={() => {
+                void fetchTrips();
+                void fetchOtherData();
+                void fetchSeats();
+              }}
+            >
+              Thử lại
+            </button>
+          </div>
+        )}
+
+        {networkStatus === 'online' && (
+          <div className="network-status-banner network-status-online" role="status">
+            <div>
+              <strong>✓ Đã kết nối lại</strong>
+              <span>Dữ liệu đang được cập nhật trở lại.</span>
+            </div>
+          </div>
+        )}
+
+        {(tripError || seatError || otherDataError) && (
+          <div className="network-inline-error" role="status">
+            <div>
+              <strong>Một số dữ liệu chưa được cập nhật</strong>
+              {tripError && <div>{tripError}</div>}
+              {seatError && <div>{seatError}</div>}
+              {otherDataError && <div>{otherDataError}</div>}
+            </div>
+            <button
+              type="button"
+              className="network-retry-button"
+              onClick={() => {
+                void fetchTrips();
+                void fetchOtherData();
+                void fetchSeats();
+              }}
+            >
+              Thử lại
+            </button>
+          </div>
+        )}
+
+        <style>{`
+          .network-status-banner,
+          .network-inline-error {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            border-radius: 14px;
+            font-size: 13px;
+          }
+
+          .network-status-banner {
+            position: sticky;
+            top: 8px;
+            z-index: 25;
+            backdrop-filter: blur(12px);
+          }
+
+          .network-status-banner strong,
+          .network-status-banner span {
+            display: block;
+          }
+
+          .network-status-banner span {
+            margin-top: 2px;
+            opacity: 0.78;
+          }
+
+          .network-status-offline,
+          .network-inline-error {
+            color: #fff7ed;
+            background: rgba(124, 45, 18, 0.92);
+            border: 1px solid rgba(251, 146, 60, 0.4);
+          }
+
+          .network-status-online {
+            color: #ecfdf5;
+            background: rgba(6, 78, 59, 0.92);
+            border: 1px solid rgba(52, 211, 153, 0.4);
+          }
+
+          .network-inline-error > div {
+            min-width: 0;
+          }
+
+          .network-inline-error > div > div {
+            margin-top: 3px;
+            line-height: 1.45;
+          }
+
+          .network-retry-button {
+            flex: 0 0 auto;
+            border: 1px solid rgba(255, 255, 255, 0.24);
+            border-radius: 10px;
+            padding: 8px 14px;
+            color: #fff;
+            background: rgba(255, 255, 255, 0.08);
+          }
+
+          .passenger-seat-grid button,
+          .passenger-portal button {
+            transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+          }
+
+          .passenger-seat-grid button:not(:disabled):hover {
+            transform: translateY(-2px);
+          }
+
+          @media (max-width: 900px) {
+            .passenger-content {
+              padding: 20px !important;
+            }
+
+            .passenger-header {
+              padding-left: 20px !important;
+              padding-right: 20px !important;
+            }
+          }
+
+          @media (max-width: 680px) {
+            .passenger-header {
+              position: relative !important;
+              flex-direction: column !important;
+              align-items: flex-start !important;
+              gap: 12px !important;
+            }
+
+            .passenger-nav {
+              padding: 12px 14px 0 !important;
+              flex-direction: column !important;
+              align-items: stretch !important;
+            }
+
+            .passenger-nav .menu-item {
+              width: 100% !important;
+            }
+
+            .passenger-content {
+              padding: 14px !important;
+            }
+
+            .passenger-booking-form {
+              grid-template-columns: 1fr !important;
+            }
+
+            .passenger-seat-grid {
+              grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+              gap: 8px !important;
+              padding: 12px !important;
+            }
+
+            .passenger-seat-grid button {
+              min-width: 0 !important;
+              padding: 11px 4px !important;
+            }
+
+            .passenger-ticket-content {
+              flex-direction: column !important;
+              align-items: stretch !important;
+            }
+
+            .passenger-ticket-content > div,
+            .passenger-ticket-content > aside {
+              width: 100% !important;
+              max-width: 100% !important;
+            }
+
+            .network-status-banner,
+            .network-inline-error {
+              align-items: stretch;
+              flex-direction: column;
+              padding: 11px 12px;
+            }
+
+            .network-retry-button {
+              width: 100%;
+            }
+          }
+
+          @media (max-width: 420px) {
+            .passenger-content {
+              padding: 10px !important;
+            }
+
+            .passenger-seat-grid {
+              grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+            }
+          }
+        `}</style>
+
         {/* TAB 1: ĐẶT VÉ TRỰC TUYẾN */}
         {activeTab === 'booking' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -580,7 +860,7 @@ export const PassengerPortalPage: React.FC = () => {
                 Chọn chuyến xe xuất bến, chọn vị trí ngồi và nhận vé điện tử QR lưu trữ trực tiếp trong cơ sở dữ liệu.
               </p>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+              <div className="passenger-booking-form" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '24px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'rgba(255, 255, 255, 0.75)', marginBottom: '8px' }}>
                     Chọn chuyến xe xuất bến:
@@ -647,6 +927,7 @@ export const PassengerPortalPage: React.FC = () => {
                 </div>
 
                 <div
+                  className="passenger-seat-grid"
                   style={{
                     display: 'grid',
                     gridTemplateColumns: 'repeat(auto-fill, minmax(70px, 1fr))',
@@ -745,7 +1026,7 @@ export const PassengerPortalPage: React.FC = () => {
 
                 return (
                   <div
-                    className="liquid-glass-strong"
+                    className="liquid-glass-strong passenger-ticket-card"
                     style={{
                       marginTop: '28px',
                       padding: '24px',
@@ -757,7 +1038,7 @@ export const PassengerPortalPage: React.FC = () => {
                     <h3 style={{ color: '#38bdf8', fontSize: '22px', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       🎟️ Vé Điện Tử SmartBus Của Bạn (Lưu trong cơ sở dữ liệu)
                     </h3>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '28px', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div className="passenger-ticket-content" style={{ display: 'flex', flexWrap: 'wrap', gap: '28px', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div style={{ fontSize: '14px', lineHeight: 2, color: 'rgba(255, 255, 255, 0.9)' }}>
                         <p style={{ margin: 0 }}><strong>Mã vé:</strong> <span style={{ color: '#38bdf8', fontWeight: 700, fontSize: '15px' }}>{tCode}</span></p>
                         <p style={{ margin: 0 }}><strong>Số ghế:</strong> <span style={{ color: '#34d399', fontWeight: 600 }}>{sNumber}</span></p>

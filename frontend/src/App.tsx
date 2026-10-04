@@ -2,6 +2,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import AppRoutes from './routes/AppRoutes';
+import NetworkStatusBanner from './components/common/NetworkStatusBanner';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -108,11 +109,11 @@ function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <AuthProvider>
+          <NetworkStatusBanner />
           <AppRoutes />
         </AuthProvider>
       </BrowserRouter>
     </ErrorBoundary>
   );
 }
-
 export default App;
