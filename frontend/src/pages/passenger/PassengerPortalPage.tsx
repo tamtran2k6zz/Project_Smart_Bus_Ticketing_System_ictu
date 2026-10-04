@@ -35,6 +35,26 @@ interface CompletedTrip {
   arrivalTime: string;
 }
 
+interface MyTicketItem {
+  ticket_id: string;
+  ticket_code: string;
+  seat_number: string;
+  fare_amount: number;
+  ticket_status: string;
+  reservation_expires_at?: string;
+  trip_id: string;
+  departure_time: string;
+  arrival_time: string;
+  route_code: string;
+  route_name: string;
+  bus_plate?: string;
+  order_id?: string;
+  payment_method?: string;
+  payment_amount?: number;
+  payment_status?: string;
+  paid_at?: string;
+}
+
 const ReservationCountdown: React.FC<{ expiresAt: string; onExpired: () => void }> = ({ expiresAt, onExpired }) => {
   const [timeLeft, setTimeLeft] = useState<number>(() => {
     const diff = new Date(expiresAt).getTime() - Date.now();
@@ -81,7 +101,7 @@ export const PassengerPortalPage: React.FC = () => {
   const [selectedSeat, setSelectedSeat] = useState<string>('');
   const [voucherCode, setVoucherCode] = useState<string>('');
   const [bookingResult, setBookingResult] = useState<BookingResult | null>(null);
-  const [myTickets, setMyTickets] = useState<any[]>([]);
+  const [myTickets, setMyTickets] = useState<MyTicketItem[]>([]);
   const [isBooking, setIsBooking] = useState<boolean>(false);
   const [bookingMsg, setBookingMsg] = useState<string | null>(null);
 
