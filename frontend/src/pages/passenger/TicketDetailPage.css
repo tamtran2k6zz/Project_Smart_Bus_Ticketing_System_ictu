@@ -1,0 +1,238 @@
+.ticket-detail-page {
+  min-height: 100vh;
+  padding: 32px;
+  background: #090909;
+  color: #f8fafc;
+}
+
+.ticket-detail-container {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+}
+
+.ticket-back-button {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  margin-bottom: 18px;
+}
+
+.ticket-back-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.ticket-detail-card {
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 22px;
+  background: rgba(15, 15, 18, 0.96);
+  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.ticket-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 28px 32px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ticket-detail-eyebrow {
+  font-size: 12px;
+  color: #38bdf8;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+}
+
+.ticket-detail-header h1 {
+  margin: 8px 0;
+  font-size: 30px;
+}
+
+.ticket-detail-header p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.ticket-status {
+  padding: 9px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ticket-status-booked {
+  color: #34d399;
+  background: rgba(52, 211, 153, 0.1);
+  border: 1px solid rgba(52, 211, 153, 0.3);
+}
+
+.ticket-status-reserved {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.ticket-status-cancelled {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+}
+
+.ticket-detail-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 32px;
+  padding: 32px;
+}
+
+.ticket-info-section h2,
+.ticket-qr-section h2 {
+  margin: 0 0 18px;
+  font-size: 20px;
+}
+
+.ticket-route-box {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 18px;
+  padding: 20px;
+  margin-bottom: 24px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ticket-stop {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ticket-stop span,
+.ticket-info-item span {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.ticket-stop strong {
+  font-size: 17px;
+}
+
+.ticket-route-arrow {
+  font-size: 28px;
+  color: #38bdf8;
+}
+
+.ticket-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.ticket-info-item {
+  padding: 15px 16px;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.ticket-info-item strong {
+  display: block;
+  margin-top: 5px;
+  line-height: 1.4;
+}
+
+.ticket-section-title {
+  margin-top: 28px !important;
+}
+
+.ticket-qr-section {
+  padding: 22px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.035);
+  text-align: center;
+  align-self: start;
+}
+
+.ticket-qr-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 250px;
+  padding: 18px;
+  background: #fff;
+  border-radius: 18px;
+}
+
+.ticket-qr-image {
+  display: block;
+  width: 220px;
+  height: 220px;
+  object-fit: contain;
+}
+
+.ticket-qr-empty {
+  color: #111827;
+}
+
+.ticket-qr-note {
+  margin: 14px 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.ticket-code-box {
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  color: #38bdf8;
+  font-family: monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.ticket-detail-error {
+  padding: 40px;
+  text-align: center;
+}
+
+@media (max-width: 850px) {
+  .ticket-detail-page {
+    padding: 18px;
+  }
+
+  .ticket-detail-header {
+    flex-direction: column;
+  }
+
+  .ticket-detail-content {
+    grid-template-columns: 1fr;
+    padding: 20px;
+  }
+
+  .ticket-qr-section {
+    order: -1;
+  }
+}
+
+@media (max-width: 560px) {
+  .ticket-info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ticket-route-box {
+    grid-template-columns: 1fr;
+  }
+
+  .ticket-route-arrow {
+    transform: rotate(90deg);
+    justify-self: center;
+  }
+}

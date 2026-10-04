@@ -13,9 +13,11 @@ import DriverPortalPage from '../pages/driver/DriverPortalPage';
 import PassengerPortalPage from '../pages/passenger/PassengerPortalPage';
 import DriverTripDetailPage from '../pages/driver/DriverTripDetailPage';
 import PaymentPage from '../pages/payment/PaymentPage';
+import TicketDetailPage from '../pages/passenger/TicketDetailPage';
 
 export const AppRoutes: React.FC = () => {
   return (
+    
     <Routes>
       {/* US 01: Trang chủ với thanh tra cứu chuyến xe (Công khai) */}
       <Route path="/" element={<HomePage />} />
@@ -74,19 +76,35 @@ export const AppRoutes: React.FC = () => {
 
       {/* Phân hệ Hành khách (Passenger Portal): Đặt vé & Sơ đồ ghế */}
       <Route
-        path="/passenger"
-        element={<ProtectedRoute allowedRoles={['PASSENGER', 'ADMIN', 'MANAGER']} />}
-      >
-        <Route index element={<Navigate to="/passenger/booking" replace />} />
-        <Route path="booking" element={<PassengerPortalPage />} />
-      </Route>
+  path="/passenger"
+  element={
+    <ProtectedRoute
+      allowedRoles={['PASSENGER', 'ADMIN', 'MANAGER']}
+    />
+  }
+>
+  <Route
+    index
+    element={<Navigate to="/passenger/booking" replace />}
+  />
 
+  <Route
+    path="booking"
+    element={<PassengerPortalPage />}
+  />
+
+  <Route
+    path="ticket/:ticketCode"
+    element={<TicketDetailPage />}
+  />
+</Route>
       {/* Trang báo lỗi 403 Forbidden khi thiếu quyền */}
       <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
       {/* Điều hướng mặc định nếu route không tồn tại */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    
   );
 };
 

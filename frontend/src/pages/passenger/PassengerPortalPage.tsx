@@ -839,6 +839,32 @@ export const PassengerPortalPage: React.FC = () => {
                           {ticketQrValue}
                         </div>
                       </div>}
+                      {tCode && (
+  <div
+    style={{
+      flexBasis: '100%',
+      display: 'flex',
+      gap: '12px',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+    }}
+  >
+    <button
+      type="button"
+      className="primary-button"
+      onClick={() =>
+        navigate(
+          `/passenger/ticket/${encodeURIComponent(tCode)}`
+        )
+      }
+      style={{
+        padding: '11px 22px',
+      }}
+    >
+      🎫 Xem chi tiết vé →
+    </button>
+  </div>
+)}
                       {ticketStatus === 'BOOKED' && (
                         <button type="button" onClick={handleCancelTicket} className="primary-button" style={{ marginTop: '20px', background: '#b91c1c' }}>
                           Hủy vé / yêu cầu hoàn tiền
