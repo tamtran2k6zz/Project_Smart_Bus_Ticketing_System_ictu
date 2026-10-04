@@ -1066,3 +1066,468 @@ button {
     width: calc(100vw - 16px);
   }
 }
+/* =========================================================
+   ROUTE MANAGEMENT - DARK LIQUID GLASS POLISH
+   ========================================================= */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+/* Ô tìm kiếm */
+.search-input {
+  height: 42px;
+  min-width: 240px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 10px !important;
+  outline: none;
+  background: rgba(255, 255, 255, 0.055) !important;
+  color: #ffffff !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.search-input::placeholder {
+  color: rgba(255, 255, 255, 0.42) !important;
+}
+
+.search-input:hover {
+  background: rgba(255, 255, 255, 0.07) !important;
+}
+
+.search-input:focus {
+  border-color: rgba(56, 189, 248, 0.65) !important;
+  background: rgba(255, 255, 255, 0.07) !important;
+  box-shadow:
+    0 0 0 3px rgba(56, 189, 248, 0.08),
+    0 0 18px rgba(56, 189, 248, 0.08);
+}
+
+/* Select */
+.filter-select {
+  height: 42px;
+  min-width: 105px;
+  padding: 0 36px 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 10px !important;
+  outline: none;
+  background-color: #0b0b0f !important;
+  color: #ffffff !important;
+  color-scheme: dark;
+  cursor: pointer;
+}
+
+.filter-select:hover {
+  border-color: rgba(255, 255, 255, 0.24) !important;
+}
+
+.filter-select:focus {
+  border-color: rgba(56, 189, 248, 0.65) !important;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.08);
+}
+
+.filter-select option {
+  background: #111116;
+  color: #ffffff;
+}
+
+/* Nút Thêm tuyến */
+.toolbar .primary-button,
+.toolbar > .primary-button {
+  height: 42px;
+  border: 1px solid rgba(56, 189, 248, 0.42) !important;
+  border-radius: 10px !important;
+  padding: 0 16px !important;
+  background: rgba(56, 189, 248, 0.10) !important;
+  color: #7dd3fc !important;
+  font-weight: 600;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 0 14px rgba(56, 189, 248, 0.04);
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.15s ease,
+    box-shadow 0.2s ease;
+}
+
+.toolbar .primary-button:hover,
+.toolbar > .primary-button:hover {
+  background: rgba(56, 189, 248, 0.16) !important;
+  border-color: rgba(56, 189, 248, 0.7) !important;
+  color: #bae6fd !important;
+  box-shadow:
+    0 0 18px rgba(56, 189, 248, 0.10);
+}
+
+.toolbar .primary-button:active,
+.toolbar > .primary-button:active {
+  transform: translateY(1px);
+}
+
+/* Khung bảng */
+.content-card {
+  background: rgba(255, 255, 255, 0.025) !important;
+  border: 1px solid rgba(255, 255, 255, 0.09) !important;
+  border-radius: 16px !important;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.025);
+}
+
+/* Bảng */
+.route-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: transparent;
+}
+
+.route-table th {
+  padding: 15px 16px;
+  background: rgba(255, 255, 255, 0.035) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: rgba(125, 211, 252, 0.9) !important;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.route-table td {
+  padding: 16px;
+  background: transparent !important;
+  color: rgba(255, 255, 255, 0.86) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.065) !important;
+}
+
+.route-table tbody tr {
+  transition:
+    background 0.18s ease,
+    transform 0.18s ease;
+}
+
+.route-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.025) !important;
+}
+
+/* Cột mã tuyến */
+.route-table td:first-child {
+  color: #ffffff !important;
+  font-weight: 700;
+}
+
+/* Cột tên tuyến */
+.route-table td:nth-child(2) {
+  color: rgba(255, 255, 255, 0.88) !important;
+}
+
+/* Số trạm */
+.route-table td:nth-child(3) {
+  color: rgba(255, 255, 255, 0.78) !important;
+}
+
+/* Badge trạng thái */
+.status-badge.active {
+  padding: 6px 11px;
+  border: 1px solid rgba(16, 185, 129, 0.35) !important;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.09) !important;
+  color: #34d399 !important;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.08);
+}
+
+/* Nút Trạm / Sửa / Xóa */
+.table-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.action-button {
+  border: 1px solid rgba(255, 255, 255, 0.11) !important;
+  border-radius: 9px !important;
+  padding: 7px 11px !important;
+  background: rgba(255, 255, 255, 0.045) !important;
+  color: rgba(255, 255, 255, 0.82) !important;
+  font-size: 12px;
+  font-weight: 500;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.15s ease;
+}
+
+.action-button:hover {
+  background: rgba(255, 255, 255, 0.09) !important;
+  border-color: rgba(255, 255, 255, 0.22) !important;
+  color: #ffffff !important;
+}
+
+.action-button:active {
+  transform: translateY(1px);
+}
+
+/* Nút Xóa nổi bật nhẹ */
+.action-button:last-child {
+  color: #fca5a5 !important;
+}
+
+.action-button:last-child:hover {
+  border-color: rgba(248, 113, 113, 0.35) !important;
+  background: rgba(248, 113, 113, 0.08) !important;
+  color: #f87171 !important;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .search-input,
+  .filter-select,
+  .toolbar .primary-button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .route-table {
+    min-width: 820px;
+  }
+}
+
+@media (max-width: 480px) {
+  .route-table {
+    min-width: 760px;
+  }
+
+  .route-table th,
+  .route-table td {
+    padding: 13px 12px;
+  }
+}
+/* =========================================================
+   ROUTE TOOLBAR - FORCE DARK CONTROLS
+   ========================================================= */
+
+.toolbar input,
+.toolbar select,
+.toolbar button {
+  box-sizing: border-box !important;
+  font-family: 'Open Sans', sans-serif !important;
+  color: #ffffff !important;
+}
+
+/* Search */
+.toolbar input {
+  height: 42px !important;
+  padding: 0 14px !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 10px !important;
+  background: rgba(255, 255, 255, 0.055) !important;
+  color: #ffffff !important;
+  outline: none !important;
+  box-shadow: none !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+}
+
+.toolbar input::placeholder {
+  color: rgba(255, 255, 255, 0.42) !important;
+}
+
+.toolbar input:focus {
+  border-color: rgba(56, 189, 248, 0.65) !important;
+  background: rgba(255, 255, 255, 0.07) !important;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.08) !important;
+}
+
+/* Select */
+.toolbar select {
+  height: 42px !important;
+  padding: 0 34px 0 12px !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 10px !important;
+  background: #0b0b0f !important;
+  color: #ffffff !important;
+  outline: none !important;
+  appearance: auto !important;
+  -webkit-appearance: auto !important;
+  color-scheme: dark !important;
+}
+
+.toolbar select option {
+  background: #111116 !important;
+  color: #ffffff !important;
+}
+
+/* Thêm tuyến */
+.toolbar button {
+  height: 42px !important;
+  padding: 0 16px !important;
+  border: 1px solid rgba(56, 189, 248, 0.42) !important;
+  border-radius: 10px !important;
+  background: rgba(56, 189, 248, 0.10) !important;
+  color: #7dd3fc !important;
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.04) !important;
+}
+
+.toolbar button:hover {
+  background: rgba(56, 189, 248, 0.16) !important;
+  border-color: rgba(56, 189, 248, 0.7) !important;
+  color: #bae6fd !important;
+}
+/* =========================================================
+   ROUTE TABLE TOOLBAR
+   ========================================================= */
+
+.route-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.018);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-wrap: wrap;
+}
+
+/* Ô tìm kiếm */
+.route-search {
+  flex: 1 1 260px;
+  min-width: 220px;
+  height: 42px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 10px !important;
+  outline: none !important;
+  background: rgba(255, 255, 255, 0.045) !important;
+  color: #ffffff !important;
+  font-family: 'Open Sans', sans-serif !important;
+  font-size: 13px;
+  transition: all 0.2s ease;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.route-search::placeholder {
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.route-search:hover {
+  background: rgba(255, 255, 255, 0.065) !important;
+  border-color: rgba(255, 255, 255, 0.22) !important;
+}
+
+.route-search:focus {
+  background: rgba(255, 255, 255, 0.07) !important;
+  border-color: rgba(56, 189, 248, 0.65) !important;
+  box-shadow:
+    0 0 0 3px rgba(56, 189, 248, 0.08),
+    0 0 18px rgba(56, 189, 248, 0.08);
+}
+
+/* Bộ lọc */
+.route-filter {
+  flex: 0 0 105px;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 10px !important;
+  outline: none !important;
+  background: #0b0b0f !important;
+  color: #ffffff !important;
+  font-family: 'Open Sans', sans-serif !important;
+  font-size: 13px;
+  cursor: pointer;
+  color-scheme: dark;
+}
+
+.route-filter:hover {
+  border-color: rgba(255, 255, 255, 0.25) !important;
+}
+
+.route-filter:focus {
+  border-color: rgba(56, 189, 248, 0.65) !important;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.08);
+}
+
+.route-filter option {
+  background: #0d0d14;
+  color: #ffffff;
+}
+
+/* Nút thêm tuyến */
+.route-add-button {
+  flex: 0 0 auto;
+  height: 42px;
+  padding: 0 17px;
+  border: 1px solid rgba(56, 189, 248, 0.40) !important;
+  border-radius: 10px !important;
+  background: rgba(56, 189, 248, 0.10) !important;
+  color: #7dd3fc !important;
+  font-family: 'Open Sans', sans-serif !important;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 0 14px rgba(56, 189, 248, 0.04);
+}
+
+.route-add-button:hover {
+  background: rgba(56, 189, 248, 0.16) !important;
+  border-color: rgba(56, 189, 248, 0.70) !important;
+  color: #bae6fd !important;
+  box-shadow:
+    0 0 18px rgba(56, 189, 248, 0.12);
+  transform: translateY(-1px);
+}
+
+.route-add-button:active {
+  transform: translateY(0);
+}
+
+/* Các nút trong từng dòng */
+.route-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+/* Mobile */
+@media (max-width: 680px) {
+  .route-toolbar {
+    padding: 10px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .route-search,
+  .route-filter,
+  .route-add-button {
+    width: 100%;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .route-row-actions {
+    flex-wrap: nowrap;
+  }
+}

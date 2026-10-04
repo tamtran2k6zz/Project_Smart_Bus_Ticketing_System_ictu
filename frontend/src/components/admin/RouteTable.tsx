@@ -13,20 +13,60 @@ interface RouteTableProps {
 }
 
 function RouteTable({
-  routes, search = '', statusFilter = 'ALL', onSearchChange, onStatusFilterChange, onAdd,
+  routes,
+  search = '',
+  statusFilter = 'ALL',
+  onSearchChange,
+  onStatusFilterChange,
+  onAdd,
   onEdit,
   onDelete,
   onViewStations,
 }: RouteTableProps) {
   return (
     <div className="table-wrapper">
-      <div className="table-actions">
-        {onSearchChange && <input aria-label="Tìm tuyến" value={search} onChange={e => onSearchChange(e.target.value)} placeholder="Tìm mã hoặc tên tuyến" />}
-        {onStatusFilterChange && <select aria-label="Trạng thái tuyến" value={statusFilter} onChange={e => onStatusFilterChange(e.target.value as 'ALL' | 'ACTIVE' | 'INACTIVE')}>
-          <option value="ALL">Tất cả</option><option value="ACTIVE">Hoạt động</option><option value="INACTIVE">Tạm dừng</option>
-        </select>}
-        {onAdd && <button type="button" onClick={onAdd}>Thêm tuyến</button>}
+      {/* Thanh tìm kiếm + bộ lọc */}
+      <div className="route-toolbar">
+        {onSearchChange && (
+          <input
+            className="route-search"
+            aria-label="Tìm tuyến"
+            type="text"
+            value={search}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="Tìm mã hoặc tên tuyến"
+          />
+        )}
+
+        {onStatusFilterChange && (
+          <select
+            className="route-filter"
+            aria-label="Trạng thái tuyến"
+            value={statusFilter}
+            onChange={(e) =>
+              onStatusFilterChange(
+                e.target.value as 'ALL' | 'ACTIVE' | 'INACTIVE',
+              )
+            }
+          >
+            <option value="ALL">Tất cả</option>
+            <option value="ACTIVE">Hoạt động</option>
+            <option value="INACTIVE">Tạm dừng</option>
+          </select>
+        )}
+
+        {onAdd && (
+          <button
+            type="button"
+            className="route-add-button"
+            onClick={onAdd}
+          >
+            Thêm tuyến
+          </button>
+        )}
       </div>
+
+      {/* Bảng tuyến */}
       <table className="route-table">
         <thead>
           <tr>
@@ -47,7 +87,10 @@ function RouteTable({
 
               <td>{route.name}</td>
 
-              <td>{Array.isArray(route.stations) ? route.stations.length : 0} trạm</td>
+              <td>
+                {Array.isArray(route.stations) ? route.stations.length : 0}{' '}
+                trạm
+              </td>
 
               <td>
                 <span
@@ -60,8 +103,9 @@ function RouteTable({
               </td>
 
               <td>
-                <div className="table-actions">
+                <div className="table-actions route-row-actions">
                   <button
+                    type="button"
                     className="action-button view"
                     onClick={() => onViewStations(route)}
                   >
@@ -69,6 +113,7 @@ function RouteTable({
                   </button>
 
                   <button
+                    type="button"
                     className="action-button edit"
                     onClick={() => onEdit(route)}
                   >
@@ -76,6 +121,7 @@ function RouteTable({
                   </button>
 
                   <button
+                    type="button"
                     className="action-button delete"
                     onClick={() => onDelete(route)}
                   >
