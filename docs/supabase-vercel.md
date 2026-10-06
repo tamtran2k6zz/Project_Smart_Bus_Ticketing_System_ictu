@@ -124,21 +124,18 @@ This runner applies `supabase/migrations/*.sql` in one transaction, uses an advi
 
 Use this runner consistently. It stores checksums in `smartbus_private.migrations` and synchronizes version records with `supabase_migrations.schema_migrations` when that Supabase CLI history table exists. A migration already recorded in Supabase history is registered locally without being replayed. Avoid applying the same migration independently through multiple tools, and never edit an already-applied migration file.
 
-### 3.1 Prisma is documentation only
+### 3.1 No ORM — the API uses node-postgres directly
 
-`backend/prisma/schema.prisma` describes the same PostgreSQL database for tooling and review, and
-`npm run ci:validate` checks that it stays parseable and consistent. It is **not** the migration
-tool:
+The backend is plain Express + `pg`. `backend/package.json` no longer ships Prisma, NestJS or any
+ORM; CI checks the TypeScript sources with `npm run typecheck` instead of validating a schema file:
 
-* `provider = "postgresql"`. The historical `provider = "mysql"` model and its Prisma migration
-  history were removed because they described a database that no longer exists.
-* There is no `prisma/migrations` directory, so `prisma migrate deploy` has nothing to apply. Do not
-  run `prisma migrate` against Supabase: the applied history is `smartbus_private.migrations`.
-* Every model uses `@@map()` to the real Supabase table and every field uses `@map()` to the real
-  column, so the model names cannot drift into a `payments`/`bookings` schema that Supabase lacks.
-  The real tables are `payment_transactions` and `tickets`.
-* The deployed API uses `node-postgres` (`backend/src/config/database.ts`) and does not import
-  `@prisma/client`, so the Prisma client is not required at runtime.
+* All queries go through `backend/src/config/database.ts` (`pg.Pool`, `query()`, `transaction()`
+  with BEGIN/COMMIT/ROLLBACK). No source file imports `@prisma/client`, `typeorm` or `@nestjs/*`.
+* There is no `prisma/migrations` directory; the applied history lives in
+  `smartbus_private.migrations`. Do not run `prisma migrate` against Supabase.
+* The DDL reference for standalone provisioning is `supabase/migrations/*.sql`, with
+  `migrations/sprint3_schema.sql` covering the Sprint 3 validation/audit tables and their
+  composite indexes.
 
 All 14 application tables have RLS enabled and deny `anon`/`authenticated` access. The backend connects using the database owner account through the pooler and enforces JWT roles and user ownership. The custom JWT is not a Supabase Auth JWT. Do not expose these tables through a browser Supabase client.
 
@@ -152,7 +149,7 @@ Back up MySQL and stop application writes during the final import/cutover. Keep 
 npm run db:import:mysql
 ```
 
-The importer supports the legacy MySQL tables listed in `backend/scripts/import-mysql.cjs` (plus the four standard roles). It reads a consistent MySQL snapshot, writes a single PostgreSQL transaction, retains IDs and bcrypt hashes, converts booleans/timestamps, and verifies row counts. It requires empty destination application tables (the four seeded roles are allowed). Unknown source tables/columns, conflicting emails, duplicate active seat sales, orphaned references, or a different role mapping abort the import. It never deletes or updates source data. The separate Prisma schema needs an explicit mapping and will be rejected rather than silently losing its extra tables.
+The importer supports the legacy MySQL tables listed in `backend/scripts/import-mysql.cjs` (plus the four standard roles). It reads a consistent MySQL snapshot, writes a single PostgreSQL transaction, retains IDs and bcrypt hashes, converts booleans/timestamps, and verifies row counts. It requires empty destination application tables (the four seeded roles are allowed). Unknown source tables/columns, conflicting emails, duplicate active seat sales, orphaned references, or a different role mapping abort the import. It never deletes or updates source data.
 
 If starting empty, skip import. Set private `ADMIN_EMAIL` and `ADMIN_PASSWORD` (12+ characters) locally, then run:
 

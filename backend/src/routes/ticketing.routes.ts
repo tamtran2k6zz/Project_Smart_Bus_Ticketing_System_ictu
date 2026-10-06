@@ -5,6 +5,7 @@ import { getSeatsByTrip } from '../controllers/seats.controller';
 import { AuthenticatedRequest, authenticateJWT } from '../middlewares/auth';
 import { authorizeRoles } from '../middlewares/rbac';
 import { acquireSeatLock, releaseSeatLock, redisSeatLockEnabled } from '../config/redis';
+import { validateTicketQr } from '../services/ticket.service';
 import { appLogger } from '../config/logger';
 import { getGatewayCallbacks, readEnv } from '../config/env';
 import { PaymentGatewayService, OnlinePaymentMethod } from '../services/payment-gateway.service';
@@ -912,40 +913,10 @@ router.post(
         res.status(400).json({ success: false, message: 'Vui lòng cung cấp mã vé.' });
         return;
       }
-      const code = req.body.code.trim().replace(/^SMARTBUS-QR-/, '');
-      const result = await transaction(async client => {
-        const {
-          rows: [ticket],
-        } = await client.query(
-          `SELECT t.*,u.full_name,u.email,r.name AS route_name,r.code AS route_code
-         FROM tickets t LEFT JOIN users u ON u.id=t.user_id
-         JOIN trips tr ON tr.id=t.trip_id JOIN routes r ON r.id=tr.route_id
-         WHERE t.ticket_code=$1 OR t.id=$1 FOR UPDATE OF t`,
-          [code]
-        );
-        if (!ticket) throw new BookingError(404, 'Không tìm thấy vé.');
-        if (!['BOOKED', 'CHECKED_IN'].includes(ticket.status))
-          throw new BookingError(409, 'Vé không còn hiệu lực.');
-        const isAlreadyCheckedIn = ticket.status === 'CHECKED_IN';
-        if (!isAlreadyCheckedIn) {
-          await client.query("UPDATE tickets SET status='CHECKED_IN' WHERE id=$1", [ticket.id]);
-          await client.query("UPDATE trip_seats SET status='CHECKED_IN' WHERE ticket_id=$1", [
-            ticket.id,
-          ]);
-        }
-        return {
-          isAlreadyCheckedIn,
-          ticket: {
-            id: ticket.id,
-            ticketCode: ticket.ticket_code,
-            seatNumber: ticket.seat_number,
-            fareAmount: Number(ticket.fare_amount),
-            status: 'CHECKED_IN',
-            user: { fullName: ticket.full_name, email: ticket.email },
-            trip: { route: { name: ticket.route_name, code: ticket.route_code } },
-          },
-        };
-      });
+      // Sprint 3: delegate sang ticket.service.validateTicketQr —
+      // cùng lõi với POST /api/v1/tickets/validate-qr nhưng thêm ghi log
+      // kiểm toán (ticket_validation_logs) và khóa phân tán chống quét trùng.
+      const result = await validateTicketQr({ code: req.body.code, validatedBy: req.user?.id });
       res.json({ success: true, ...result });
     } catch (error: any) {
       res

@@ -1,8 +1,8 @@
 import { Response, Router } from 'express';
-import * as QRCode from 'qrcode';
 import { appLogger } from '../config/logger';
 import { query } from '../config/database';
 import { AuthenticatedRequest, authenticateJWT } from '../middlewares/auth';
+import { buildQrPayload, generateTicketQrDataUrl } from '../services/ticket.service';
 
 const router = Router();
 const logger = appLogger.child('ticket-details');
@@ -56,20 +56,11 @@ router.get(
         return;
       }
 
-      const qrCodeBase64 = await QRCode.toDataURL(
-        JSON.stringify({
-          ticket_code: ticket.ticket_code,
-          trip_id: ticket.trip_id,
-          seat_number: ticket.seat_number,
-          status: ticket.status,
-        }),
-        {
-          errorCorrectionLevel: 'M',
-          type: 'image/png',
-          width: 300,
-          margin: 1,
-          color: { dark: '#000000', light: '#FFFFFF' },
-        }
+      // Sprint 3: tái sử dụng helper QR của ticket.service để định dạng
+      // payload đồng bộ với POST /api/v1/tickets/validate-qr. Kèm exp + nonce
+      // + chữ ký HMAC-SHA256 để endpoint kiểm tra hết hạn / chống replay.
+      const qrCodeBase64 = await generateTicketQrDataUrl(
+        buildQrPayload(ticket, { withSecurity: true })
       );
 
       res.json({
