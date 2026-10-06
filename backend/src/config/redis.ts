@@ -64,8 +64,20 @@ export async function acquireSeatLock(
     });
     throw new Error('Redis is configured but unavailable.');
   }
+  const key = `lock:trip:${tripId}:seat:${seatNumber}`;
+  const existing = await redisClient.get(key);
+  if (existing && existing.startsWith(`${ownerId}:`)) {
+    await redisClient.expire(key, ttlSeconds);
+    logger.debug('seat_lock_reentered', {
+      trip_id: tripId,
+      seat_number: seatNumber,
+      owner_id: ownerId,
+    });
+    return existing;
+  }
+
   const lockId = `${ownerId}:${randomUUID()}`;
-  const result = await redisClient.set(`lock:trip:${tripId}:seat:${seatNumber}`, lockId, {
+  const result = await redisClient.set(key, lockId, {
     NX: true,
     EX: ttlSeconds,
   });

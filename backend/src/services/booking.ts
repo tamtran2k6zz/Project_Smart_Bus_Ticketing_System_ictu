@@ -56,6 +56,11 @@ export async function prepareSeats(client: PoolClient, tripId: string) {
      WHERE s.bus_id=$2 ON CONFLICT (trip_id,seat_number) DO NOTHING`,
     [tripId, trip.bus_id]
   );
+  const { rows: expiredSeats } = await client.query(
+    `SELECT seat_number, redis_lock_id FROM trip_seats
+     WHERE trip_id=$1 AND status='LOCKED' AND lock_expires_at <= NOW()`,
+    [tripId]
+  );
   await client.query(
     `UPDATE payment_transactions p SET status='FAILED'
      FROM tickets t
@@ -74,6 +79,13 @@ export async function prepareSeats(client: PoolClient, tripId: string) {
      WHERE trip_id=$1 AND status='LOCKED' AND lock_expires_at <= NOW()`,
     [tripId]
   );
+  for (const seat of expiredSeats) {
+    if (seat.seat_number) {
+      await releaseSeatLock(tripId, seat.seat_number, seat.redis_lock_id || undefined).catch(
+        () => {}
+      );
+    }
+  }
   return trip;
 }
 
