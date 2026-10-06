@@ -60,7 +60,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsLoading(true);
     setError(null);
     try {
-      // Kết nối trực tiếp vào cơ sở dữ liệu API Backend NestJS - KHÔNG MOCK TEST
+      // Kết nối trực tiếp vào cơ sở dữ liệu API Backend Express - KHÔNG MOCK TEST
       const res = await apiFetch(getApiUrl('/api/v1/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
