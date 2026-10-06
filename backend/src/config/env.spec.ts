@@ -114,9 +114,9 @@ describe('config/env', () => {
     expect(getGatewayCallbacks()).toEqual({
       vnpayReturnUrl: 'http://localhost:5000/api/v1/ticketing/payments/vnpay/return',
       vnpayIpnUrl: 'http://localhost:5000/api/v1/ticketing/payments/vnpay/ipn',
-      momoRedirectUrl: 'http://localhost:5000/passenger/booking',
+      momoRedirectUrl: 'http://localhost:5000/payment/result',
       momoIpnUrl: 'http://localhost:5000/api/v1/ticketing/payments/momo/ipn',
-      paymentResultUrl: 'http://localhost:5000/passenger/booking',
+      paymentResultUrl: 'http://localhost:5000/payment/result',
     });
   });
 

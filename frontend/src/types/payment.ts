@@ -1,4 +1,4 @@
-export type PaymentMethod = 'VNPAY' | 'MOMO';
+export type PaymentMethod = 'VNPAY' | 'MOMO' | 'QR';
 
 // Dữ liệu chuyến + ghế truyền từ trang chọn ghế sang /payment qua location.state
 export interface PaymentPageState {
@@ -8,6 +8,7 @@ export interface PaymentPageState {
   routeName: string;
   departureTime: string;
   fare: number;
+  voucherCode?: string;
 }
 
 // Kết quả rút gọn từ POST /api/v1/ticketing/bookings khi có paymentMethod
@@ -18,7 +19,7 @@ export interface CreateBookingResult {
   seatNumber: string;
   amount: number;
   reservationExpiresAt: string;
-  paymentUrl: string;
+  paymentUrl: string | null;
 }
 
 // Phản hồi GET /api/v1/ticketing/payments/:orderId (trạng thái lấy từ DB, không tin query URL)
@@ -49,8 +50,9 @@ export interface BookingSession {
   seatNumber: string;
   amount: number;
   paymentMethod: PaymentMethod;
-  paymentUrl: string;
+  paymentUrl: string | null;
   reservationExpiresAt: string;
   status: 'PENDING' | 'SUCCESS' | 'FAILED' | 'EXPIRED';
   createdAt: string;
+  voucherCode?: string;
 }

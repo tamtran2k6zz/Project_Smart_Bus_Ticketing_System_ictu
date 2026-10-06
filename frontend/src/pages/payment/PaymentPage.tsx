@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { createBooking, isAllowedGatewayUrl } from '../../services/payment';
-import { saveBookingSession } from '../../utils/bookingSession';
-import type { PaymentMethod, PaymentPageState } from '../../types/payment';
-
-const BOOKING_PAGE = '/passenger/booking';
+import { loadBookingSession, saveBookingSession } from '../../utils/bookingSession';
+import { bookingPageUrl, clearPaymentDraft, isPaymentPageState, loadPaymentDraft, savePaymentDraft } from '../../utils/paymentDraft';
+import type { PaymentMethod } from '../../types/payment';
 
 const paymentMethods: { id: PaymentMethod; name: string; description: string; icon: string }[] = [
   {
@@ -20,18 +19,13 @@ const paymentMethods: { id: PaymentMethod; name: string; description: string; ic
     description: 'Thanh toán nhanh qua ví điện tử MoMo',
     icon: 'M',
   },
+  {
+    id: 'QR',
+    name: 'QR (demo)',
+    description: 'Giữ ghế và tạo QR thông tin giao dịch; không chuyển tiền thật',
+    icon: 'QR',
+  },
 ];
-
-const isValidState = (value: unknown): value is PaymentPageState => {
-  const s = value as Partial<PaymentPageState> | null;
-  return (
-    !!s &&
-    typeof s.tripId === 'string' && !!s.tripId &&
-    typeof s.seatNumber === 'string' && !!s.seatNumber &&
-    typeof s.departureTime === 'string' &&
-    Number.isFinite(s.fare)
-  );
-};
 
 const formatPrice = (price: number) => `${price.toLocaleString('vi-VN')}đ`;
 
@@ -42,8 +36,21 @@ const PaymentPage: React.FC = () => {
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('VNPAY');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const submittingRef = useRef(false);
 
-  const order = isValidState(location.state) ? location.state : null;
+  const stateOrder = isPaymentPageState(location.state) ? location.state : null;
+  const order = stateOrder || (user ? loadPaymentDraft(user.id) : null);
+  const session = user ? loadBookingSession(user.id) : null;
+  const handleBack = () => navigate(bookingPageUrl(order), { state: order });
+
+  useEffect(() => {
+    if (user && stateOrder) savePaymentDraft(user.id, stateOrder);
+  }, [user, stateOrder]);
+
+  // A created transaction must be checked before offering another payment.
+  if (!order && session) {
+    return <Navigate to={`/payment/result?orderId=${encodeURIComponent(session.orderId)}`} replace />;
+  }
 
   if (!order) {
     return (
@@ -52,7 +59,10 @@ const PaymentPage: React.FC = () => {
           <section style={styles.card}>
             <h2 style={styles.sectionTitle}>Chưa có thông tin đặt chỗ</h2>
             <p style={styles.subtitle}>Vui lòng chọn chuyến xe và ghế trước khi thanh toán.</p>
-            <button onClick={() => navigate(BOOKING_PAGE)} style={{ ...styles.paymentButton, marginTop: '20px' }}>
+            <button onClick={handleBack} style={{ ...styles.backButton, marginTop: '20px', marginRight: '12px' }}>
+              ← Quay lại
+            </button>
+            <button onClick={handleBack} style={{ ...styles.paymentButton, marginTop: '20px' }}>
               Chọn chuyến xe
             </button>
           </section>
@@ -65,7 +75,8 @@ const PaymentPage: React.FC = () => {
   const hasDeparture = !Number.isNaN(departure.getTime());
 
   const handlePayment = async () => {
-    if (submitting || !user) return;
+    if (submittingRef.current || !user) return;
+    submittingRef.current = true;
     setSubmitting(true);
     setError(null);
     try {
@@ -73,8 +84,9 @@ const PaymentPage: React.FC = () => {
         tripId: order.tripId,
         seatNumber: order.seatNumber,
         paymentMethod: selectedMethod,
+        voucherCode: order.voucherCode,
       });
-      if (!isAllowedGatewayUrl(booking.paymentUrl)) {
+      if (selectedMethod !== 'QR' && (!booking.paymentUrl || !isAllowedGatewayUrl(booking.paymentUrl))) {
         throw new Error('Địa chỉ thanh toán trả về không hợp lệ. Vui lòng liên hệ hỗ trợ.');
       }
 
@@ -93,12 +105,36 @@ const PaymentPage: React.FC = () => {
         reservationExpiresAt: booking.reservationExpiresAt,
         status: 'PENDING',
         createdAt: new Date().toISOString(),
+        voucherCode: order.voucherCode,
       });
 
+      clearPaymentDraft(user.id);
+      if (selectedMethod === 'QR') {
+        navigate(bookingPageUrl(order), {
+          replace: true,
+          state: {
+            bookingResult: {
+              ...booking,
+              paymentMethod: 'QR',
+              paymentStatus: 'PENDING',
+              ticket: {
+                id: booking.ticketId, ticketCode: booking.ticketCode, seatNumber: booking.seatNumber,
+                tripId: order.tripId, fareAmount: booking.amount, status: 'RESERVED',
+                reservationExpiresAt: booking.reservationExpiresAt,
+              },
+              payment: { orderId: booking.orderId, amount: booking.amount, method: 'QR', status: 'PENDING' },
+            },
+          },
+        });
+        return;
+      }
+      // Returning with the browser Back button opens this transaction's result.
+      navigate(`/payment/result?orderId=${encodeURIComponent(booking.orderId)}`, { replace: true });
       // Domain ngoài nên dùng window.location, không dùng navigate() của router.
-      window.location.assign(booking.paymentUrl);
+      window.location.assign(booking.paymentUrl!);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không thể tạo giao dịch thanh toán.');
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -116,7 +152,7 @@ const PaymentPage: React.FC = () => {
           </div>
 
           <button
-            onClick={() => navigate(BOOKING_PAGE)}
+            onClick={handleBack}
             disabled={submitting}
             style={styles.backButton}
           >
@@ -161,6 +197,8 @@ const PaymentPage: React.FC = () => {
             </div>
 
             <div style={styles.divider} />
+
+            {order.voucherCode && <p>Mã ưu đãi: {order.voucherCode} (máy chủ xác nhận khi đặt vé)</p>}
 
             <div style={styles.totalRow}>
               <span>Tổng tiền</span>
@@ -221,7 +259,7 @@ const PaymentPage: React.FC = () => {
           </section>
         </div>
 
-        {error && <div style={styles.errorBox}>{error}</div>}
+        {error && <div style={styles.errorBox} role="alert">{error}</div>}
 
         {/* Payment Footer */}
         <div style={styles.footer}>
@@ -240,7 +278,7 @@ const PaymentPage: React.FC = () => {
               ...(submitting ? styles.paymentButtonDisabled : {}),
             }}
           >
-            {submitting ? 'Đang chuyển sang cổng thanh toán...' : 'Thanh toán ngay'}
+            {submitting ? 'Đang tạo giao dịch...' : selectedMethod === 'QR' ? 'Tạo QR demo và giữ ghế' : 'Thanh toán ngay'}
           </button>
         </div>
       </div>
@@ -250,6 +288,7 @@ const PaymentPage: React.FC = () => {
 
 const styles: Record<string, React.CSSProperties> = {
   page: {
+    color: '#111',
     minHeight: '100vh',
     background: '#f5f7fb',
     padding: '32px 20px',
@@ -269,6 +308,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
 
   title: {
+    color: '#111',
     margin: 0,
     fontSize: '30px',
   },
@@ -300,6 +340,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
 
   sectionTitle: {
+    color: '#111',
     margin: '0 0 20px',
     fontSize: '20px',
   },
