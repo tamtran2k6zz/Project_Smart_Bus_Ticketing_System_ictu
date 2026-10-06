@@ -3,7 +3,7 @@
 Target database: [uhoznqcpaasartfvdynx](https://supabase.com/dashboard/project/uhoznqcpaasartfvdynx).
 Target app: [project-smart-bus-ticketing-system-ictu](https://vercel.com/dtc245220005-9804s-projects/project-smart-bus-ticketing-system-ictu).
 
-The code migration covers the Express API selected by the repository's start command and Dockerfile. The historical Nest/Prisma model is not used by this deployment. Authentication remains Express JWT + bcrypt; existing users do not need to be recreated in Supabase Auth.
+The code migration covers the Express API selected by the repository's start command and Dockerfile. The historical backend model is not used by this deployment. Authentication remains Express JWT + bcrypt; existing users do not need to be recreated in Supabase Auth.
 
 ## 1. Authenticate tooling
 

@@ -243,7 +243,6 @@ export const PassengerPortalPage: React.FC = () => {
         ? dashJson.data.tripOccupancy
         : [];
 
-      const now = Date.now();
       const tripList: TripItem[] = rawOccupancy
         .map(t => ({
           id: String(t.id),
@@ -252,8 +251,7 @@ export const PassengerPortalPage: React.FC = () => {
           plateNumber: t.busPlate || '',
           departureTime: t.departureTime || '',
           basePrice: Number(t.basePrice),
-        }))
-        .filter(t => new Date(t.departureTime).getTime() > now);
+        }));
 
       setTrips(tripList);
       if (preferredTripId && !tripList.some(trip => trip.id === preferredTripId)) {
