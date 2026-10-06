@@ -124,10 +124,13 @@ Docker Compose chạy frontend, Express API và Redis cục bộ; API kết nố
 - Báo cáo tổng hợp số lượng tuyến, số lượt xe đang chạy, tỷ lệ lấp đầy ghế bình quân và doanh thu theo ngày/tháng.
 
 ### 💡 H. Các tính năng nâng cao & Cải tiến mới (Sprint Hoàn thiện)
+- **Đặt vé nhiều lần & Giữ chuyến đến khi xuất bến:** Chuyến xe được duy trì trạng thái hoạt động cho đến thời điểm xuất phát, cho phép hành khách đặt nhiều vé, nhiều chỗ ngồi trên cùng một chuyến một cách linh hoạt.
 - **Tải ảnh QR vé về máy:** Nút "Lưu ảnh QR về máy" cho phép xuất hình ảnh PNG chất lượng cao cho cả mã QR thông tin giao dịch đặt chỗ và mã QR soát vé.
-- **Quản lý & Hủy vé trực tuyến:** Hỗ trợ hủy vé cho cả trạng thái `RESERVED` (giữ chỗ) và `BOOKED` (đã xác nhận), tự động hoàn trả ghế trống về CSDL.
-- **Vé của tôi & Lịch sử đặt vé (`GET /api/v1/ticketing/my-tickets`):** Tra cứu toàn bộ lịch sử vé điện tử đã đặt của tài khoản, đồng bộ hóa trực tiếp từ PostgreSQL và lưu trữ phiên qua `localStorage`.
+- **Quản lý & Hủy vé trực tuyến / Hoàn tiền tự động (*Soft Refund*):** Hỗ trợ hủy vé cho cả trạng thái `RESERVED` (giữ chỗ) và `BOOKED` (đã xác nhận), tích hợp cơ chế hoàn tiền tự động và trả ghế trống về CSDL.
+- **Vé của tôi & Lịch sử đặt vé toàn diện (`myTickets` / `GET /api/v1/ticketing/my-tickets`):** Lưu trữ và hiển thị đầy đủ toàn bộ lịch sử vé điện tử đã đặt của hành khách, đồng bộ hóa trực tiếp từ PostgreSQL và lưu trữ phiên qua `localStorage`.
 - **Khôi phục đặt chỗ:** Lưu bản nháp chuyến, ghế và voucher theo tài khoản trong `sessionStorage`, có thời hạn 30 phút; lưu giao dịch đã tạo trong `localStorage` trước khi chuyển sang cổng thanh toán.
+- **Xác nhận đăng ký tài khoản qua Email thật (`nodemailer`):** Gửi email thông tin khởi tạo tài khoản xác thực tới hộp thư thật của người dùng khi đăng ký mới.
+- **Hỗ trợ Docker Desktop:** Đóng gói và chạy ổn định qua `docker compose` trên môi trường Docker Desktop.
 
 ### 💳 I. Luồng thanh toán VNPay / MoMo / QR demo
 
