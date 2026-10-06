@@ -7,8 +7,8 @@
   <img src="https://img.shields.io/badge/Node.js-20-339933?style=for-the-badge&logo=node.js&logoColor=white" alt="Node.js" />
   <img src="https://img.shields.io/badge/Express-TypeScript-000000?style=for-the-badge&logo=express&logoColor=white" alt="Express" />
   <img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React 19" />
-  <img src="https://img.shields.io/badge/Vite-6-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite" />
-  <img src="https://img.shields.io/badge/TailwindCSS-3.4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="TailwindCSS" />
+  <img src="https://img.shields.io/badge/Vite-8-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite 8" />
+  <img src="https://img.shields.io/badge/CSS-Liquid%20Glass-38B2AC?style=for-the-badge&logo=css&logoColor=white" alt="CSS Liquid Glass" />
 </p>
 
 > **Đồ án Thực tập Cơ sở 2026 — Nhóm 5 (N5 Innovators)**  
@@ -37,7 +37,9 @@ Hệ thống đã được đóng gói và xuất bản chính thức trên Clou
 4. [Hướng dẫn cài đặt & Khởi chạy cục bộ](#-4-hướng-dẫn-cài-đặt--khởi-chạy-cục-bộ)
 5. [Cấu trúc thư mục mã nguồn](#-5-cấu-trúc-thư-mục-mã-nguồn)
 6. [Danh mục RESTful API Backend](#-6-danh-mục-restful-api-backend)
-7. [Đội ngũ phát triển (Team 5 - N5 Innovators)](#-7-đội-ngũ-phát-triển-team-5---n5-innovators)
+7. [Cấu hình biến môi trường](#-7-cấu-hình-biến-môi-trường)
+8. [Các tính năng nâng cao & Hoàn thiện hệ thống](#-8-các-tính-năng-nâng-cao--hoàn-thiện-hệ-thống-sprint-cuối)
+9. [Đội ngũ phát triển (Team 5 - N5 Innovators)](#-9-đội-ngũ-phát-triển-team-5---n5-innovators)
 
 ---
 
@@ -65,7 +67,7 @@ Hệ thống sử dụng mô hình kiến trúc Serverless Micro-Architecture k�
                      ▼                                           ▼
        ┌───────────────────────────┐               ┌───────────────────────────┐
        │   Frontend SPA (dist/)    │               │    Serverless Function    │
-       │   React 19 + TailwindCSS  │               │      (api/index.ts)       │
+       │   React 19 + CSS         │               │      (api/index.ts)       │
        │   Client-side Routing     │               │   Express RESTful Engine  │
        └───────────────────────────┘               └─────────────┬─────────────┘
                                                                  │
@@ -125,7 +127,19 @@ Docker Compose chạy frontend, Express API và Redis cục bộ; API kết nố
 - **Tải ảnh QR vé về máy:** Nút "Lưu ảnh QR về máy" cho phép xuất hình ảnh PNG chất lượng cao cho cả mã QR thông tin giao dịch đặt chỗ và mã QR soát vé.
 - **Quản lý & Hủy vé trực tuyến:** Hỗ trợ hủy vé cho cả trạng thái `RESERVED` (giữ chỗ) và `BOOKED` (đã xác nhận), tự động hoàn trả ghế trống về CSDL.
 - **Vé của tôi & Lịch sử đặt vé (`GET /api/v1/ticketing/my-tickets`):** Tra cứu toàn bộ lịch sử vé điện tử đã đặt của tài khoản, đồng bộ hóa trực tiếp từ PostgreSQL và lưu trữ phiên qua `localStorage`.
-- **Gửi email xác nhận tự động:** Gửi thông tin hóa đơn và ảnh QR vé qua email cho hành khách sau khi đặt vé thành công, đồng thời gửi email xác nhận tài khoản khi người dùng đăng ký mới.
+- **Khôi phục đặt chỗ:** Lưu bản nháp chuyến, ghế và voucher theo tài khoản trong `sessionStorage`, có thời hạn 30 phút; lưu giao dịch đã tạo trong `localStorage` trước khi chuyển sang cổng thanh toán.
+
+### 💳 I. Luồng thanh toán VNPay / MoMo / QR demo
+
+1. Vào `/passenger/booking`, chọn chuyến và một ghế trống. Nút **Tiếp tục thanh toán** mở `/payment`; bước này chưa tạo giao dịch hoặc giữ ghế.
+2. Tại `/payment`, kiểm tra thông tin đặt chỗ và chọn **VNPay**, **MoMo** hoặc **QR (demo)**. Bấm xác nhận để gọi `POST /api/v1/ticketing/bookings`; máy chủ xác định giá vé và giữ ghế tối đa 10 phút. Nút gửi được khóa trong khi xử lý để tránh tạo nhiều giao dịch khi bấm liên tiếp.
+3. Với VNPay/MoMo, trình duyệt chuyển sang URL HTTPS của cổng đã được cho phép. Kết quả được hiển thị tại `/payment/result`, đọc mã giao dịch từ `orderId` hoặc `paymentOrder` và tra cứu trạng thái từ API; không xác nhận thanh toán dựa trên query URL.
+4. Với QR demo, người dùng quay về trang đặt vé để xem QR thông tin giao dịch. QR này không chuyển tiền. Nút **Hoàn thành chuyến đi (demo)** mô phỏng xác nhận thanh toán/vé và hoàn thành chuyến trên dữ liệu chung, sau đó mở phần đánh giá.
+5. Trang kết quả hỗ trợ **Xem vé**, **Thử lại** khi giao dịch thất bại và tự kiểm tra giao dịch đang chờ tối đa 10 lần, mỗi 3 giây. **Xem vé** mở tab lịch sử và đánh dấu vé tương ứng; callback cũ về trang đặt vé được chuyển tiếp sang trang kết quả.
+
+Khi tải lại hoặc mở `/payment` trong cùng tab, hệ thống khôi phục bản nháp còn hạn. Nếu bản nháp không còn nhưng có phiên giao dịch đã tạo, hệ thống mở kết quả giao dịch đó. Khi chưa có dữ liệu, trang vẫn có **Quay lại** và **Chọn chuyến xe**. Nút **Quay lại** giữ đúng chuyến, ghế và voucher; ghế chỉ được chọn lại nếu API xác nhận vẫn trống.
+
+Sơ đồ ghế cập nhật mỗi 3 giây, có trạng thái đang tải, thông báo lỗi và nút **Thử lại tải ghế**. Khi ghế đã chọn không còn trống, lựa chọn bị xóa và nút tiếp tục bị vô hiệu hóa. Khi API trả `401`, người dùng có thể đăng nhập lại.
 
 ---
 
@@ -192,12 +206,12 @@ Redis mặc định chạy riêng trên từng máy. Điều này phù hợp đ�
 
 ### Lựa chọn 3: Chạy trực tiếp bằng Node.js / Vite (Phát triển tính năng)
 
-**Yêu cầu:** Node.js phiên bản 20 trở lên.
+**Yêu cầu:** Node.js `20.19+` hoặc `22.12+` (theo yêu cầu của Vite 8), cùng npm.
 
 ```bash
 # 1. Cài đặt dependencies cho Backend
 cd backend
-npm install
+npm ci
 cp ../.env.example .env
 # PowerShell: Copy-Item ..\.env.example .env
 # (Điền DATABASE_URL và JWT_SECRET vào backend/.env)
@@ -212,17 +226,30 @@ npm run start:express
 Mở một cửa sổ Terminal mới để khởi chạy Frontend:
 
 ```bash
-# 4. Cài đặt dependencies và chạy Frontend (Cổng 5173 hoặc 3000)
+# 4. Cài đặt dependencies và chạy Frontend (mặc định cổng 3000)
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
 
 ---
 
-### 🧪 Bộ Kiểm thử Tự động (Automated Test Suite)
+### 🧪 Build & Bộ Kiểm thử Tự động (Automated Test Suite)
 
-Dự án tích hợp bộ kiểm thử 61 kiểm tra tự động mô phỏng môi trường PostgreSQL nhúng (**PGlite**), không cần kết nối mạng:
+Chạy từ thư mục gốc repository sau khi đã cài dependencies cho cả `backend` và `frontend`:
+
+```bash
+npm run build:frontend
+npm run build:backend
+npm --prefix frontend run lint
+npm test
+```
+
+`npm test` chạy Jest cho backend, các kiểm thử theme bằng Node.js và Vitest cho frontend. Kiểm thử thanh toán bao gồm khôi phục bản nháp theo tài khoản, dữ liệu lưu bị hỏng/hết hạn, gửi phương thức và voucher, QR demo, lỗi giữ ghế và giới hạn URL chuyển hướng.
+
+Nếu backend build báo thiếu `qrcode` hoặc `@types/qrcode`, chạy lại `npm ci` trong thư mục `backend`. Hai package đã có trong `backend/package.json` và lockfile; không cần sửa mã nguồn để xử lý việc cài dependencies thiếu.
+
+Dự án còn có bộ kiểm thử API với PostgreSQL nhúng (**PGlite**), không cần kết nối database bên ngoài:
 
 ```bash
 npm --prefix backend run test:postgres
@@ -234,6 +261,8 @@ Bộ kiểm thử tự động xác minh:
 * Khóa ghế nguyên tử chống đặt trùng lặp (Concurrency & Atomic Seat Locking).
 * Phát hành vé, sinh mã QR và luồng soát vé `CHECKED_IN`.
 * Kiểm tra chính sách Row-Level Security (RLS) chặn truy cập trái phép.
+
+Kiểm thử tự động và kiểm tra trình duyệt dùng API/cổng giả lập không thay thế nghiệm thu giao dịch thật. Trước khi dùng VNPay/MoMo thực tế, cần cấu hình merchant, callback/IPN công khai và kiểm tra xác nhận, thất bại, hết hạn giữ ghế, hủy vé và hoàn tiền trong môi trường của cổng thanh toán.
 
 ---
 
@@ -248,12 +277,12 @@ Project_Smart_Bus_Ticketing_System_ictu/
 │   ├── scripts/
 │   │   ├── migrate-postgres.cjs       # Trình thực thi Migration PostgreSQL
 │   │   ├── import-mysql.cjs           # Script chuyển đổi dữ liệu MySQL -> PostgreSQL
-│   │   ├── test-postgres.cjs          # Bộ kiểm thử 61 kịch bản API tự động
+│   │   ├── test-postgres.cjs          # Kiểm thử API với PostgreSQL nhúng
 │   │   └── create-admin.cjs           # Tiện ích tạo tài khoản quản trị viên
 │   ├── src/
 │   │   ├── config/
 │   │   │   ├── database.ts            # PostgreSQL Pool Client (node-postgres)
-│   │   │   └── auth.ts                # Cấu hình mã hóa JWT & Secret
+│   │   │   ├── auth.ts                # Cấu hình mã hóa JWT & Secret
 │   │   │   ├── env.ts                 # Nguồn cấu hình duy nhất + kiểm tra biến môi trường
 │   │   │   ├── logger.ts              # Log có cấu trúc key=value, tự che bí mật
 │   │   │   └── redis.ts               # Redis client & khoá ghế tạm (tuỳ chọn)
@@ -284,7 +313,14 @@ Project_Smart_Bus_Ticketing_System_ictu/
 │   │   ├── context/
 │   │   │   └── AuthContext.tsx        # Quản lý phiên làm việc & Token toàn cục
 │   │   ├── pages/                     # Màn hình theo phân hệ (Admin, Driver, Passenger)
-│   │   ├── App.tsx                    # Điều hướng Route & React ErrorBoundary
+│   │   │   └── payment/               # PaymentPage & PaymentResultPage
+│   │   ├── routes/AppRoutes.tsx       # Route đặt vé và kết quả thanh toán
+│   │   ├── services/payment.ts        # Tạo giao dịch & kiểm tra URL gateway
+│   │   ├── utils/
+│   │   │   ├── paymentDraft.ts        # Bản nháp theo tài khoản, hết hạn sau 30 phút
+│   │   │   ├── bookingSession.ts      # Phiên giao dịch trước khi rời sang gateway
+│   │   │   └── paymentResult.ts       # Phân loại trạng thái thanh toán/vé
+│   │   ├── App.tsx                    # AuthProvider, BrowserRouter & ErrorBoundary
 │   │   └── main.tsx
 │   ├── nginx.conf                     # Cấu hình Nginx Reverse Proxy trong Docker
 │   ├── Dockerfile                     # Dockerfile Multi-stage build Nginx Alpine
@@ -325,17 +361,17 @@ Tất cả các API hỗ trợ đồng thời cả hai tiền tố định tuy�
 * `POST /seats/unlock`: Hủy khóa ghế đã giữ chỗ.
 
 ### 5. Phân hệ Đặt vé & Soát vé QR (`/api/v1/ticketing`)
-* `POST /bookings`: Đặt vé, lưu giao dịch/giá vé vào PostgreSQL và giữ ghế 10 phút. Mặc định
-  `paymentMethod` là `"QR"`; frontend tự sinh QR cục bộ chứa mã đơn, chuyến, ghế và số tiền.
-  QR hiện tại chỉ lưu/trình bày dữ liệu, không chuyển tiền và không tự xác nhận đã thanh toán.
-  Response trả về `data.payment.orderId` — UUID của giao dịch.
+* `GET /trips/:tripId/seats`: Lấy sơ đồ ghế dùng bởi trang đặt vé.
+* `POST /bookings`: Frontend gửi `tripId`, `seatNumber` và `paymentMethod` (`VNPAY`, `MOMO` hoặc `QR`), kèm `voucherCode` nếu có. Máy chủ lưu giao dịch/giá vé vào PostgreSQL và giữ ghế 10 phút. Response trả về `data.payment.orderId` — UUID của giao dịch; với VNPay/MoMo còn có `data.paymentUrl`. QR demo chỉ hiển thị dữ liệu và không tự xác nhận thanh toán.
+* **Tương thích API cũ:** Nếu không truyền `paymentMethod`, backend đi theo nhánh đặt vé trực tiếp (`BOOKED`) thay vì tạo giao dịch chờ thanh toán. Luồng frontend hiện tại luôn truyền phương thức rõ ràng.
+* `GET /my-tickets`: Lấy lịch sử vé của tài khoản đăng nhập.
+* `POST /bookings/:ticketId/demo-complete`: Mô phỏng thanh toán QR và hoàn thành chuyến; không chuyển tiền thật.
+* `POST /tickets/:ticketId/cancel`: Hủy vé/giữ chỗ và xử lý hoàn tiền nếu phù hợp.
 * `POST /verify`: Soát vé điện tử bằng chuỗi mã QR hoặc mã vé, đổi trạng thái `CHECKED_IN`.
 
 ### 6. Phân hệ Thanh toán (`/api/v1/ticketing`)
 
-Mặc định, booking dùng QR nội bộ để hiển thị dữ liệu chuyến/giá vé; đây chưa phải QR ngân hàng,
-không phát sinh thanh toán và giao dịch vẫn `PENDING`. Không cần cấu hình MoMo/VNPay để chạy luồng này.
-Các callback gateway bên dưới chỉ dành cho tích hợp merchant cũ/sandbox.
+Trang `/payment` cho phép chọn VNPay, MoMo hoặc QR demo. QR demo không yêu cầu thông tin merchant, không phát sinh chuyển tiền và giữ giao dịch ở `PENDING` cho đến khi được xác nhận bằng thao tác demo. VNPay/MoMo cần cấu hình merchant và callback/IPN công khai; giao dịch chỉ được coi là thành công khi API xác nhận thanh toán `SUCCESS` và vé `BOOKED`.
 
 | Phương thức | Endpoint | Mục đích |
 | :--- | :--- | :--- |
@@ -373,8 +409,13 @@ Nhóm biến chính:
 * `JWT_SECRET` — bắt buộc, tối thiểu 32 ký tự.
 * `REDIS_URL` — *tuỳ chọn*. Để trống nghĩa là chỉ dùng khoá dòng PostgreSQL (đây là hành vi đúng,
   không phải lỗi). Cũng chấp nhận bộ ba `REDIS_HOST`/`REDIS_PORT`/`REDIS_PASSWORD`.
-* `PAYMENT_PUBLIC_BASE_URL`, `VNPAY_*`, `MOMO_*` — chỉ cần nếu bật tích hợp gateway cũ; không cần
-  cho QR nội bộ tạm thời.
+* `PAYMENT_PUBLIC_BASE_URL` — origin HTTPS công khai của API để cổng thanh toán gọi callback/IPN; không có dấu `/` cuối.
+* `VNPAY_*`, `MOMO_*` — thông tin merchant và URL callback cho phương thức tương ứng; không cần cho QR demo.
+* `PAYMENT_RESULT_URL` — URL trang kết quả frontend, ví dụ `http://localhost:3000/payment/result` khi chạy Vite cục bộ; khi triển khai dùng `https://<frontend-domain>/payment/result`.
+* `MOMO_REDIRECT_URL` — trang kết quả frontend cho MoMo, nên trỏ tới cùng `/payment/result`. Nếu không khai báo, backend dùng `${PAYMENT_PUBLIC_BASE_URL}/payment/result`; đặt URL đầy đủ khi frontend và API có origin khác nhau.
+* `VITE_PAYMENT_GATEWAY_HOSTS` — danh sách hostname HTTPS được frontend cho phép chuyển hướng, cách nhau bằng dấu phẩy. Hai host sandbox `sandbox.vnpayment.vn` và `test-payment.momo.vn` đã được cho phép sẵn; bổ sung host merchant thực tế khi cần.
+
+Mẫu `.env.example` hiện còn đặt `PAYMENT_RESULT_URL` về `/passenger/booking`. Khi tạo `.env` mới, đổi sang `/payment/result` như trên; route cũ vẫn được frontend hỗ trợ để giữ tương thích callback đã cấu hình. Các biến `VITE_*` đặt trong file môi trường của frontend và cần build lại để áp dụng.
 
 Log ứng dụng dùng định dạng `key=value` và không bắt đầu bằng dấu `[`, nên có thể dán trực tiếp
 vào PowerShell mà không bị lỗi cú pháp:
@@ -390,8 +431,8 @@ vào PowerShell mà không bị lỗi cú pháp:
 * **Tải ảnh QR vé (`Lưu ảnh QR về máy`)**: Tích hợp tính năng xuất tệp PNG chất lượng cao cho mã QR thông tin giao dịch đặt chỗ và mã QR vé điện tử đưa cho tài xế soát vé.
 * **Hủy vé & Hoàn tiền trực tuyến**: Cho phép hành khách chủ động hủy vé/yêu cầu hoàn tiền đối với các vé đang ở trạng thái `RESERVED` (giữ chỗ) hoặc `BOOKED` (đã xác nhận), tự động hoàn trả ghế về trạng thái trống.
 * **Lịch sử vé của tôi (`GET /api/v1/ticketing/my-tickets`)**: Quản lý toàn bộ vé điện tử đã đặt của tài khoản, đồng bộ trực tiếp từ cơ sở dữ liệu PostgreSQL và lưu trữ phiên qua `localStorage`.
-* **Gửi email xác nhận & hóa đơn tự động**: Tự động thông báo hóa đơn điện tử và ảnh QR vé qua email cho hành khách sau khi đặt vé, đồng thời gửi email xác nhận và thông tin tài khoản khi người dùng đăng ký mới.
-* **Định tuyến kết quả thanh toán (`/payment/result`)**: Đồng bộ hóa trải nghiệm giữa Local (Docker/Vite) và Vercel (Production) với route xử lý kết quả thanh toán mượt mà.
+* **Chọn phương thức thanh toán (`/payment`)**: Tách bước chọn ghế khỏi bước tạo giao dịch, hỗ trợ VNPay/MoMo/QR demo và khôi phục thông tin đặt chỗ.
+* **Định tuyến kết quả thanh toán (`/payment/result`)**: Tra cứu trạng thái từ API, nhận cả `orderId`/`paymentOrder`, hỗ trợ xem vé, thử lại khi thất bại và kiểm tra giao dịch đang chờ.
 
 ---
 
