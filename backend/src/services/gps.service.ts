@@ -6,16 +6,19 @@ const logger = appLogger.child('gps-service');
 
 const target = describeRedisTarget();
 // Standalone Redis client specifically for GPS caching if configured, otherwise fallback to memory
-const gpsRedisClient = target.configured
-  ? createClient({ url: target.url })
-  : null;
+const gpsRedisClient = target.configured ? createClient({ url: target.url }) : null;
 
 if (gpsRedisClient && !gpsRedisClient.isOpen) {
-  void gpsRedisClient.connect().catch(err => logger.error('gps_redis_connect_error', { error: err }));
+  void gpsRedisClient
+    .connect()
+    .catch(err => logger.error('gps_redis_connect_error', { error: err }));
 }
 
 // In-memory fallback cache with periodic cleanup
-const memoryGpsCache = new Map<string, { latitude: number; longitude: number; speed?: number; heading?: number; updatedAt: number }>();
+const memoryGpsCache = new Map<
+  string,
+  { latitude: number; longitude: number; speed?: number; heading?: number; updatedAt: number }
+>();
 const lastUpdateMap = new Map<string, number>();
 
 // Periodic cleanup of stale memory entries every 5 minutes
@@ -70,7 +73,12 @@ export function checkGeofencing(
   let nearest: { stopId: string; stopName: string; distanceMeters: number } | null = null;
   for (const stop of stops) {
     if (!stop.latitude || !stop.longitude) continue;
-    const distance = calculateHaversineDistance(currentLat, currentLon, stop.latitude, stop.longitude);
+    const distance = calculateHaversineDistance(
+      currentLat,
+      currentLon,
+      stop.latitude,
+      stop.longitude
+    );
     if (distance <= thresholdMeters) {
       if (!nearest || distance < nearest.distanceMeters) {
         nearest = { stopId: stop.id, stopName: stop.name, distanceMeters: Math.round(distance) };
@@ -102,9 +110,13 @@ export async function saveTripLocation(
 /**
  * Day 12: Retrieve latest GPS coordinates for a trip
  */
-export async function getTripLocation(
-  tripId: string
-): Promise<{ latitude: number; longitude: number; speed?: number; heading?: number; updatedAt: number } | null> {
+export async function getTripLocation(tripId: string): Promise<{
+  latitude: number;
+  longitude: number;
+  speed?: number;
+  heading?: number;
+  updatedAt: number;
+} | null> {
   if (gpsRedisClient?.isReady) {
     try {
       const raw = await gpsRedisClient.get(`trip:location:${tripId}`);

@@ -81,7 +81,9 @@ export async function prepareSeats(client: PoolClient, tripId: string) {
   );
   for (const seat of expiredSeats) {
     if (seat.seat_number) {
-      await releaseSeatLock(tripId, seat.seat_number, seat.redis_lock_id || undefined).catch(() => {});
+      await releaseSeatLock(tripId, seat.seat_number, seat.redis_lock_id || undefined).catch(
+        () => {}
+      );
     }
   }
   return trip;

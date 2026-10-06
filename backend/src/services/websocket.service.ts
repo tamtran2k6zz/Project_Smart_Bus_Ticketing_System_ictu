@@ -72,7 +72,10 @@ export function setupWebSocketGateway(server: HttpServer): WebSocketServer {
           }
 
           // Day 14: Throttling & duplicate check
-          if (ws.userId && shouldThrottleGpsUpdate(ws.userId, Number(latitude), Number(longitude))) {
+          if (
+            ws.userId &&
+            shouldThrottleGpsUpdate(ws.userId, Number(latitude), Number(longitude))
+          ) {
             return; // Throttled
           }
 
