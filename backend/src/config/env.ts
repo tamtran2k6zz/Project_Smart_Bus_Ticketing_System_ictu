@@ -145,9 +145,9 @@ export function getGatewayCallbacks(): GatewayCallbacks {
     vnpayReturnUrl:
       readGatewayEnv('VNPAY_RETURN_URL') || `${base}/api/v1/ticketing/payments/vnpay/return`,
     vnpayIpnUrl: readGatewayEnv('VNPAY_IPN_URL') || `${base}/api/v1/ticketing/payments/vnpay/ipn`,
-    momoRedirectUrl: readGatewayEnv('MOMO_REDIRECT_URL') || `${base}/passenger/booking`,
+    momoRedirectUrl: readGatewayEnv('MOMO_REDIRECT_URL') || `${base}/payment/result`,
     momoIpnUrl: readGatewayEnv('MOMO_IPN_URL') || `${base}/api/v1/ticketing/payments/momo/ipn`,
-    paymentResultUrl: readGatewayEnv('PAYMENT_RESULT_URL') || `${base}/passenger/booking`,
+    paymentResultUrl: readGatewayEnv('PAYMENT_RESULT_URL') || `${base}/payment/result`,
   };
 }
 

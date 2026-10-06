@@ -33,6 +33,7 @@ export const createBooking = async (params: {
   tripId: string;
   seatNumber: string;
   paymentMethod: PaymentMethod;
+  voucherCode?: string;
 }): Promise<CreateBookingResult> => {
   const res = await apiFetch(getApiUrl('/api/v1/ticketing/bookings'), {
     method: 'POST',
@@ -53,10 +54,12 @@ export const createBooking = async (params: {
     seatNumber: data?.ticket?.seatNumber,
     amount: Number(data?.payment?.amount),
     reservationExpiresAt: data?.ticket?.reservationExpiresAt,
-    paymentUrl: data?.paymentUrl,
+    paymentUrl: data?.paymentUrl ?? null,
   };
 
-  if (!result.orderId || !result.ticketId || typeof result.paymentUrl !== 'string') {
+  if (!result.orderId || !result.ticketId || !Number.isFinite(result.amount)
+    || !result.seatNumber || !result.ticketCode
+    || (params.paymentMethod !== 'QR' && typeof result.paymentUrl !== 'string')) {
     throw new Error('Phản hồi tạo giao dịch từ máy chủ không đúng định dạng.');
   }
   return result;

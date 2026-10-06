@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiFetch, getApiUrl } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
-import { loadBookingSession } from '../../utils/bookingSession';
+import { loadBookingSession, saveBookingSession } from '../../utils/bookingSession';
+import { savePaymentDraft } from '../../utils/paymentDraft';
 import { getPaymentOutcome, parsePaymentStatus, type PaymentOutcome } from '../../utils/paymentResult';
 import type { PaymentPageState, PaymentStatusDetail } from '../../types/payment';
 
@@ -63,38 +64,60 @@ const PaymentResultPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
-  const orderId = searchParams.get('orderId')?.trim() || '';
+  const orderId = searchParams.get('orderId')?.trim() || searchParams.get('paymentOrder')?.trim() || '';
 
   const [detail, setDetail] = useState<PaymentStatusDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [polls, setPolls] = useState(0);
+  const requestRef = useRef<AbortController | null>(null);
 
   const fetchStatus = useCallback(async () => {
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
+    const timeout = setTimeout(() => controller.abort(), 15000);
     try {
-      const res = await apiFetch(getApiUrl(`/api/v1/ticketing/payments/${encodeURIComponent(orderId)}`));
+      const res = await apiFetch(getApiUrl(`/api/v1/ticketing/payments/${encodeURIComponent(orderId)}`), { signal: controller.signal });
       const body = await res.json().catch(() => null);
       if (!res.ok) throw new Error(body?.message || 'Không thể tải trạng thái thanh toán.');
       const parsed = parsePaymentStatus(body?.data);
-      if (!parsed) throw new Error('Phản hồi trạng thái thanh toán không đúng định dạng.');
+      if (!parsed || parsed.orderId !== orderId) throw new Error('Phản hồi trạng thái thanh toán không đúng định dạng.');
+      if (requestRef.current !== controller) return;
       setDetail(parsed);
       setError(null);
     } catch (err) {
+      if (requestRef.current !== controller) return;
       setError(err instanceof Error ? err.message : 'Không thể tải trạng thái thanh toán.');
     } finally {
-      setLoading(false);
+      clearTimeout(timeout);
+      if (requestRef.current === controller) setLoading(false);
     }
   }, [orderId]);
 
   useEffect(() => {
+    setDetail(null);
+    setError(null);
+    setPolls(0);
+    setLoading(!!orderId);
     if (!orderId) {
       setLoading(false);
       return;
     }
     void fetchStatus();
+    return () => {
+      requestRef.current?.abort();
+      requestRef.current = null;
+    };
   }, [orderId, fetchStatus]);
 
   const outcome = detail ? getPaymentOutcome(detail) : null;
+
+  useEffect(() => {
+    if (!user || !outcome) return;
+    const session = loadBookingSession(user.id);
+    if (session?.orderId === orderId) saveBookingSession(user.id, { ...session, status: outcome });
+  }, [user, orderId, outcome]);
 
   useEffect(() => {
     if (outcome !== 'PENDING' || polls >= MAX_POLLS) return;
@@ -111,14 +134,14 @@ const PaymentResultPage: React.FC = () => {
   };
 
   const handleViewTicket = () => {
-    navigate(BOOKING_PAGE, { state: { viewOrderId: orderId } });
+    navigate(`${BOOKING_PAGE}?view_order=${encodeURIComponent(orderId)}`, { state: { viewOrderId: orderId } });
   };
 
   // VNPay/MoMo: dựng lại state cho /payment từ phiên đặt chỗ đã lưu trước khi rời sang cổng.
   // QR hoặc không còn phiên: quay về chọn ghế của đúng chuyến đó.
   const handleRetry = () => {
     const session = user ? loadBookingSession(user.id) : null;
-    if (session && session.orderId === orderId) {
+    if (session && session.orderId === orderId && session.paymentMethod !== 'QR') {
       const state: PaymentPageState = {
         tripId: session.tripId,
         seatNumber: session.seatNumber,
@@ -126,7 +149,9 @@ const PaymentResultPage: React.FC = () => {
         routeName: session.routeName,
         departureTime: session.departureTime,
         fare: session.amount,
+        voucherCode: session.voucherCode,
       };
+      savePaymentDraft(user!.id, state);
       navigate('/payment', { state });
       return;
     }
@@ -254,9 +279,9 @@ const PaymentResultPage: React.FC = () => {
               </button>
             )}
             {outcome === 'PENDING' && (
-              <button onClick={handleRecheck} disabled={!pollingDone} style={{
+              <button onClick={handleRecheck} disabled={!pollingDone && !error} style={{
                 ...styles.primaryButton,
-                ...(!pollingDone ? styles.buttonDisabled : {}),
+                ...(!pollingDone && !error ? styles.buttonDisabled : {}),
               }}>
                 Kiểm tra lại
               </button>

@@ -1,4 +1,5 @@
 import type { BookingSession } from '../types/payment';
+import { isPaymentPageState } from './paymentDraft';
 
 // Gắn theo userId để tài khoản khác đăng nhập trên cùng trình duyệt không đọc nhầm phiên.
 export const bookingSessionKey = (userId: string): string => `smartbus_booking_session_${userId}`;
@@ -7,7 +8,12 @@ export const bookingSessionKey = (userId: string): string => `smartbus_booking_s
 export const loadBookingSession = (userId: string): BookingSession | null => {
   try {
     const raw = localStorage.getItem(bookingSessionKey(userId));
-    return raw ? (JSON.parse(raw) as BookingSession) : null;
+    if (!raw) return null;
+    const session = JSON.parse(raw) as BookingSession;
+    if (!session || typeof session.orderId !== 'string' || !session.orderId.trim()
+      || !isPaymentPageState({ ...session, fare: session.amount })
+      || !['VNPAY', 'MOMO', 'QR'].includes(session.paymentMethod)) return null;
+    return session;
   } catch {
     return null;
   }
