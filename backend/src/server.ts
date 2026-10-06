@@ -4,6 +4,7 @@ import { connectRedis, closeRedis, redisStatus } from './config/redis';
 import { collectEnvironmentIssues, logEnvironmentSummary, readEnv } from './config/env';
 import { appLogger } from './config/logger';
 import { releaseExpiredReservations } from './routes/ticketing.routes';
+import { setupWebSocketGateway } from './services/websocket.service';
 
 const logger = appLogger.child('server');
 const port = Number(readEnv('PORT') || 5000);
@@ -13,6 +14,8 @@ logEnvironmentSummary();
 const server = app.listen(port, '0.0.0.0', () =>
   logger.info('api_started', { port, redis: redisStatus() })
 );
+
+setupWebSocketGateway(server);
 
 let cleanupRunning = false;
 async function cleanupExpiredReservations(): Promise<void> {
