@@ -654,6 +654,154 @@ async function main() {
       { status: 'APPROVED' },
       admin
     );
+    // ---------------------------------------------------------------------------
+    // Sprint 3 — Soát vé QR (US 15), thông báo & device token (US 10).
+    // ---------------------------------------------------------------------------
+    // RBAC: chỉ DRIVER/ADMIN/MANAGER được phép soát vé.
+    const demoTicketCode = (
+      await db.query('SELECT ticket_code FROM tickets WHERE id=$1', [demoReservation.ticketId])
+    ).rows[0].ticket_code;
+    await call('post', '/api/tickets/validate-qr', { code: demoTicketCode }, other, 403);
+
+    // Sai chuyến xe → 403 và ghi log REJECTED (không thay đổi trạng thái vé).
+    await call(
+      'post',
+      '/api/tickets/validate-qr',
+      { code: demoTicketCode, tripId: trip },
+      admin,
+      403
+    );
+
+    // Vé BOOKED trên đúng chuyến → check-in thành công + log VALID.
+    const sprint3Checkin = await call(
+      'post',
+      '/api/tickets/validate-qr',
+      { code: demoTicketCode, tripId: demoTrip },
+      admin
+    );
+    assert.equal(sprint3Checkin.isAlreadyCheckedIn, false);
+    assert.ok(sprint3Checkin.validationId);
+    assert.equal(
+      (await db.query('SELECT status FROM tickets WHERE id=$1', [demoReservation.ticketId]))
+        .rows[0].status,
+      'CHECKED_IN'
+    );
+    assert.equal(
+      (
+        await db.query(
+          "SELECT count(*)::int AS n FROM ticket_validation_logs WHERE ticket_id=$1 AND result='VALID'",
+          [demoReservation.ticketId]
+        )
+      ).rows[0].n,
+      1
+    );
+
+    // Quét lần 2 → isAlreadyCheckedIn=true, không đụng trạng thái thêm lần nữa.
+    const sprint3Rescan = await call(
+      'post',
+      '/api/tickets/validate-qr',
+      { code: demoTicketCode, tripId: demoTrip },
+      admin
+    );
+    assert.equal(sprint3Rescan.isAlreadyCheckedIn, true);
+
+    // Log kiểm toán: admin xem được (kèm filter kết quả), passenger thì không.
+    const allLogs = await call('get', '/api/tickets/validation-logs', null, admin);
+    assert.equal(allLogs.success, true);
+    assert.ok(allLogs.items.length >= 3); // VALID + ALREADY_USED + REJECTED
+    const rejectedLogs = await call(
+      'get',
+      '/api/tickets/validation-logs?result=REJECTED',
+      null,
+      admin
+    );
+    assert.ok(rejectedLogs.items.length >= 1);
+    await call('get', '/api/tickets/validation-logs', null, other, 403);
+
+    // Device token (US 10): đăng ký / đăng ký lại (upsert) / liệt kê / gỡ.
+    const deviceToken = 'integration-fcm-token-000001';
+    const deviceRegister = await call(
+      'post',
+      '/api/devices/register',
+      { deviceToken, platform: 'ANDROID', deviceName: 'Pixel Test' },
+      passenger,
+      201
+    );
+    assert.equal(deviceRegister.device.platform, 'ANDROID');
+    const deviceReregister = await call(
+      'post',
+      '/api/devices/register',
+      { deviceToken, platform: 'WEB', deviceName: 'Web Test' },
+      passenger,
+      201
+    );
+    assert.equal(deviceReregister.device.id, deviceRegister.device.id);
+    assert.equal(deviceReregister.device.platform, 'WEB');
+    await call(
+      'post',
+      '/api/devices/register',
+      { deviceToken: 'short', platform: 'ANDROID' },
+      passenger,
+      400
+    );
+    await call(
+      'post',
+      '/api/devices/register',
+      { deviceToken: 'integration-fcm-token-000002', platform: 'SAILFISH' },
+      passenger,
+      400
+    );
+    const deviceList = await call('get', '/api/devices', null, passenger);
+    assert.equal(deviceList.devices.length, 1);
+    // Người khác không gỡ được token của passenger (idempotent, affected=0).
+    const deviceForeign = await call('post', '/api/devices/unregister', { deviceToken }, other);
+    assert.equal(deviceForeign.affected, 0);
+    const deviceRemove = await call('post', '/api/devices/unregister', { deviceToken }, passenger);
+    assert.equal(deviceRemove.affected, 1);
+    const deviceRemoveAgain = await call(
+      'post',
+      '/api/devices/unregister',
+      { deviceToken },
+      passenger
+    );
+    assert.equal(deviceRemoveAgain.affected, 0);
+
+    // Notifications (US 10): không có endpoint tạo — gọi thẳng service (ghi qua pool đã patch).
+    const notificationService = require('../dist/services/notification.service');
+    await notificationService.createNotification(first.data.user.id, {
+      type: 'TRIP_UPDATE',
+      title: 'Chuyến TEST sắp khởi hành',
+      body: 'Vui lòng có mặt sớm tại trạm.',
+      data: { tripId: trip },
+    });
+    await notificationService.createNotification(second.data.user.id, {
+      type: 'TRIP_UPDATE',
+      title: 'Thông báo riêng của người khác',
+    });
+    const notifList = await call('get', '/api/notifications?limit=50', null, passenger);
+    assert.equal(notifList.success, true);
+    assert.equal(notifList.items.length, 1); // isolation: chỉ thông báo của mình
+    assert.equal(notifList.unreadCount, 1);
+    const notifUnread = await call('get', '/api/notifications/unread-count', null, passenger);
+    assert.equal(notifUnread.unreadCount, 1);
+    const notifRead = await call(
+      'post',
+      `/api/notifications/${notifList.items[0].id}/read`,
+      {},
+      passenger
+    );
+    assert.equal(notifRead.notification.is_read, true);
+    // Người khác không đánh dấu được thông báo của passenger → 404.
+    await call('post', `/api/notifications/${notifList.items[0].id}/read`, {}, other, 404);
+    const notifReadAll = await call('post', '/api/notifications/read-all', {}, passenger);
+    assert.equal(notifReadAll.success, true);
+    const notifUnreadAfter = await call('get', '/api/notifications/unread-count', null, passenger);
+    assert.equal(notifUnreadAfter.unreadCount, 0);
+    // Danh sách của `other` vẫn tách bạch: 1 thông báo chưa đọc.
+    const otherNotif = await call('get', '/api/notifications', null, other);
+    assert.equal(otherNotif.items.length, 1);
+    assert.equal(otherNotif.unreadCount, 1);
+
     for (const role of ['anon', 'authenticated']) {
       await db.exec('SET ROLE ' + role);
       await assert.rejects(db.query('SELECT password_hash FROM users'), e => e.code === '42501');
@@ -661,8 +809,18 @@ async function main() {
         db.query("INSERT INTO tickets(id,trip_id) VALUES ('forged','x')"),
         e => e.code === '42501'
       );
+      // Sprint 3: 3 bảng mới cũng phải bị REVOKE toàn bộ vớianon/authenticated.
+      await assert.rejects(
+        db.query('SELECT result FROM ticket_validation_logs'),
+        e => e.code === '42501'
+      );
+      await assert.rejects(
+        db.query('SELECT device_token FROM user_devices'),
+        e => e.code === '42501'
+      );
+      await assert.rejects(db.query('SELECT title FROM notifications'), e => e.code === '42501');
       await db.exec('RESET ROLE');
-      checks += 2;
+      checks += 5;
     }
     assert.equal(
       (
@@ -670,7 +828,7 @@ async function main() {
           "SELECT count(*)::int AS n FROM pg_tables WHERE schemaname='public' AND rowsecurity"
         )
       ).rows[0].n,
-      14
+      17
     );
     await call('delete', `/api/routes/${route}`, null, admin);
     await call('delete', `/api/routes/${routeWithStops}`, null, admin);

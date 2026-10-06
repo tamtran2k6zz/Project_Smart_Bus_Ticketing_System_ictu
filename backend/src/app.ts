@@ -9,6 +9,9 @@ import operationsRoutes from './routes/operations.routes';
 import ticketingRoutes from './routes/ticketing.routes';
 import seatsRoutes from './routes/seats.routes';
 import usersRoutes from './routes/users.routes';
+import ticketsRoutes from './routes/tickets.routes';
+import devicesRoutes from './routes/devices.routes';
+import notificationsRoutes from './routes/notifications.routes';
 import ticketDetailsRoutes from './routes/ticket-details.routes';
 import { query } from './config/database';
 import { getJwtSecret } from './config/auth';
@@ -88,7 +91,15 @@ app.use('/api/operations', operationsRoutes);
 app.use('/api/v1/operations', operationsRoutes);
 app.use('/api/ticketing', ticketingRoutes);
 app.use('/api/v1/ticketing', ticketingRoutes);
+// Sprint 3: routes tĩnh của tickets phải mount TRƯỚC ticketDetailsRoutes
+// (GET /:ticketCode) để không bị route động nuốt mất.
+app.use('/api/tickets', ticketsRoutes);
+app.use('/api/v1/tickets', ticketsRoutes);
 app.use('/api/v1/tickets', ticketDetailsRoutes);
+app.use('/api/devices', devicesRoutes);
+app.use('/api/v1/devices', devicesRoutes);
+app.use('/api/notifications', notificationsRoutes);
+app.use('/api/v1/notifications', notificationsRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/v1/users', usersRoutes);
 

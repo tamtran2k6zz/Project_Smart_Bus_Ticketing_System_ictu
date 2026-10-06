@@ -15,6 +15,27 @@ interface AuthenticatedWebSocket extends WebSocket {
 }
 
 const tripRooms = new Map<string, Set<AuthenticatedWebSocket>>();
+// Sprint 3 (US 10): user_id → các kết nối của người dùng đó, dùng để push
+// thông báo realtime (notifications) tới đúng thiết bị của hành khách.
+const userRooms = new Map<string, Set<AuthenticatedWebSocket>>();
+
+/**
+ * Push một payload tới mọi kết nối WebSocket của một người dùng.
+ * Trả về true nếu có ít nhất một kết nối đang mở nhận được.
+ */
+export function sendToUser(userId: string, payload: Record<string, unknown>): boolean {
+  const room = userRooms.get(userId);
+  if (!room || room.size === 0) return false;
+  let delivered = false;
+  const message = JSON.stringify(payload);
+  for (const client of room) {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(message);
+      delivered = true;
+    }
+  }
+  return delivered;
+}
 
 export function setupWebSocketGateway(server: HttpServer): WebSocketServer {
   const wss = new WebSocketServer({ server, path: '/ws' });
@@ -37,6 +58,16 @@ export function setupWebSocketGateway(server: HttpServer): WebSocketServer {
       } catch (err) {
         logger.warn('ws_auth_failed', { error: err });
       }
+    }
+
+    // Sprint 3: đưa kết nối vào "phòng" của user để nhận thông báo realtime.
+    if (ws.userId) {
+      let room = userRooms.get(ws.userId);
+      if (!room) {
+        room = new Set();
+        userRooms.set(ws.userId, room);
+      }
+      room.add(ws);
     }
 
     ws.on('message', async data => {
@@ -117,6 +148,13 @@ export function setupWebSocketGateway(server: HttpServer): WebSocketServer {
         if (room) {
           room.delete(ws);
           if (room.size === 0) tripRooms.delete(ws.tripId);
+        }
+      }
+      if (ws.userId) {
+        const userRoom = userRooms.get(ws.userId);
+        if (userRoom) {
+          userRoom.delete(ws);
+          if (userRoom.size === 0) userRooms.delete(ws.userId);
         }
       }
     });

@@ -304,8 +304,6 @@ Project_Smart_Bus_Ticketing_System_ictu/
 │   │   │   └── payment-refund.service.ts     # Hoàn tiền VNPay / MoMo
 │   │   ├── app.ts                     # Cấu hình Express App, CORS, Health, Error Handler
 │   │   └── server.ts                  # Điểm khởi chạy Local HTTP Server (Port 5000)
-│   ├── prisma/
-│   │   └── schema.prisma              # Mô hình PostgreSQL (tài liệu, KHÔNG chạy migration)
 │   ├── Dockerfile                     # Dockerfile đóng gói Backend Node.js
 │   └── package.json
 ├── frontend/

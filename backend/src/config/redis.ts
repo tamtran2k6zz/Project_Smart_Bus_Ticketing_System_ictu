@@ -114,6 +114,81 @@ export async function releaseSeatLock(
   );
 }
 
+/**
+ * Sprint 3: khóa phân tán khi soát vé QR — chống hai thiết bị quét cùng lúc.
+ * Trả về lockId (kèm 'redis-disabled'/'redis-unavailable' khi không có Redis
+ * → caller vẫn tiếp tục vì PostgreSQL SELECT ... FOR UPDATE là chốt chặn cuối).
+ * Trả về null nghĩa là thiết bị khác đang giữ khóa (caller trả 409).
+ */
+export async function acquireTicketValidationLock(
+  code: string,
+  ownerId: string,
+  ttlSeconds = 5
+): Promise<string | null> {
+  if (!redisClient) return 'redis-disabled';
+  if (!redisClient.isReady) {
+    logger.error('ticket_lock_unavailable', {
+      code,
+      owner_id: ownerId,
+      redis_status: redisStatus(),
+      fallback: 'postgres-row-lock',
+    });
+    return 'redis-unavailable';
+  }
+  const key = `lock:ticket:scan:${code}`;
+  const lockId = `${ownerId}:${randomUUID()}`;
+  const result = await redisClient.set(key, lockId, { NX: true, EX: ttlSeconds });
+  if (result === 'OK') {
+    logger.debug('ticket_lock_acquired', { code, owner_id: ownerId });
+    return lockId;
+  }
+  logger.warn('ticket_lock_conflict', { code, owner_id: ownerId });
+  return null;
+}
+
+export async function releaseTicketValidationLock(code: string, lockId?: string): Promise<void> {
+  if (!redisClient?.isReady) return;
+  const key = `lock:ticket:scan:${code}`;
+  if (!lockId) {
+    await redisClient.del(key);
+    return;
+  }
+  await redisClient.eval(
+    "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+    { keys: [key], arguments: [lockId] }
+  );
+}
+
+// Sprint 3: idempotency flags (notification dedup, ...)
+// Without Redis the process-local fallback still protects a single instance;
+// multi-instance deployments need Redis for cross-instance deduplication.
+const memoryFlags = new Map<string, number>();
+
+export async function setIfAbsent(
+  key: string,
+  value: string,
+  ttlSeconds: number
+): Promise<boolean> {
+  if (redisClient?.isReady) {
+    try {
+      const result = await redisClient.set(key, value, { NX: true, EX: ttlSeconds });
+      return result === 'OK';
+    } catch (error) {
+      logger.error('set_if_absent_failed', { key, error });
+    }
+  }
+  const now = Date.now();
+  const expiresAt = memoryFlags.get(key);
+  if (expiresAt && expiresAt > now) return false;
+  if (memoryFlags.size > 1000) {
+    for (const [flagKey, flagExpiry] of memoryFlags) {
+      if (flagExpiry <= now) memoryFlags.delete(flagKey);
+    }
+  }
+  memoryFlags.set(key, now + ttlSeconds * 1000);
+  return true;
+}
+
 export async function closeRedis(): Promise<void> {
   if (!redisClient?.isOpen) return;
   if (redisClient.isReady) await redisClient.quit();
