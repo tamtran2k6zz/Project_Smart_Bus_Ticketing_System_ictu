@@ -277,8 +277,8 @@ erDiagram
    - Bổ sung trường `mat_khau_hash`, `minh_chung_uu_dai_url` trong `NGUOI_DUNG` đáp ứng tính năng phân quyền RBAC và duyệt ưu đãi học sinh, sinh viên (US 17, US 22).
    - Bảng `THANH_TOAN`: Sửa lỗi chữ `ma_hoa_don_dieu_tu` thành `ma_hoa_don_dien_tu`, bổ sung trường `ma_giao_dich_cong` khớp với API tích hợp cổng thanh toán MoMo/VNPay/ZaloPay (US 6, US 7, US 8).
    - Bảng `BAO_CAO_SU_CO`: Chuẩn hóa enum loại sự cố `"KetXeUdTat, HuHongXe, ThoiTietXau, VaChamGiaoThong"` và bổ sung thời gian trễ dự kiến `thoi_gian_tre_phut`.
-2. **Khớp nối cấu trúc Cơ sở dữ liệu Prisma hiện hành của dự án:**
-   - Bổ sung cấu trúc biểu phí đa dạng `BIEU_PHI_CHIEU` (Fares) khớp với model `Fare` trong `schema.prisma` và migration `20260928000000_harmonize_routes_and_fares`.
+2. **Khớp nối cấu trúc cơ sở dữ liệu PostgreSQL hiện hành của dự án:**
+   - Bổ sung cấu trúc biểu phí đa dạng `BIEU_PHI_CHIEU` (Fares) khớp với bảng `fares` trong `supabase/migrations`.
    - Kết nối trạm lên (`tram_len`) và trạm xuống (`tram_xuong`) từ `TRAM_DUNG` đến `VE_DIEN_TU` phục vụ chính xác thuật toán tìm kiếm chuyến xe (Trips Search Service theo cặp trạm khởi hành - điểm đến).
 3. **Bổ sung thực thể Thông báo (THONG_BAO):**
    - Đảm bảo đáp ứng đầy đủ tính năng thông báo đón xe tại trạm thời gian thực (US 10) mà sơ đồ dự thảo ban đầu bị khuyết.
