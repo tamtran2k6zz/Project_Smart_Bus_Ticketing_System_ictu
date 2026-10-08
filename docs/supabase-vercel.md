@@ -14,7 +14,7 @@ codex mcp login supabase
 npx vercel login
 ```
 
-Complete each browser authorization. Confirm MCP authentication using `/mcp` in Codex. The Supabase skills are already installed in `.agents/skills`.
+Complete each browser authorization. Confirm MCP authentication using `/mcp` in Codex. Local agent configuration is excluded from Git.
 
 ## 2. Configure private connection strings
 
@@ -151,11 +151,13 @@ Remove `ADMIN_PASSWORD` afterward. This creates a new administrator and never ov
 
 ## 5. Configure and deploy Vercel
 
-Use repository root as the Vercel **Root Directory**, **Other** as the framework preset, and Node.js 22. Repository `vercel.json` supplies installation/build/output settings:
+Use repository root as the Vercel **Root Directory**, **Other** as the framework preset, and Node.js 22. Repository `vercel.json` explicitly selects two builders because the serverless entrypoint lives inside `backend`:
 
-- Install root, backend, and frontend packages using their lockfiles.
-- Compile the Express backend and build the frontend to `frontend/dist`.
-- Route `/api/*` to `api/index.ts` before the SPA fallback.
+- `@vercel/node` builds `backend/api/index.ts` using the backend package and its lockfile. The entrypoint imports `../src/app`.
+- `@vercel/static-build` runs from root `package.json`, installs the root packages automatically, then runs `npm --prefix frontend ci && npm run build:frontend` to build `frontend/dist`. This mounts static files at the site root.
+- Route `/api` and `/api/*` to `backend/api/index.ts`, serve existing static files, and then fall back to `index.html` for frontend routes.
+
+The explicit `builds` configuration is a legacy Vercel option used here to support the nested API entrypoint in one deployment. Do not add a `functions` property alongside it. No root-level `api` folder is needed.
 
 In the target project's **Settings → Environment Variables**, set `DATABASE_URL`, `JWT_SECRET`, and `DB_POOL_MAX=2` for Production. Set Preview separately to a test database. Remove old `VITE_API_URL`/`VITE_API_BASE_URL` overrides so requests use the same Vercel origin. The Supabase URL is a database endpoint, not a replacement for the Express API URL.
 

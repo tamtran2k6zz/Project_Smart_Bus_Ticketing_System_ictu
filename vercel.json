@@ -1,20 +1,31 @@
 {
-  "installCommand": "npm install && npm --prefix backend install && npm --prefix frontend install",
-  "buildCommand": "npm --prefix backend run build && npm --prefix frontend run build",
-  "outputDirectory": "frontend/dist",
-  "functions": {
-    "api/index.ts": {
-      "maxDuration": 30
-    }
-  },
-  "rewrites": [
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "builds": [
     {
-      "source": "/api/:path*",
-      "destination": "/api"
+      "src": "backend/api/index.ts",
+      "use": "@vercel/node"
     },
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "frontend/dist",
+        "buildCommand": "npm --prefix frontend ci && npm run build:frontend"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api(?:/.*)?",
+      "dest": "/backend/api/index.ts"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/.*",
+      "dest": "/index.html"
     }
   ]
 }
