@@ -137,7 +137,7 @@ Cần nối xác thực phiên/cookie, tồn ghế/hold/giá server, webhook tha
 Hệ thống sử dụng mô hình kiến trúc Serverless Micro-Architecture kết hợp Single-Page Application (SPA):
 
 - **Frontend:** React 19 / Vite SPA; chế độ demo/API và giao diện mới/cũ được chọn lúc build bằng biến `VITE_*`.
-- **Backend API:** Entrypoint `api/index.ts` điều hướng toàn bộ yêu cầu `/api/*` tới Express Engine (Node.js Serverless Function).
+- **Backend API:** Entrypoint `backend/api/index.ts` điều hướng toàn bộ yêu cầu `/api/*` tới Express Engine (Node.js Serverless Function).
 - **Database:** **Supabase PostgreSQL** kết nối qua Transaction Pooler (PgBouncer cổng `6543`) tối ưu tài nguyên kết nối serverless; bảo mật toàn diện qua **Row-Level Security (RLS)** trên 14 bảng.
 
 ```
