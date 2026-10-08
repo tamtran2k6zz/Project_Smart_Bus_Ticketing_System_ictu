@@ -6,6 +6,8 @@ import { QrCode, Download, MapPin } from 'lucide-react';
 import { useSession } from '@/store/session.store';
 import { ticketsApi } from '../services/tickets.api';
 import { bookingApi } from '@/features/booking/services/booking.api';
+import { PriceBreakdown } from '@/features/booking/components/PriceBreakdown';
+import { receiptPriceLines } from '@/features/booking/utils/price';
 import { operationsApi } from '@/features/operations/services/operations.api';
 import { paymentApi } from '@/features/payments/services/payment.api';
 import { createPdf, download } from '@/features/reports/services/export';
@@ -218,7 +220,7 @@ export function TicketDetail() {
         'Mã đặt vé: ' + b.id,
         'Khách hàng: ' + b.name,
         'Số vé: ' + b.quantity,
-        'Tổng tiền: ' + money(b.total),
+        ...receiptPriceLines(b),
         'Ngày: ' + dateTime(b.createdAt),
       ]);
       download(blob, 'smartbus-demo-receipt.pdf');
@@ -295,7 +297,7 @@ export function TicketDetail() {
                       {b.quantity} vé ·{' '}
                       {b.seatIds.length ? 'Ghế ' + b.seatIds.join(', ') : 'Không gắn ghế'}
                     </p>
-                    <p className="price">{money(b.total)}</p>
+                    <PriceBreakdown booking={b} totalLabel="Tổng thanh toán" />
                     <p className="muted">
                       Hoàn tiền:{' '}
                       {b.refund === 'none'
@@ -354,6 +356,23 @@ export function TicketDetail() {
           khoản hoàn chờ xử lý. Đổi được duyệt giữ nguyên giá, chọn chỗ trống trên chuyến cùng tuyến
           và loại vé.
         </p>
+        {modal === 'cancel' && b && (
+          <div className="stack" style={{ gap: 8, margin: '16px 0' }}>
+            <PriceBreakdown booking={b} totalLabel="Số tiền đã thanh toán" />
+            <hr className="divider" />
+            <div className="between">
+              <span className="muted">Phí hủy</span>
+              <span>Điều hành xác nhận khi duyệt</span>
+            </div>
+            <div className="between">
+              <strong>Số tiền hoàn dự kiến</strong>
+              <span>{money(b.total)} − phí hủy</span>
+            </div>
+            <p className="muted" style={{ margin: 0 }}>
+              Số tiền hoàn chính xác sẽ được thông báo khi yêu cầu hủy được duyệt.
+            </p>
+          </div>
+        )}
         {modal === 'exchange' && (
           <Field label="Chuyến muốn đổi">
             <select value={target} onChange={e => setTarget(e.target.value)}>

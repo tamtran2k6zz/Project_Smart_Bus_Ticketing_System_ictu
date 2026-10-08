@@ -8,6 +8,7 @@ import { bookingApi } from '@/features/booking/services/booking.api';
 import { paymentApi } from '../services/payment.api';
 import { HoldTimer } from '@/features/booking/components/BookingFlow';
 import { JourneySummary } from '@/features/booking/components/JourneySummary';
+import { PriceBreakdown } from '@/features/booking/components/PriceBreakdown';
 import {
   Card,
   Button,
@@ -168,19 +169,7 @@ export function Checkout() {
                 {b.seatIds.length ? 'Ghế ' + b.seatIds.join(', ') : 'Không gắn ghế'}
               </p>
               <hr className="divider" />
-              <div className="between">
-                <span className="muted">Tạm tính</span>
-                <strong>{money(b.total + b.discount)}</strong>
-              </div>
-              <div className="between" style={{ marginTop: 16 }}>
-                <span className="muted">Ưu đãi {b.voucher}</span>
-                <strong>− {money(b.discount)}</strong>
-              </div>
-              <hr className="divider" />
-              <div className="between">
-                <strong>Tổng cộng</strong>
-                <span className="price">{money(b.total)}</span>
-              </div>
+              <PriceBreakdown booking={b} />
               <p className="muted row">
                 <ShieldCheck size={17} />
                 Không lưu thông tin thẻ tại frontend
@@ -225,9 +214,7 @@ export function PaymentResult() {
             <Badge tone={b.status === 'paid' ? 'green' : b.status === 'pending' ? 'amber' : 'red'}>
               {statusText[b.status]}
             </Badge>
-            <p>
-              Tổng tiền: <strong>{money(b.total)}</strong>
-            </p>
+            <PriceBreakdown booking={b} totalLabel="Tổng tiền" />
             <p className="muted">Mã đặt vé: {b.id}</p>
             <p className="muted">
               {b.status === 'paid'
