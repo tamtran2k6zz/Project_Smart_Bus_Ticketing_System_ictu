@@ -410,7 +410,6 @@ Project_Smart_Bus_Ticketing_System_ictu/
 ├── backend/
 │   ├── scripts/
 │   │   ├── migrate-postgres.cjs       # Trình thực thi Migration PostgreSQL
-│   │   ├── import-mysql.cjs           # Script chuyển đổi dữ liệu MySQL -> PostgreSQL
 │   │   ├── test-postgres.cjs          # Kiểm thử API với PostgreSQL nhúng
 │   │   └── create-admin.cjs           # Tiện ích tạo tài khoản quản trị viên
 │   ├── src/
