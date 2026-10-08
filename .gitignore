@@ -24,7 +24,7 @@ supabase/.temp/
 *service-account*.json
 /DB_URL & JWT.docx
 
-# Local agent, editor, workspace, and workflow configuration
+# Local agent, editor, and workspace configuration
 .agent/
 .agents/
 .codex/
@@ -32,7 +32,6 @@ supabase/.temp/
 .vscode/
 .idea/
 .postman/
-.github/
 skills-lock.json
 
 # OS files, temporary files, and backups

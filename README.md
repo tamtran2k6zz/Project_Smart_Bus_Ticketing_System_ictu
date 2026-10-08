@@ -471,11 +471,12 @@ Project_Smart_Bus_Ticketing_System_ictu/
 └── README.md                          # Tài liệu hướng dẫn đồ án
 ```
 
-Các cấu hình local (`.agents`, `.agent`, `.github`, `.vscode`, `.postman`),
+Các cấu hình local (`.agents`, `.agent`, `.vscode`, `.postman`),
 file môi trường riêng, tài liệu chứa DB URL/JWT và kết quả build/test được loại
-khỏi Git. Các mẫu `.env.example` vẫn được chia sẻ. Workflow `.github` chỉ còn
-trên máy local; repository không tự chạy GitHub Actions. Kiểm tra trước khi
-push bằng `npm run lint`, `npm test`, `npm run build` và
+khỏi Git. Các mẫu `.env.example` vẫn được chia sẻ. Workflow
+`.github/workflows/ci.yml` được giữ trong Git để tự động kiểm tra lint, test
+và build khi push hoặc mở pull request vào `main`/`develop`. Có thể kiểm tra
+trước khi push bằng `npm run lint`, `npm test`, `npm run build` và
 `npm --prefix backend run test:postgres`.
 
 ---
