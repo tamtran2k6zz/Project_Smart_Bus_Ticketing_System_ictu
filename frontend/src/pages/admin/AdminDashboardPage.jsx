@@ -10,15 +10,18 @@ import {
   Ticket,
   ArrowRight,
   LayoutDashboard,
+  Calendar,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import Button from '../../components/common/Button';
 import AdminBookingsPage from './AdminBookingsPage';
 import AdminRevenueReconciliationPage from './AdminRevenueReconciliationPage';
+import AdminSchedulesPage from './AdminSchedulesPage';
+import AdminMonthlyTicketsPage from './AdminMonthlyTicketsPage';
 
 export const AdminDashboardPage = () => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('bookings'); // 'bookings' | 'reconciliation' | 'overview'
+  const [activeTab, setActiveTab] = useState('bookings'); // 'bookings' | 'reconciliation' | 'schedules' | 'monthly-tickets' | 'overview'
 
   return (
     <div className="space-y-6">
@@ -60,6 +63,40 @@ export const AdminDashboardPage = () => {
 
         <button
           type="button"
+          onClick={() => setActiveTab('schedules')}
+          className={`flex items-center gap-2 py-3 px-4 font-semibold text-sm border-b-2 transition-colors whitespace-nowrap ${
+            activeTab === 'schedules'
+              ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50 rounded-t-lg'
+              : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
+          }`}
+          data-testid="tab-schedules"
+        >
+          <Calendar className="w-4 h-4 text-indigo-600" />
+          <span>Lịch trình chạy xe</span>
+          <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-indigo-100 text-indigo-700">
+            Mới
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('monthly-tickets')}
+          className={`flex items-center gap-2 py-3 px-4 font-semibold text-sm border-b-2 transition-colors whitespace-nowrap ${
+            activeTab === 'monthly-tickets'
+              ? 'border-purple-600 text-purple-600 bg-purple-50/50 rounded-t-lg'
+              : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
+          }`}
+          data-testid="tab-monthly-tickets"
+        >
+          <Ticket className="w-4 h-4 text-purple-600" />
+          <span>Vé tháng trực tuyến</span>
+          <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-purple-100 text-purple-700">
+            Sinh viên
+          </span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveTab('overview')}
           className={`flex items-center gap-2 py-3 px-4 font-semibold text-sm border-b-2 transition-colors whitespace-nowrap ${
             activeTab === 'overview'
@@ -79,7 +116,13 @@ export const AdminDashboardPage = () => {
       {/* Tab 2: Revenue Reconciliation Management (US 06 STT 25) */}
       {activeTab === 'reconciliation' && <AdminRevenueReconciliationPage />}
 
-      {/* Tab 2: General Operational Overview */}
+      {/* Tab 3: Bus Schedules Management */}
+      {activeTab === 'schedules' && <AdminSchedulesPage />}
+
+      {/* Tab 4: Monthly Ticket Subscriptions Management */}
+      {activeTab === 'monthly-tickets' && <AdminMonthlyTicketsPage />}
+
+      {/* Tab 5: General Operational Overview */}
       {activeTab === 'overview' && (
         <div className="space-y-8 animate-in fade-in duration-200">
           {/* Header Banner */}

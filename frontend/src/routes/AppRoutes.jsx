@@ -18,6 +18,8 @@ import DashboardPage from '../pages/dashboard/DashboardPage';
 import AdminDashboardPage from '../pages/admin/AdminDashboardPage';
 import AdminBookingsPage from '../pages/admin/AdminBookingsPage';
 import AdminRevenueReconciliationPage from '../pages/admin/AdminRevenueReconciliationPage';
+import AdminSchedulesPage from '../pages/admin/AdminSchedulesPage';
+import AdminMonthlyTicketsPage from '../pages/admin/AdminMonthlyTicketsPage';
 import TicketsPage from '../pages/tickets/TicketsPage';
 import ProfilePage from '../pages/profile/ProfilePage';
 import ForbiddenPage from '../pages/error/ForbiddenPage';
@@ -74,6 +76,8 @@ export const AppRoutes = () => {
             <Route path="/admin/transactions" element={<AdminBookingsPage />} />
             <Route path="/admin/reconciliation" element={<AdminRevenueReconciliationPage />} />
             <Route path="/admin/revenue" element={<AdminRevenueReconciliationPage />} />
+            <Route path="/admin/schedules" element={<AdminSchedulesPage />} />
+            <Route path="/admin/monthly-tickets" element={<AdminMonthlyTicketsPage />} />
           </Route>
         </Route>
       </Route>

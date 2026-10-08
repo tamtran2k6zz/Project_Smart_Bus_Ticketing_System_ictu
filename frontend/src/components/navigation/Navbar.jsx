@@ -13,6 +13,7 @@ import {
   TrendingUp,
   WifiOff,
   Wifi,
+  Calendar,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNetworkStatus } from '../../contexts/NetworkStatusContext';
@@ -147,6 +148,28 @@ export const Navbar = () => {
                       >
                         <TrendingUp className="w-4 h-4 text-emerald-600" />
                         Đối soát Doanh thu
+                      </Link>
+                      <Link
+                        to="/admin/schedules"
+                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                          isActive('/admin/schedules')
+                            ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                        }`}
+                      >
+                        <Calendar className="w-4 h-4 text-indigo-600" />
+                        Lịch trình
+                      </Link>
+                      <Link
+                        to="/admin/monthly-tickets"
+                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                          isActive('/admin/monthly-tickets')
+                            ? 'bg-purple-50 text-purple-700 font-semibold'
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                        }`}
+                      >
+                        <Ticket className="w-4 h-4 text-purple-600" />
+                        Vé tháng
                       </Link>
                     </>
                   )}
@@ -375,6 +398,24 @@ export const Navbar = () => {
                     }`}
                   >
                     Đối soát Doanh thu (STT 25)
+                  </Link>
+                  <Link
+                    to="/admin/schedules"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      isActive('/admin/schedules') ? 'bg-indigo-100 text-indigo-800 font-semibold' : 'text-indigo-700 hover:bg-indigo-50'
+                    }`}
+                  >
+                    Lịch trình chạy xe
+                  </Link>
+                  <Link
+                    to="/admin/monthly-tickets"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      isActive('/admin/monthly-tickets') ? 'bg-purple-100 text-purple-800 font-semibold' : 'text-purple-700 hover:bg-purple-50'
+                    }`}
+                  >
+                    Đăng ký Vé tháng trực tuyến
                   </Link>
                 </div>
               )}
