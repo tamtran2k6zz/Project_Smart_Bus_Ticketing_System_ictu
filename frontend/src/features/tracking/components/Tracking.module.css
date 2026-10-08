@@ -1,0 +1,49 @@
+.map {
+  height: 420px;
+  width: 100%;
+  border-radius: 13px;
+  background:
+    repeating-linear-gradient(0deg, #eff4ed 0, #eff4ed 69px, #dae4d7 70px, #eff4ed 73px),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent 69px,
+      #dae4d7 70px,
+      transparent 73px
+    );
+  z-index: 0;
+}
+.busMarker {
+  background: #15803d;
+  border: 3px solid white;
+  border-radius: 12px;
+  box-shadow: 0 4px 14px #16653440;
+  display: grid;
+  place-items: center;
+  font-size: 21px;
+}
+.stop {
+  display: flex;
+  gap: 13px;
+  padding: 17px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.stopNumber {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #edf7ef;
+  color: #15803d;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+}
+.map :global(.leaflet-control-attribution) {
+  font-size: 8px;
+}
+@media (max-width: 600px) {
+  .map {
+    height: 310px;
+  }
+}

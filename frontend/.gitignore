@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.npm-cache/
+.playwright/
+playwright-report/
+test-results/
+dependency-audit.json
+.env
+.env.local
+.env.*.local

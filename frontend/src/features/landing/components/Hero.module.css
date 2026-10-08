@@ -1,0 +1,366 @@
+.demoNotice {
+  background: #eff8ed;
+  color: var(--body);
+  text-align: center;
+  font-size: 13px;
+  padding: 10px 16px;
+  line-height: 1.6;
+}
+.hero {
+  background:
+    radial-gradient(ellipse at 75% 45%, #e3f2df 0, transparent 58%),
+    linear-gradient(110deg, #eff8ed, #f5faf4 68%, #fff);
+  overflow: hidden;
+  padding: 44px 0 100px;
+}
+.heroGrid {
+  width: min(1600px, calc(100% - 64px));
+  margin: auto;
+  display: grid;
+  grid-template-columns: 42% 58%;
+  align-items: center;
+  min-height: 640px;
+}
+.content {
+  position: relative;
+  z-index: 2;
+  padding: 28px 0 20px;
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #336540;
+  background: #dcebd7;
+  padding: 12px 16px;
+  border-radius: var(--radius-pill);
+  font-size: clamp(12px, 1.1vw, 16px);
+  line-height: 1.5;
+}
+.content h1 {
+  font-size: clamp(42px, 4.25vw, 72px);
+  font-weight: 800;
+  color: var(--heading);
+  line-height: 1.23;
+  letter-spacing: -2.2px;
+  margin: 32px 0 34px;
+}
+.content h1 span {
+  color: var(--primary);
+}
+.content > p {
+  color: var(--body);
+  font-size: clamp(13px, 1.13vw, 18px);
+  line-height: 1.9;
+  margin: 0 0 34px;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.actions a {
+  min-height: 58px;
+  font-size: 16px;
+  padding: 15px 24px;
+  border-radius: var(--radius-control);
+}
+.notes {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-top: 30px;
+  font-size: 13px;
+  color: var(--body);
+}
+.notes span {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.notes svg {
+  color: var(--primary);
+}
+.visual {
+  position: relative;
+  min-width: 0;
+  padding-block: 24px 44px;
+}
+.visual::before {
+  content: '';
+  position: absolute;
+  width: 70%;
+  aspect-ratio: 1;
+  background: #d6eaca;
+  border-radius: 50%;
+  right: 7%;
+  top: 8%;
+  opacity: 0.45;
+}
+.busFrame {
+  position: relative;
+  z-index: 1;
+  width: 110%;
+  margin-left: -6%;
+}
+.bus {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: contain;
+}
+.visualLabel {
+  position: absolute;
+  z-index: 2;
+  top: 20px;
+  right: 5%;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  color: #416847;
+  letter-spacing: 2px;
+  font-size: 11px;
+}
+.dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  background: var(--primary);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.arrivalCard,
+.ticketCard {
+  position: absolute;
+  z-index: 3;
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-float);
+}
+.arrivalCard {
+  top: 40%;
+  right: 0;
+  padding: 18px 22px;
+}
+.arrivalCard .dot {
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  width: 14px;
+  height: 14px;
+  border: 3px solid white;
+}
+.arrivalCard strong,
+.ticketCard strong {
+  display: block;
+  color: var(--heading);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.arrivalCard small,
+.ticketCard small {
+  color: #627384;
+  font-size: 12px;
+  line-height: 1.6;
+  margin-top: 5px;
+  display: block;
+}
+.ticketCard {
+  left: 23%;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+}
+.ticketCard small {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.qrIcon {
+  display: grid;
+  place-items: center;
+  width: 55px;
+  height: 55px;
+  border-radius: 14px;
+  color: var(--primary);
+  background: #e4f3e9;
+  flex-shrink: 0;
+}
+.check {
+  color: var(--primary);
+}
+@media (min-width: 1600px) {
+  .heroGrid {
+    min-height: 720px;
+  }
+}
+@media (max-width: 1100px) {
+  .heroGrid {
+    width: calc(100% - 48px);
+    min-height: 550px;
+    grid-template-columns: 45% 55%;
+  }
+  .content h1 {
+    font-size: clamp(38px, 4.3vw, 52px);
+  }
+  .actions a {
+    padding: 12px 18px;
+    font-size: 14px;
+    min-height: 50px;
+  }
+  .ticketCard {
+    padding: 14px;
+    gap: 10px;
+    left: 10%;
+  }
+  .ticketCard strong,
+  .arrivalCard strong {
+    font-size: 13px;
+  }
+  .ticketCard small,
+  .arrivalCard small {
+    font-size: 11px;
+  }
+  .visualLabel {
+    font-size: 9px;
+  }
+  .notes {
+    gap: 15px;
+  }
+}
+@media (max-width: 900px) {
+  .heroGrid {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+  .content {
+    max-width: 670px;
+  }
+  .content h1 {
+    font-size: clamp(38px, 6vw, 54px);
+  }
+  .content > p {
+    font-size: 15px;
+  }
+  .visual {
+    width: 100%;
+    max-width: 800px;
+    margin: 20px auto 0;
+    padding-bottom: 65px;
+  }
+  .busFrame {
+    width: 100%;
+    margin: 0;
+  }
+  .ticketCard {
+    left: 22%;
+    bottom: 5px;
+  }
+  .visualLabel {
+    top: 0;
+    font-size: 11px;
+  }
+  .arrivalCard {
+    top: 42%;
+    right: 0;
+  }
+  .hero {
+    padding-top: 24px;
+  }
+}
+@media (max-width: 480px) {
+  .heroGrid {
+    width: calc(100% - 32px);
+  }
+  .content {
+    padding-top: 12px;
+  }
+  .content h1 {
+    font-size: clamp(32px, 9.5vw, 42px);
+    letter-spacing: -1.2px;
+    margin: 24px 0;
+  }
+  .pill {
+    font-size: 12px;
+    padding: 10px 12px;
+  }
+  .content > p {
+    font-size: 14px;
+    margin-bottom: 25px;
+  }
+  .desktopBreak {
+    display: none;
+  }
+  .actions {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .actions a {
+    font-size: 15px;
+    min-height: 52px;
+  }
+  .notes {
+    gap: 12px 16px;
+    font-size: 12px;
+    margin-top: 23px;
+  }
+  .visual {
+    padding: 24px 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .visualLabel {
+    position: static;
+    order: 0;
+    font-size: 10px;
+    justify-content: center;
+    letter-spacing: 1.4px;
+  }
+  .busFrame {
+    order: 1;
+    width: 100%;
+  }
+  .arrivalCard,
+  .ticketCard {
+    position: relative;
+    left: auto;
+    right: auto;
+    top: auto;
+    bottom: auto;
+  }
+  .arrivalCard {
+    order: 2;
+    align-self: flex-end;
+    padding: 14px 18px;
+  }
+  .ticketCard {
+    order: 3;
+    padding: 16px 12px;
+    gap: 10px;
+  }
+  .ticketCard strong {
+    font-size: 13px;
+  }
+  .ticketCard small {
+    font-size: 11px;
+  }
+  .qrIcon {
+    width: 43px;
+    height: 43px;
+  }
+  .ticketCard .check {
+    margin-left: auto;
+    width: 18px;
+  }
+  .hero {
+    padding-bottom: 100px;
+  }
+  .demoNotice {
+    font-size: 11px;
+    padding: 8px 14px;
+  }
+}

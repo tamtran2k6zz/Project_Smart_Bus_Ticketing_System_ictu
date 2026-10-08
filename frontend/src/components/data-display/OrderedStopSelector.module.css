@@ -1,0 +1,52 @@
+.fieldset {
+  grid-column: 1/-1;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin: 0;
+  padding: 16px;
+  min-width: 0;
+}
+.fieldset legend {
+  font-size: 13px;
+  font-weight: 600;
+}
+.fieldset p {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0 0 12px;
+}
+.choices {
+  display: grid;
+  gap: 6px;
+}
+.choices label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.order {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+}
+.order li {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+.order li > span {
+  flex: 1;
+  font-size: 13px;
+}
+.order button {
+  padding: 10px;
+  min-width: 44px;
+}
+.fieldset .error {
+  color: #b91c1c;
+}
