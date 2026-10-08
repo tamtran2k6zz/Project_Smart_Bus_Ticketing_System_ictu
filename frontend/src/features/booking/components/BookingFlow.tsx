@@ -129,6 +129,26 @@ export function BookingFlow() {
     resolver: zodResolver(schema),
     defaultValues: { name: user.name, phone: user.phone, voucher: '' },
   });
+  // Xem trước voucher khi đang gõ (chờ 300ms sau lần gõ cuối) để thấy ngay số tiền giảm.
+  const voucherInput = form.watch('voucher').trim().toUpperCase();
+  const [voucherCode, setVoucherCode] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => setVoucherCode(voucherInput), 300);
+    return () => clearTimeout(timer);
+  }, [voucherInput]);
+  const preview = useQuery({
+    queryKey: ['voucher-preview', holdId, user.id, voucherCode, hold.data?.quantity],
+    queryFn: () => bookingApi.previewVoucher(holdId, user.id, voucherCode),
+    enabled: active && !!voucherCode,
+    retry: false,
+  });
+  const voucherChecking =
+    active && !!voucherInput && (voucherInput !== voucherCode || preview.isFetching);
+  const voucherError =
+    active && !!voucherCode && !voucherChecking && preview.isError
+      ? preview.error.message
+      : undefined;
+  const voucherResult = active && voucherCode && !voucherChecking ? preview.data : undefined;
   const book = useAction(async (v: z.infer<typeof schema>) => {
     if (journeyChanged) throw new Error('Hành trình đã thay đổi. Giải phóng giữ chỗ và chọn lại.');
     const b = await bookingApi.createBooking(holdId, user.id, v.name, v.phone, v.voucher);
@@ -284,12 +304,53 @@ export function BookingFlow() {
                   <Field label="Số điện thoại" error={form.formState.errors.phone?.message}>
                     <input autoComplete="tel" {...form.register('phone')} />
                   </Field>
-                  <Field label="Mã ưu đãi" hint="Demo: SMART10 giảm 10%">
-                    <input placeholder="Nhập mã nếu có" {...form.register('voucher')} />
+                  <Field label="Mã ưu đãi" hint="Demo: SMART10 giảm 10%" error={voucherError}>
+                    <input
+                      placeholder="Nhập mã nếu có"
+                      autoComplete="off"
+                      style={{ textTransform: 'uppercase' }}
+                      {...form.register('voucher')}
+                    />
                   </Field>
+                  {voucherInput && !active && (
+                    <p className="muted" style={{ margin: 0 }}>
+                      Giữ chỗ trước để kiểm tra mã và xem số tiền được giảm.
+                    </p>
+                  )}
+                  {voucherChecking && (
+                    <p className="muted" role="status" style={{ margin: 0 }}>
+                      Đang kiểm tra mã…
+                    </p>
+                  )}
+                  {voucherResult && (
+                    <div className="stack" role="status" style={{ gap: 6 }}>
+                      <div className="between">
+                        <span className="muted">Tạm tính</span>
+                        <span>{money(voucherResult.subtotal)}</span>
+                      </div>
+                      <div className="between">
+                        <span>
+                          Ưu đãi {voucherResult.code} (−{voucherResult.percent}%)
+                        </span>
+                        <strong>− {money(voucherResult.discount)}</strong>
+                      </div>
+                      <div className="between">
+                        <strong>Tổng thanh toán</strong>
+                        <strong className="price">{money(voucherResult.total)}</strong>
+                      </div>
+                    </div>
+                  )}
                   <ActionMessage action={book} />
                   <Message error>{hold.error ? String(hold.error.message) : ''}</Message>
-                  <Button disabled={!active || journeyChanged || book.isPending}>
+                  <Button
+                    disabled={
+                      !active ||
+                      journeyChanged ||
+                      book.isPending ||
+                      voucherChecking ||
+                      !!voucherError
+                    }
+                  >
                     {book.isPending ? 'Đang tạo đặt vé…' : 'Tiếp tục thanh toán'}
                   </Button>
                   <p className="muted">

@@ -236,6 +236,13 @@ export function TicketDetail() {
     !ticket.request &&
     trip &&
     Date.parse(trip.departure) > Date.now() + 1800000;
+  // Giải thích vì sao không hiện nút hủy/đổi (trường hợp đang chờ xử lý đã có thông báo riêng).
+  const requestBlockedReason =
+    !ticket || !trip || eligible || ticket.request
+      ? ''
+      : ticketState(ticket, now) !== 'valid'
+        ? `Không thể yêu cầu hủy/đổi: ${statusText[ticketState(ticket, now)].toLowerCase()}.`
+        : 'Đã quá hạn gửi yêu cầu hủy/đổi: cần gửi trước giờ khởi hành ít nhất 30 phút.';
   return (
     <>
       <PageTitle
@@ -331,6 +338,7 @@ export function TicketDetail() {
                     </Button>
                   </div>
                 )}
+                {requestBlockedReason && <p className="muted">{requestBlockedReason}</p>}
               </div>
             </Card>
           </div>

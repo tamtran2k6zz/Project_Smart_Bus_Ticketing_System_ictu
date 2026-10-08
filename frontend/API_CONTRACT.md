@@ -18,6 +18,7 @@ Base URL mặc định /api/smartbus/v1; tất cả response là JSON trực ti�
 | GET /holds/:id                    | Hold thuộc session, serverTime mới                                                                    |
 | DELETE /holds/:id                 | Giải phóng hold của session                                                                           |
 | POST /bookings                    | {holdId,name,phone,voucher} → Booking; tính giá/voucher phía server, idempotent theo hold             |
+| POST /vouchers/preview            | {holdId,voucher} → {code,percent,subtotal,discount,total}; cách tính như POST /bookings               |
 | GET /bookings                     | Booking[] thuộc session                                                                               |
 | GET /bookings/:id                 | Booking thuộc session, không tin callback params                                                      |
 | POST /payments                    | {bookingId,gateway,idempotencyKey} → Payment; redirectUrl HTTPS sandbox khi tích hợp                  |

@@ -1,7 +1,7 @@
 import { service } from '@/services/adapter';
 import { audit, iso, uid, requireUser, tripAvailability } from '@/services/mocks/database';
 import type { Database } from '@/services/mocks/database';
-import type { Booking, Hold, Seat, Trip } from '../types';
+import type { Booking, Hold, Seat, Trip, VoucherPreview } from '../types';
 import { localDay, time } from '@/utils/format';
 import { journeyStops } from '../utils/journey';
 export const getTrip = (db: Database, id: string) => {
@@ -14,6 +14,22 @@ export const ownBooking = (db: Database, id: string, userId: string) => {
   const booking = db.bookings.find(b => b.id === id && b.userId === userId);
   if (!booking) throw new Error('Không tìm thấy đặt vé của bạn.');
   return booking;
+};
+const findActiveHold = (db: Database, holdId: string, userId: string) => {
+  const hold = db.holds.find(h => h.id === holdId && h.userId === userId && h.status === 'active');
+  if (!hold) throw new Error('Giữ chỗ đã hết hạn. Vui lòng chọn lại.');
+  return hold;
+};
+// Dùng chung cho xem trước và tạo đặt vé để số tiền tạm tính khớp với đơn.
+const priceWithVoucher = (db: Database, hold: Hold, voucher: string) => {
+  const code = voucher.trim().toUpperCase();
+  const promo = code
+    ? db.vouchers.find(v => v.code === code && v.active && Date.parse(v.expiresAt) > Date.now())
+    : undefined;
+  if (code && !promo) throw new Error('Voucher không tồn tại hoặc đã hết hạn.');
+  const subtotal = hold.price * hold.quantity;
+  const discount = promo ? Math.round((subtotal * promo.percent) / 100) : 0;
+  return { promo, subtotal, discount, total: subtotal - discount };
 };
 export const bookingApi = {
   history: (userId: string) =>
@@ -167,23 +183,12 @@ export const bookingApi = {
       '/bookings',
       db => {
         requireUser(db, userId);
-        const hold = db.holds.find(
-          h => h.id === holdId && h.userId === userId && h.status === 'active'
-        );
-        if (!hold) throw new Error('Giữ chỗ đã hết hạn. Vui lòng chọn lại.');
+        const hold = findActiveHold(db, holdId, userId);
         if (name.trim().length < 2 || !/^(0|\+84)\d{9}$/.test(phone))
           throw new Error('Thông tin hành khách không hợp lệ.');
         const existing = db.bookings.find(b => b.holdId === holdId);
         if (existing) return existing;
-        const promo = voucher
-          ? db.vouchers.find(
-              v =>
-                v.code === voucher.toUpperCase() && v.active && Date.parse(v.expiresAt) > Date.now()
-            )
-          : undefined;
-        if (voucher && !promo) throw new Error('Voucher không tồn tại hoặc đã hết hạn.');
-        const subtotal = hold.price * hold.quantity;
-        const discount = promo ? Math.round((subtotal * promo.percent) / 100) : 0;
+        const { promo, subtotal, discount } = priceWithVoucher(db, hold, voucher);
         const b: Booking = {
           id: uid('b'),
           tripId: hold.tripId,
@@ -208,6 +213,21 @@ export const bookingApi = {
       },
       'POST',
       { holdId, name, phone, voucher }
+    ),
+  previewVoucher: (holdId: string, userId: string, voucher: string) =>
+    service<VoucherPreview>(
+      '/vouchers/preview',
+      db => {
+        requireUser(db, userId);
+        const { promo, subtotal, discount, total } = priceWithVoucher(
+          db,
+          findActiveHold(db, holdId, userId),
+          voucher
+        );
+        return { code: promo?.code || '', percent: promo?.percent || 0, subtotal, discount, total };
+      },
+      'POST',
+      { holdId, voucher }
     ),
   booking: (id: string, userId: string) =>
     service<Booking>('/bookings/' + id, db => ownBooking(db, id, userId)),
