@@ -7,7 +7,7 @@ React + TypeScript + Vite, giao diện tiếng Việt / VND / Asia/Ho_Chi_Minh. 
 Yêu cầu Node.js 24 (phiên này kiểm tra bằng 24.14.0), npm 11.
 
 ```powershell
-cd "D:\ICTU\TTCS2026\Team 5\Final_Project\Project_Smart_Bus_Ticketing_System_ictu\frontend"
+cd frontend # từ thư mục gốc repository
 npm ci
 Copy-Item .env.example .env.local
 npm run dev
