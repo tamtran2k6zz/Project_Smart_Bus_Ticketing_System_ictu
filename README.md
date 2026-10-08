@@ -594,7 +594,7 @@ vào PowerShell mà không bị lỗi cú pháp:
 |  2  | **Nguyễn Hoàng Đức**   | **Frontend Developer**       | Layout Auth, State Management (`AuthContext`), UI Đăng nhập & RBAC   |
 |  3  | **Hà Quang Vinh**      | **Frontend Developer**       | Quản trị tuyến & Sắp xếp trạm dừng xe buýt kéo thả (`@dnd-kit`)      |
 |  4  | **Triệu Văn Thiệp**    | **Frontend Developer**       | Giao diện Trang chủ, Tra cứu thông tin tuyến xe & Kết quả tìm kiếm   |
-|  5  | **La Công Tuấn**       | **Backend Developer**        | Kiến trúc Backend API, Xử lý Đặt vé, Sơ đồ ghế & Sinh mã QR          |
+|  5  | **La Công Tuấn**       | **Backend Developer**        | Kiến trúc Backend API, Xử lý Đặt vé, Sơ đồ ghế, Vé tháng, Lịch chạy & Báo cáo thống kê |
 |  6  | **Tào Hoàng Minh Vũ**  | **Backend Developer**        | Thiết kế CSDL PostgreSQL, Migration Supabase, Bảng mã UTF-8          |
 |  7  | **Nguyễn Minh Đức**    | **Backend Developer**        | API Tìm kiếm chuyến xe (`US01`) & Tối ưu hóa truy vấn CSDL           |
 |  8  | **Mạch Thị Ngọc Ánh**  | **Quality Assurance (QA)**   | Kiểm thử chất lượng phần mềm, lập Test Case, soát vé QR              |
