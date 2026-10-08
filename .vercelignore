@@ -1,0 +1,27 @@
+.agent/
+.agents/
+.codex/
+.gemini/
+.github/
+.vscode/
+.idea/
+.postman/
+.cache/
+.npm-cache/
+.playwright/
+playwright-report/
+test-results/
+coverage/
+supabase/.temp/
+skills-lock.json
+DB_URL & JWT.docx
+.env*
+*.pem
+*.key
+*.p12
+*.pfx
+*service-account*.json
+*.log
+*.tsbuildinfo
+*.tmp
+*.bak

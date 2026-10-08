@@ -121,7 +121,8 @@ export const getTrips = async (req: Request, res: Response): Promise<void> => {
       params.push(date);
     }
     if (bookable === 'true')
-      sql += " AND t.status = 'SCHEDULED' AND r.status = 'ACTIVE' AND t.departure_time >= NOW()";
+      sql +=
+        " AND t.status = 'SCHEDULED' AND r.status = 'ACTIVE' AND t.departure_time >= NOW() - INTERVAL '24 hours'";
     sql += ` ORDER BY t.departure_time ${bookable === 'true' ? 'ASC' : 'DESC'} LIMIT 100`;
 
     const trips = await query<any[]>(sql, params);

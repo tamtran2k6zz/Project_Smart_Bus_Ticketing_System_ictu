@@ -1,0 +1,22 @@
+:root {
+  --primary: #008a43;
+  --primary-control: #007f3d;
+  --heading: #050b24;
+  --text: #0f172a;
+  --body: #536b59;
+  --bg: #f8fafc;
+  --border: #e1eae6;
+  --muted: #64748b;
+  --soft: #eef7f0;
+  --hero-background: #eff8ed;
+  --auth-brand-background: #ecf4e8;
+  --auth-content-background: var(--bg);
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --radius-control: 12px;
+  --radius-card: 16px;
+  --radius-pill: 999px;
+  --shadow-float: 0 16px 36px #1d39251c;
+}
