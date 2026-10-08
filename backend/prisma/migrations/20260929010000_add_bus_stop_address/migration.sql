@@ -1,2 +1,0 @@
-ALTER TABLE `bus_stops`
-    ADD COLUMN `address` VARCHAR(255) NOT NULL DEFAULT '';

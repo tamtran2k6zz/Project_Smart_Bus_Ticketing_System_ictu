@@ -23,7 +23,7 @@ interface ApiResponse<T> {
   pagination: TripSearchPagination;
 }
 
-import { getApiUrl } from '../api/client';
+import { getApiUrl, apiFetch } from '../api/client';
 
 export async function searchTrips(
   originStopId: string,
@@ -35,7 +35,7 @@ export async function searchTrips(
     destination_stop_id: destinationStopId,
     departure_date: departureDate,
   });
-  const response = await fetch(getApiUrl(`/api/v1/trips/search?${query.toString()}`), {
+  const response = await apiFetch(getApiUrl(`/api/v1/trips/search?${query.toString()}`), {
     headers: {
       'ngrok-skip-browser-warning': 'true',
     },

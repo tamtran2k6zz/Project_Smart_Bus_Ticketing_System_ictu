@@ -1,15 +1,20 @@
+import { authenticateJWT } from '../middlewares/auth';
+import { authorizeRoles } from '../middlewares/rbac';
 import { Router, Request, Response } from 'express';
 import { query } from '../config/database';
+import { appLogger } from '../config/logger';
 
+const logger = appLogger.child('users');
 const router = Router();
+router.use(authenticateJWT, authorizeRoles('ADMIN', 'MANAGER'));
 
 // 1. Danh sách người dùng (US 17, US 22)
 router.get('/', async (_req: Request, res: Response): Promise<void> => {
   try {
     const users = await query<any[]>(
-      `SELECT id, full_name AS fullName, email, phone_number AS phoneNumber,
-              role, status, discount_type AS discountType, discount_status AS discountStatus,
-              created_at AS createdAt
+      `SELECT id, full_name AS "fullName", email, phone_number AS "phoneNumber",
+              role, status, discount_type AS "discountType", discount_status AS "discountStatus",
+              created_at AS "createdAt"
        FROM users
        ORDER BY id ASC`
     );
@@ -20,7 +25,7 @@ router.get('/', async (_req: Request, res: Response): Promise<void> => {
       data: users,
     });
   } catch (err: any) {
-    console.error('Lỗi API getUsers:', err);
+    logger.error('users_list_failed', { table: 'users', operation: 'select', error: err });
     res.status(500).json({
       statusCode: 500,
       success: false,
@@ -44,10 +49,10 @@ router.patch('/:id/discount-approval', async (req: Request, res: Response): Prom
       return;
     }
 
-    await query(
-      'UPDATE users SET discount_status = ?, updated_at = NOW() WHERE id = ?',
-      [status, id]
-    );
+    await query('UPDATE users SET discount_status = $1, updated_at = NOW() WHERE id = $2', [
+      status,
+      id,
+    ]);
 
     res.status(200).json({
       statusCode: 200,
@@ -55,7 +60,12 @@ router.patch('/:id/discount-approval', async (req: Request, res: Response): Prom
       message: `Đã cập nhật trạng thái duyệt ưu đãi thành ${status}`,
     });
   } catch (err: any) {
-    console.error('Lỗi duyệt ưu đãi người dùng:', err);
+    logger.error('discount_approval_failed', {
+      table: 'users',
+      operation: 'update',
+      user_id: req.params.id ?? '',
+      error: err,
+    });
     res.status(500).json({
       statusCode: 500,
       success: false,

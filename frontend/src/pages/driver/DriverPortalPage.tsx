@@ -2,7 +2,22 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import type { BusRoute } from '../../types/route';
-import { getApiUrl } from '../../api/client';
+import { getApiUrl, apiFetch } from '../../api/client';
+import type {
+  ApiRoute,
+  IncidentRecord,
+  TicketVerificationResult,
+  TripOccupancy,
+} from '../../types/api';
+import { getErrorMessage } from '../../utils/errorMessage';
+
+interface VerifiedTicketSummary {
+  code: string;
+  passenger: string;
+  seat: string;
+  time: string;
+  status: string;
+}
 
 export const DriverPortalPage: React.FC = () => {
   const { user, logout } = useAuth();
@@ -13,16 +28,16 @@ export const DriverPortalPage: React.FC = () => {
 
   // 1. Soát vé QR (US 15)
   const [verifyCode, setVerifyCode] = useState('');
-  const [verifyResult, setVerifyResult] = useState<any>(null);
+  const [verifyResult, setVerifyResult] = useState<TicketVerificationResult | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
-  const [verifiedList, setVerifiedList] = useState<any[]>([]);
+  const [verifiedList, setVerifiedList] = useState<VerifiedTicketSummary[]>([]);
 
   // 2. Báo cáo sự cố đường sá (US 11)
   const [incidentType, setIncidentType] = useState('TRAFFIC_JAM');
   const [delayMinutes, setDelayMinutes] = useState(15);
   const [incidentDescription, setIncidentDescription] = useState('');
   const [incidentMsg, setIncidentMsg] = useState<string | null>(null);
-  const [incidents, setIncidents] = useState<any[]>([]);
+  const [incidents, setIncidents] = useState<IncidentRecord[]>([]);
   const [isSubmittingIncident, setIsSubmittingIncident] = useState(false);
 
   // 3. Danh sách tuyến xe
@@ -34,10 +49,10 @@ export const DriverPortalPage: React.FC = () => {
     navigate('/login');
   };
 
-  // Nạp dữ liệu sự cố từ MySQL
+  // Nạp dữ liệu sự cố từ cơ sở dữ liệu
   const fetchIncidents = useCallback(async () => {
     try {
-      const res = await fetch(getApiUrl('/api/v1/operations/incidents'));
+      const res = await apiFetch(getApiUrl('/api/v1/operations/incidents'));
       const json = await res.json();
       setIncidents(Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : []);
       setDbStatus('connected');
@@ -51,19 +66,19 @@ export const DriverPortalPage: React.FC = () => {
   const fetchRoutes = useCallback(async () => {
     setIsLoadingRoutes(true);
     try {
-      const res = await fetch(getApiUrl('/api/v1/routes'));
+      const res = await apiFetch(getApiUrl('/api/v1/routes'));
       const json = await res.json();
-      const rawList = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
-      const mapped: BusRoute[] = rawList.map((r: any) => ({
-        id: r.id,
+      const rawList: ApiRoute[] = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
+      const mapped: BusRoute[] = rawList.map(r => ({
+        id: String(r.id),
         code: r.code,
         name: r.name,
-        status: r.status,
-        stations: (Array.isArray(r.stops) ? r.stops : Array.isArray(r.routeStops) ? r.routeStops : []).map((rs: any) => ({
-          id: rs.stop?.id || rs.stopId || rs.id || `st-${rs.stopOrder}`,
+        status: r.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE',
+        stations: (Array.isArray(r.stops) ? r.stops : Array.isArray(r.routeStops) ? r.routeStops : []).map(rs => ({
+          id: String(rs.stop?.id || rs.stopId || rs.id || `st-${rs.stopOrder ?? 0}`),
           name: rs.stop?.name || rs.name || 'Trạm đón trả',
           address: rs.stop?.address || rs.address || '',
-          order: rs.stopOrder,
+          order: rs.stopOrder ?? 0,
         })),
       }));
       setRoutes(mapped);
@@ -80,7 +95,7 @@ export const DriverPortalPage: React.FC = () => {
     fetchRoutes();
   }, [fetchIncidents, fetchRoutes]);
 
-  // Xử lý soát vé QR vào MySQL (US 15)
+  // Xử lý soát vé QR vào cơ sở dữ liệu (US 15)
   const handleVerifyTicket = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!verifyCode.trim()) {
@@ -90,7 +105,7 @@ export const DriverPortalPage: React.FC = () => {
 
     setIsVerifying(true);
     try {
-      const res = await fetch(getApiUrl('/api/v1/ticketing/verify'), {
+      const res = await apiFetch(getApiUrl('/api/v1/ticketing/verify'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: verifyCode.trim() }),
@@ -98,7 +113,7 @@ export const DriverPortalPage: React.FC = () => {
 
       const json = await res.json();
       if (!res.ok) {
-        throw new Error(json.message || 'Mã vé không tồn tại hoặc đã hết hạn trong CSDL MySQL!');
+        throw new Error(json.message || 'Mã vé không tồn tại hoặc đã hết hạn trong CSDL cơ sở dữ liệu!');
       }
 
       const result = json.data || json;
@@ -117,14 +132,14 @@ export const DriverPortalPage: React.FC = () => {
         ]);
       }
       setVerifyCode('');
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, 'Không thể soát vé.'));
     } finally {
       setIsVerifying(false);
     }
   };
 
-  // Báo cáo sự cố vào MySQL (US 11)
+  // Báo cáo sự cố vào cơ sở dữ liệu (US 11)
   const handleReportIncident = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!incidentDescription.trim()) {
@@ -135,11 +150,14 @@ export const DriverPortalPage: React.FC = () => {
     setIsSubmittingIncident(true);
     try {
       const token = localStorage.getItem('smartbus_access_token');
-      const dashRes = await fetch(getApiUrl('/api/v1/operations/dashboard/summary'));
+      const dashRes = await apiFetch(getApiUrl('/api/v1/trips'));
       const dashJson = await dashRes.json();
-      const firstTripId = dashJson.tripOccupancy?.[0]?.id || 'trip-1';
+      dashJson.tripOccupancy = dashJson.data;
+      const tripOccupancy: TripOccupancy[] = Array.isArray(dashJson?.data) ? dashJson.data : [];
+      const firstTripId = tripOccupancy[0]?.id;
+      if (!firstTripId) throw new Error('Không có chuyến xe để gắn báo cáo sự cố.');
 
-      const res = await fetch(getApiUrl('/api/v1/operations/incidents'), {
+      const res = await apiFetch(getApiUrl('/api/v1/operations/incidents'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -154,14 +172,14 @@ export const DriverPortalPage: React.FC = () => {
         }),
       });
 
-      if (!res.ok) throw new Error('Gửi báo cáo sự cố thất bại vào MySQL!');
+      if (!res.ok) throw new Error('Gửi báo cáo sự cố thất bại vào cơ sở dữ liệu!');
 
-      setIncidentMsg('✅ Đã lưu báo cáo sự cố thành công vào MySQL! Hệ thống tự động thông báo đến hành khách.');
+      setIncidentMsg('✅ Đã lưu báo cáo sự cố thành công vào cơ sở dữ liệu! Hệ thống tự động thông báo đến hành khách.');
       setIncidentDescription('');
       await fetchIncidents();
       setTimeout(() => setIncidentMsg(null), 4000);
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, 'Không thể gửi báo cáo sự cố.'));
     } finally {
       setIsSubmittingIncident(false);
     }
@@ -199,7 +217,7 @@ export const DriverPortalPage: React.FC = () => {
             }}
           >
             <span className={dbStatus === 'connected' ? 'pulse-dot' : ''} style={{ width: '7px', height: '7px', borderRadius: '50%', background: dbStatus === 'connected' ? '#10b981' : '#ef4444' }} />
-            {dbStatus === 'connected' ? 'MySQL Online: 3307' : 'Mất kết nối'}
+            {dbStatus === 'connected' ? 'cơ sở dữ liệu Online: 3307' : 'Mất kết nối'}
           </span>
 
           <a
@@ -282,7 +300,7 @@ export const DriverPortalPage: React.FC = () => {
               <div style={{ marginBottom: '20px' }}>
                 <h2 style={{ fontSize: '28px', margin: '0 0 6px' }}>Quét & Soát Vé QR Hành Khách (US 15)</h2>
                 <p style={{ fontSize: '13.5px', color: 'rgba(255, 255, 255, 0.6)', margin: 0 }}>
-                  Kiểm tra tính hợp lệ của vé điện tử trực tiếp từ cơ sở dữ liệu MySQL dưới 1 giây.
+                  Kiểm tra tính hợp lệ của vé điện tử trực tiếp từ cơ sở dữ liệu cơ sở dữ liệu dưới 1 giây.
                 </p>
               </div>
 
@@ -481,7 +499,7 @@ export const DriverPortalPage: React.FC = () => {
                     color: '#fbbf24',
                   }}
                 >
-                  {isSubmittingIncident ? 'Đang gửi...' : '⚠️ Gửi báo cáo sự cố (Lưu MySQL)'}
+                  {isSubmittingIncident ? 'Đang gửi...' : '⚠️ Gửi báo cáo sự cố (Lưu cơ sở dữ liệu)'}
                 </button>
               </div>
             </form>
@@ -520,7 +538,7 @@ export const DriverPortalPage: React.FC = () => {
           <div className="liquid-glass" style={{ padding: '32px' }}>
             <h2 style={{ fontSize: '28px', margin: '0 0 6px' }}>Lộ Trình Các Tuyến Xe Buýt</h2>
             <p style={{ fontSize: '13.5px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '20px' }}>
-              Danh sách các tuyến xe và thứ tự trạm dừng đón trả khách được lưu trữ trong MySQL.
+              Danh sách các tuyến xe và thứ tự trạm dừng đón trả khách được lưu trữ trong cơ sở dữ liệu.
             </p>
 
             {isLoadingRoutes ? (

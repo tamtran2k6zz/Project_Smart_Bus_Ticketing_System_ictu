@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getApiUrl } from '../../api/client';
+import { getApiUrl, apiFetch } from '../../api/client';
+import type { FeedbackRecord, IncidentRecord } from '../../types/api';
+import { getErrorMessage } from '../../utils/errorMessage';
 
 export const OperationsView: React.FC = () => {
-  const [incidents, setIncidents] = useState<any[]>([]);
-  const [feedbacks, setFeedbacks] = useState<any[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [incidents, setIncidents] = useState<IncidentRecord[]>([]);
+  const [feedbacks, setFeedbacks] = useState<FeedbackRecord[]>([]);
 
   // Form báo cáo sự cố tài xế
   const [incidentDescription, setIncidentDescription] = useState('');
@@ -18,11 +19,10 @@ export const OperationsView: React.FC = () => {
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
-    setLoading(true);
     try {
       const [incRes, fbRes] = await Promise.all([
-        fetch(getApiUrl('/api/v1/operations/incidents')),
-        fetch(getApiUrl('/api/v1/operations/feedbacks')),
+        apiFetch(getApiUrl('/api/v1/operations/incidents')),
+        apiFetch(getApiUrl('/api/v1/operations/feedbacks')),
       ]);
       const incJson = await incRes.json();
       const fbJson = await fbRes.json();
@@ -32,8 +32,6 @@ export const OperationsView: React.FC = () => {
       console.error(err);
       setIncidents([]);
       setFeedbacks([]);
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -51,11 +49,11 @@ export const OperationsView: React.FC = () => {
 
     try {
       const token = localStorage.getItem('smartbus_access_token');
-      const dashRes = await fetch(getApiUrl('/api/v1/operations/dashboard/summary'));
+      const dashRes = await apiFetch(getApiUrl('/api/v1/operations/dashboard/summary'));
       const dashJson = await dashRes.json();
       const firstTripId = dashJson.tripOccupancy?.[0]?.id || 'trip-1';
 
-      const res = await fetch(getApiUrl('/api/v1/operations/incidents'), {
+      const res = await apiFetch(getApiUrl('/api/v1/operations/incidents'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -70,14 +68,14 @@ export const OperationsView: React.FC = () => {
         }),
       });
 
-      if (!res.ok) throw new Error('Báo cáo sự cố thất bại vào MySQL!');
+      if (!res.ok) throw new Error('Báo cáo sự cố thất bại vào cơ sở dữ liệu!');
 
-      setIncidentMsg('✅ Đã gửi báo cáo sự cố thành công vào CSDL MySQL!');
+      setIncidentMsg('✅ Đã gửi báo cáo sự cố thành công vào CSDL cơ sở dữ liệu!');
       setIncidentDescription('');
       await fetchData();
       setTimeout(() => setIncidentMsg(null), 3000);
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, 'Không thể gửi báo cáo sự cố.'));
     }
   };
 
@@ -94,11 +92,11 @@ export const OperationsView: React.FC = () => {
       const userStr = localStorage.getItem('smartbus_user');
       const currentUser = userStr ? JSON.parse(userStr) : null;
 
-      const dashRes = await fetch(getApiUrl('/api/v1/operations/dashboard/summary'));
+      const dashRes = await apiFetch(getApiUrl('/api/v1/operations/dashboard/summary'));
       const dashJson = await dashRes.json();
       const firstTripId = dashJson.tripOccupancy?.[0]?.id || 'trip-1';
 
-      const res = await fetch(getApiUrl('/api/v1/operations/feedbacks'), {
+      const res = await apiFetch(getApiUrl('/api/v1/operations/feedbacks'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -113,14 +111,14 @@ export const OperationsView: React.FC = () => {
         }),
       });
 
-      if (!res.ok) throw new Error('Gửi đánh giá thất bại vào MySQL!');
+      if (!res.ok) throw new Error('Gửi đánh giá thất bại vào cơ sở dữ liệu!');
 
       setFeedbackMsg('⭐ Cảm ơn bạn đã gửi đánh giá vào hệ thống!');
       setFeedbackContent('');
       await fetchData();
       setTimeout(() => setFeedbackMsg(null), 3000);
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, 'Không thể gửi đánh giá.'));
     }
   };
 
@@ -213,7 +211,7 @@ export const OperationsView: React.FC = () => {
                 color: '#fbbf24',
               }}
             >
-              ⚠️ Gửi báo cáo sự cố (Lưu MySQL)
+              ⚠️ Gửi báo cáo sự cố (Lưu cơ sở dữ liệu)
             </button>
           </div>
         </form>
@@ -317,7 +315,7 @@ export const OperationsView: React.FC = () => {
             className="primary-button"
             style={{ alignSelf: 'flex-start', padding: '11px 26px' }}
           >
-            Gửi đánh giá (Lưu MySQL) →
+            Gửi đánh giá (Lưu cơ sở dữ liệu) →
           </button>
         </form>
 

@@ -2,24 +2,30 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Navbar } from '../../components/layout/Navbar';
 import apiClient from '../../api/client';
+import { getVietnamDateString } from '../../utils/date';
 
 import { DEFAULT_STOPS, DEFAULT_ROUTES } from '../../constants/defaultData';
 
 interface StopItem {
-  id: number;
+  id: string | number;
   code: string;
   name: string;
   address: string;
 }
 
+interface RouteStopItem {
+  stopId: string | number;
+  name: string;
+}
+
 interface RouteItem {
-  id: number;
+  id: string | number;
   code: string;
   name: string;
   distanceKm: number;
   basePrice: number;
   status: string;
-  stops?: any[];
+  stops?: RouteStopItem[];
 }
 
 export const HomePage: React.FC = () => {
@@ -28,13 +34,11 @@ export const HomePage: React.FC = () => {
   const [routes, setRoutes] = useState<RouteItem[]>(DEFAULT_ROUTES);
   const [originStopId, setOriginStopId] = useState<string>(String(DEFAULT_STOPS[0].id));
   const [destStopId, setDestStopId] = useState<string>(String(DEFAULT_STOPS[1].id));
-  const [departureDate, setDepartureDate] = useState<string>(
-    new Date().toISOString().split('T')[0]
-  );
+  const [departureDate, setDepartureDate] = useState<string>(getVietnamDateString());
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Nạp danh sách trạm dừng và tuyến xe trực tiếp từ MySQL
+  // Nạp danh sách trạm dừng và tuyến xe trực tiếp từ cơ sở dữ liệu
   useEffect(() => {
     let isMounted = true;
     const fetchData = async () => {
@@ -50,13 +54,13 @@ export const HomePage: React.FC = () => {
         const rawStops = stopsRes?.data;
         const rawRoutes = routesRes?.data;
 
-        const stopsData = Array.isArray(rawStops?.data)
+        const stopsData: StopItem[] = Array.isArray(rawStops?.data)
           ? rawStops.data
           : Array.isArray(rawStops)
           ? rawStops
           : [];
 
-        const routesData = Array.isArray(rawRoutes?.data)
+        const routesData: RouteItem[] = Array.isArray(rawRoutes?.data)
           ? rawRoutes.data
           : Array.isArray(rawRoutes)
           ? rawRoutes
@@ -74,10 +78,10 @@ export const HomePage: React.FC = () => {
           setOriginStopId(String(finalStops[0].id));
           setDestStopId(String(finalStops[1].id));
         }
-      } catch (err: any) {
-        console.error('Lỗi nạp dữ liệu từ MySQL:', err);
+      } catch (err: unknown) {
+        console.error('Lỗi nạp dữ liệu từ cơ sở dữ liệu:', err);
         if (!isMounted) return;
-        setErrorMsg('Đang hoạt động ở chế độ dữ liệu mặc định (Chưa kết nối CSDL MySQL).');
+        setErrorMsg('Đang hoạt động ở chế độ dữ liệu mặc định (Chưa kết nối CSDL cơ sở dữ liệu).');
         setStops(DEFAULT_STOPS);
         setRoutes(DEFAULT_ROUTES);
         setOriginStopId(String(DEFAULT_STOPS[0].id));
@@ -143,7 +147,7 @@ export const HomePage: React.FC = () => {
             marginBottom: '20px',
           }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#38bdf8' }} />
-            Sprint 1: Trực tiếp MySQL 8.0 • 100% Zero Mock Data
+            Sprint 1: Trực tiếp cơ sở dữ liệu 8.0 • 100% Zero Mock Data
           </div>
 
           <h1 style={{
@@ -197,7 +201,7 @@ export const HomePage: React.FC = () => {
                 </h3>
               </div>
               <span style={{ fontSize: '12px', color: '#10b981', background: 'rgba(16, 185, 129, 0.1)', padding: '4px 10px', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-                ● Truy vấn CSDL MySQL
+                ● Truy vấn CSDL cơ sở dữ liệu
               </span>
             </div>
 
@@ -361,7 +365,7 @@ export const HomePage: React.FC = () => {
               Mạng Lưới Tuyến Xe Thực Tế (US 12)
             </h2>
             <p style={{ fontSize: '13px', color: '#94a3b8', margin: '4px 0 0' }}>
-              Dữ liệu lưu trữ trong bảng `routes` & `route_stops` của MySQL
+              Dữ liệu lưu trữ trong bảng `routes` & `route_stops` của cơ sở dữ liệu
             </p>
           </div>
           <span style={{ fontSize: '13px', color: '#38bdf8' }}>
@@ -480,9 +484,6 @@ export const HomePage: React.FC = () => {
       }}>
         <p style={{ margin: 0 }}>
           Smart Bus Ticketing System • Dự án Thực tập Cơ sở 2026 - Nhóm 5 (ICTU)
-        </p>
-        <p style={{ margin: '6px 0 0', fontSize: '12px' }}>
-          Quản trị CSDL trực tiếp qua phpMyAdmin: <a href="http://localhost:8080" target="_blank" rel="noreferrer" style={{ color: '#38bdf8' }}>http://localhost:8080</a>
         </p>
       </footer>
     </div>

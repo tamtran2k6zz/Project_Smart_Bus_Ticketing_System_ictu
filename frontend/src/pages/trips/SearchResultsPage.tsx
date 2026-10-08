@@ -2,9 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Navbar } from '../../components/layout/Navbar';
 import apiClient from '../../api/client';
+import { getVietnamDateString } from '../../utils/date';
+import { getErrorMessage } from '../../utils/errorMessage';
 
 interface TripResult {
-  tripId: number;
+  tripId: string;
   routeId: number;
   routeCode: string;
   routeName: string;
@@ -45,14 +47,12 @@ export const SearchResultsPage: React.FC = () => {
 
   const originStopId = searchParams.get('origin_stop_id') || '';
   const destStopId = searchParams.get('destination_stop_id') || '';
-  const departureDate =
-    searchParams.get('departure_date') || new Date().toISOString().split('T')[0];
+  const departureDate = searchParams.get('departure_date') || getVietnamDateString();
 
   const [trips, setTrips] = useState<TripResult[]>([]);
   const [stops, setStops] = useState<StopItem[]>(DEFAULT_STOPS);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [bookingSuccessTripId, setBookingSuccessTripId] = useState<number | null>(null);
 
   // Form search state for inline adjustment
   const [formOrigin, setFormOrigin] = useState<string>(originStopId);
@@ -93,7 +93,6 @@ export const SearchResultsPage: React.FC = () => {
     try {
       setIsLoading(true);
       setErrorMsg(null);
-      setBookingSuccessTripId(null);
 
       const res = await apiClient.get('/trips/search', {
         params: {
@@ -106,11 +105,12 @@ export const SearchResultsPage: React.FC = () => {
       const raw = res?.data;
       const list = Array.isArray(raw?.data) ? raw.data : Array.isArray(raw) ? raw : [];
       setTrips(list);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Lỗi tra cứu chuyến xe:', err);
-      const msg =
-        err.response?.data?.message ||
-        'Không thể nạp dữ liệu chuyến xe từ MySQL. Vui lòng kiểm tra lại kết nối!';
+      const msg = getErrorMessage(
+        err,
+        'Không thể nạp dữ liệu chuyến xe từ cơ sở dữ liệu. Vui lòng kiểm tra lại kết nối!',
+      );
       setErrorMsg(msg);
       setTrips([]);
     } finally {
@@ -141,12 +141,7 @@ export const SearchResultsPage: React.FC = () => {
   };
 
   const handleBooking = (trip: TripResult) => {
-    setBookingSuccessTripId(trip.tripId);
-    setTimeout(() => {
-      alert(
-        `🎉 Đặt vé thành công cho chuyến ${trip.routeCode} (${trip.origin.name} ➔ ${trip.destination.name})!\nBiển số xe: ${trip.busPlate}\nGiá vé: ${trip.fare.toLocaleString()} VNĐ`
-      );
-    }, 100);
+    navigate(`/passenger/booking?trip_id=${encodeURIComponent(trip.tripId)}`);
   };
 
   const originStopName = stops.find((s) => String(s.id) === originStopId)?.name || `Trạm #${originStopId}`;
@@ -300,7 +295,7 @@ export const SearchResultsPage: React.FC = () => {
             fontSize: '15px',
           }}>
             <div style={{ fontSize: '30px', marginBottom: '12px' }}>🔄</div>
-            Đang truy vấn trực tiếp cơ sở dữ liệu MySQL thật...
+            Đang truy vấn trực tiếp cơ sở dữ liệu cơ sở dữ liệu thật...
           </div>
         )}
 
@@ -331,9 +326,7 @@ export const SearchResultsPage: React.FC = () => {
               Không tìm thấy chuyến xe phù hợp
             </h3>
             <p style={{ color: '#94a3b8', maxWidth: '550px', margin: '0 auto 20px', fontSize: '14px', lineHeight: 1.6 }}>
-              Không có chuyến xe nào chạy theo thứ tự từ <strong>{originStopName}</strong> đến <strong>{destStopName}</strong> trong ngày đã chọn.
-              <br />
-              <em>Quy tắc nghiệp vụ: Hệ thống chỉ hiển thị chuyến khi thứ tự trạm đón nhỏ hơn thứ tự trạm trả (origin_rs.stop_order &lt; dest_rs.stop_order).</em>
+              Không có chuyến xe nào chạy từ <strong>{originStopName}</strong> đến <strong>{destStopName}</strong> trong ngày đã chọn.
             </p>
             <button
               onClick={() => {
@@ -453,12 +446,9 @@ export const SearchResultsPage: React.FC = () => {
                   </div>
                   <button
                     onClick={() => handleBooking(trip)}
-                    disabled={trip.availableSeats === 0 || bookingSuccessTripId === trip.tripId}
+                    disabled={trip.availableSeats === 0}
                     style={{
-                      background:
-                        bookingSuccessTripId === trip.tripId
-                          ? '#10b981'
-                          : trip.availableSeats === 0
+                      background: trip.availableSeats === 0
                           ? 'rgba(255, 255, 255, 0.1)'
                           : 'linear-gradient(135deg, #0284c7 0%, #4f46e5 100%)',
                       color: '#ffffff',
@@ -471,11 +461,9 @@ export const SearchResultsPage: React.FC = () => {
                       boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)',
                     }}
                   >
-                    {bookingSuccessTripId === trip.tripId
-                      ? '✓ Đã chọn vé'
-                      : trip.availableSeats === 0
+                    {trip.availableSeats === 0
                       ? 'Hết chỗ'
-                      : 'Chọn Chuyến'}
+                      : 'Chọn chuyến & ghế'}
                   </button>
                 </div>
               </div>

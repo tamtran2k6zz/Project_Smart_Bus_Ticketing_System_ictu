@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
 export interface AuthUserPayload {
-  id: number;
+  id: string;
   email: string;
   fullName: string;
   role: string;
@@ -12,7 +12,7 @@ export interface AuthenticatedRequest extends Request {
   user?: AuthUserPayload;
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'smartbus_jwt_secret_key_sprint1_2026';
+import { getJwtSecret } from '../config/auth';
 
 // Middleware xác thực JWT Token từ Header Authorization: Bearer <token>
 export const authenticateJWT = (
@@ -34,7 +34,7 @@ export const authenticateJWT = (
   const token = authHeader.split(' ')[1];
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as AuthUserPayload;
+    const decoded = jwt.verify(token, getJwtSecret()) as AuthUserPayload;
     req.user = decoded;
     next();
   } catch (err: any) {
@@ -47,4 +47,3 @@ export const authenticateJWT = (
 };
 
 export const authenticateJwt = authenticateJWT;
-

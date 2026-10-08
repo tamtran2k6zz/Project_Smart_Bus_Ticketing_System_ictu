@@ -1,0 +1,149 @@
+.header {
+  background: white;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  z-index: 10;
+}
+.headerInner {
+  width: min(1600px, calc(100% - 64px));
+  margin-inline: auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  min-height: 104px;
+}
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+.nav a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  color: #4d5963;
+  font-size: 14px;
+  text-decoration: none;
+}
+.nav a:hover {
+  color: var(--primary);
+}
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.headerActions > a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+}
+.headerActions > a:last-of-type {
+  min-height: 56px;
+  font-size: 15px;
+  padding: 14px 24px;
+}
+.login {
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--heading);
+}
+.headerActions > a[aria-label] {
+  min-width: 44px;
+}
+.menuButton {
+  display: none !important;
+}
+.mobileRole,
+.nav > .mobileSearch {
+  display: none;
+}
+@media (max-width: 1200px) {
+  .headerInner {
+    width: calc(100% - 48px);
+    gap: 16px;
+  }
+  .nav {
+    gap: 20px;
+  }
+  .nav a {
+    font-size: 12px;
+  }
+  .headerActions {
+    gap: 10px;
+  }
+  .headerActions > a:last-of-type {
+    padding: 12px 17px;
+    font-size: 13px;
+  }
+  .roleLink {
+    font-size: 12px;
+  }
+}
+@media (max-width: 1000px) {
+  .nav {
+    display: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 104px;
+    flex-direction: column;
+    align-items: stretch;
+    background: white;
+    padding: 16px 24px;
+    box-shadow: var(--shadow-float);
+    gap: 4px;
+  }
+  .nav.open {
+    display: flex;
+  }
+  .nav a {
+    font-size: 14px;
+    padding-inline: 12px;
+    border-radius: 8px;
+  }
+  .nav a:hover {
+    background: var(--soft);
+  }
+  .nav.open > .mobileRole,
+  .nav.open > .mobileSearch {
+    display: flex;
+  }
+  .menuButton {
+    display: inline-flex !important;
+    min-width: 44px;
+    padding: 10px;
+  }
+  .headerActions > a:last-of-type {
+    display: none;
+  }
+}
+@media (max-width: 600px) {
+  .headerInner {
+    min-height: 82px;
+    width: calc(100% - 32px);
+    gap: 8px;
+  }
+  .nav {
+    top: 82px;
+  }
+  .headerActions {
+    gap: 3px;
+  }
+  .roleLink {
+    display: none !important;
+  }
+  .login {
+    font-size: 12px;
+  }
+  .headerActions > a:last-of-type {
+    padding: 0;
+  }
+  .headerActions button {
+    padding: 10px;
+    min-width: 44px;
+  }
+}

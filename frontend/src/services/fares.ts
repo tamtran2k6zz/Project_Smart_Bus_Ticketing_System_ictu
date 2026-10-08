@@ -43,10 +43,10 @@ interface ApiRoute {
   }>;
 }
 
-import { getApiUrl } from '../api/client';
+import { getApiUrl, apiFetch } from '../api/client';
 
 export async function getFares(): Promise<FareConfiguration[]> {
-  const response = await fetch(getApiUrl('/api/v1/routes'), {
+  const response = await apiFetch(getApiUrl('/api/v1/routes'), {
     headers: {
       'ngrok-skip-browser-warning': 'true',
     },

@@ -2,19 +2,31 @@ import type { BusRoute } from '../../types/route';
 
 interface RouteTableProps {
   routes: BusRoute[];
+  search?: string;
+  statusFilter?: 'ALL' | 'ACTIVE' | 'INACTIVE';
+  onSearchChange?: (value: string) => void;
+  onStatusFilterChange?: (value: 'ALL' | 'ACTIVE' | 'INACTIVE') => void;
+  onAdd?: () => void;
   onEdit: (route: BusRoute) => void;
   onDelete: (route: BusRoute) => void;
   onViewStations: (route: BusRoute) => void;
 }
 
 function RouteTable({
-  routes,
+  routes, search = '', statusFilter = 'ALL', onSearchChange, onStatusFilterChange, onAdd,
   onEdit,
   onDelete,
   onViewStations,
 }: RouteTableProps) {
   return (
     <div className="table-wrapper">
+      <div className="table-actions">
+        {onSearchChange && <input aria-label="Tìm tuyến" value={search} onChange={e => onSearchChange(e.target.value)} placeholder="Tìm mã hoặc tên tuyến" />}
+        {onStatusFilterChange && <select aria-label="Trạng thái tuyến" value={statusFilter} onChange={e => onStatusFilterChange(e.target.value as 'ALL' | 'ACTIVE' | 'INACTIVE')}>
+          <option value="ALL">Tất cả</option><option value="ACTIVE">Hoạt động</option><option value="INACTIVE">Tạm dừng</option>
+        </select>}
+        {onAdd && <button type="button" onClick={onAdd}>Thêm tuyến</button>}
+      </div>
       <table className="route-table">
         <thead>
           <tr>

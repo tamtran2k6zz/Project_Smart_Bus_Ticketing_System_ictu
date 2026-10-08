@@ -1,13 +1,69 @@
 import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
-import { query } from '../config/database';
+import { PoolClient } from 'pg';
+import { query, transaction } from '../config/database';
+import { appLogger } from '../config/logger';
+
+const logger = appLogger.child('routes');
+
+interface RouteStopInput {
+  id?: string;
+  name: string;
+  address?: string | null;
+  order: number;
+  distanceFromStartKm?: number;
+  estimatedMinutes?: number;
+}
+
+async function replaceRouteStops(
+  client: PoolClient,
+  routeId: string,
+  stations: RouteStopInput[]
+): Promise<void> {
+  await client.query('DELETE FROM route_stops WHERE route_id = $1', [routeId]);
+
+  for (const [index, station] of stations.entries()) {
+    let stopId: string | undefined;
+    if (station.id) {
+      const existing = await client.query<{ id: string }>(
+        'SELECT id FROM bus_stops WHERE id = $1 AND deleted_at IS NULL',
+        [station.id]
+      );
+      stopId = existing.rows[0]?.id;
+    }
+
+    if (!stopId) {
+      stopId = randomUUID();
+      const stopCode = `ST-${randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
+      await client.query(
+        `INSERT INTO bus_stops (id, code, name, address, is_active)
+         VALUES ($1, $2, $3, $4, TRUE)`,
+        [stopId, stopCode, station.name.trim(), station.address?.trim() || null]
+      );
+    }
+
+    await client.query(
+      `INSERT INTO route_stops
+         (id, route_id, stop_id, stop_order, distance_from_start_km, estimated_time_minutes)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        randomUUID(),
+        routeId,
+        stopId,
+        station.order ?? index + 1,
+        station.distanceFromStartKm ?? 0,
+        station.estimatedMinutes ?? 0,
+      ]
+    );
+  }
+}
 
 // 1. Lấy danh sách tất cả tuyến xe kèm trạm dừng theo thứ tự (US 12)
 export const getRoutes = async (req: Request, res: Response): Promise<void> => {
   try {
     const routes = await query<any[]>(
       `SELECT r.id, r.code, r.name, r.description, r.distance_km, r.estimated_duration_min, r.status, r.created_at,
-              COALESCE((SELECT amount FROM fares f WHERE f.route_id = r.id AND f.ticket_type = 'SINGLE' AND f.is_active = 1 LIMIT 1), 10000) AS base_price
+              COALESCE((SELECT amount FROM fares f WHERE f.route_id = r.id AND f.ticket_type = 'SINGLE' AND f.is_active = TRUE ORDER BY f.created_at DESC LIMIT 1), r.base_price) AS base_price
        FROM routes r
        WHERE r.deleted_at IS NULL
        ORDER BY r.code ASC`
@@ -23,10 +79,10 @@ export const getRoutes = async (req: Request, res: Response): Promise<void> => {
        ORDER BY rs.route_id ASC, rs.stop_order ASC`
     );
 
-    const routesWithStops = routes.map((r) => {
+    const routesWithStops = routes.map(r => {
       const stops = routeStops
-        .filter((rs) => rs.route_id === r.id)
-        .map((rs) => ({
+        .filter(rs => rs.route_id === r.id)
+        .map(rs => ({
           stopId: rs.stop_id,
           code: rs.stop_code,
           name: rs.stop_name,
@@ -57,7 +113,11 @@ export const getRoutes = async (req: Request, res: Response): Promise<void> => {
       data: routesWithStops,
     });
   } catch (err: any) {
-    console.error('Lỗi API getRoutes:', err);
+    logger.error('routes_list_failed', {
+      table: 'routes/route_stops/bus_stops',
+      operation: 'select',
+      error: err,
+    });
     res.status(500).json({
       statusCode: 500,
       success: false,
@@ -69,7 +129,14 @@ export const getRoutes = async (req: Request, res: Response): Promise<void> => {
 // 2. Thêm mới tuyến xe buýt (US 12)
 export const createRoute = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { code, name, description, distance_km = 0, base_price = 10000, status = 'ACTIVE' } = req.body;
+    const {
+      code,
+      name,
+      description,
+      distance_km = 0,
+      base_price = 10000,
+      status = 'ACTIVE',
+    } = req.body;
 
     if (!code || !name) {
       res.status(400).json({
@@ -80,37 +147,69 @@ export const createRoute = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    const existing = await query<any[]>('SELECT id FROM routes WHERE code = ? LIMIT 1', [code.trim().toUpperCase()]);
+    const existing = await query<any[]>('SELECT id FROM routes WHERE code = $1 LIMIT 1', [
+      code.trim().toUpperCase(),
+    ]);
 
     if (existing.length > 0) {
       res.status(409).json({
         statusCode: 409,
         success: false,
-        message: `Mã tuyến '${code}' đã tồn tại trong CSDL MySQL!`,
+        message: `Mã tuyến '${code}' đã tồn tại trong CSDL PostgreSQL!`,
+      });
+      return;
+    }
+
+    const stations = req.body.stations;
+    if (
+      stations !== undefined &&
+      (!Array.isArray(stations) ||
+        stations.some(
+          (station: RouteStopInput) =>
+            !station.name?.trim() || !Number.isInteger(Number(station.order))
+        ))
+    ) {
+      res.status(400).json({
+        statusCode: 400,
+        success: false,
+        message: 'Danh sách trạm phải chứa tên và thứ tự hợp lệ.',
       });
       return;
     }
 
     const routeId = randomUUID();
-    await query(
-      `INSERT INTO routes (id, code, name, description, distance_km, status)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [routeId, code.trim().toUpperCase(), name.trim(), description ? description.trim() : null, distance_km, status]
-    );
-
-    // Lưu giá vé cơ sở vào bảng fares nếu có
-    if (base_price) {
-      await query(
-        `INSERT INTO fares (id, route_id, fareType, ticket_type, amount, is_active)
-         VALUES (UUID(), ?, 'FLAT_FARE', 'SINGLE', ?, 1)`,
-        [routeId, base_price]
+    await transaction(async client => {
+      await client.query(
+        `INSERT INTO routes (id, code, name, description, distance_km, status, base_price)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          routeId,
+          code.trim().toUpperCase(),
+          name.trim(),
+          description ? description.trim() : null,
+          distance_km,
+          status,
+          base_price,
+        ]
       );
-    }
+
+      if (base_price) {
+        await client.query(
+          `INSERT INTO fares (id, route_id, fare_type, ticket_type, amount, is_active)
+           VALUES (gen_random_uuid()::text, $1, 'FLAT_FARE', 'SINGLE', $2, TRUE)`,
+          [routeId, base_price]
+        );
+      }
+
+      if (stations) {
+        await replaceRouteStops(client, routeId, stations);
+      }
+    });
 
     res.status(201).json({
       statusCode: 201,
       success: true,
-      message: 'Tạo mới tuyến xe thành công vào MySQL!',
+      message: 'Tạo mới tuyến xe thành công vào PostgreSQL!',
       data: {
         id: routeId,
         code: code.trim().toUpperCase(),
@@ -119,11 +218,16 @@ export const createRoute = async (req: Request, res: Response): Promise<void> =>
         distanceKm: Number(distance_km),
         basePrice: Number(base_price),
         status,
-        stops: [],
+        stops: stations ?? [],
       },
     });
   } catch (err: any) {
-    console.error('Lỗi API createRoute:', err);
+    logger.error('route_create_failed', {
+      table: 'routes',
+      operation: 'insert',
+      code: String(req.body?.code ?? ''),
+      error: err,
+    });
     res.status(500).json({
       statusCode: 500,
       success: false,
@@ -138,43 +242,83 @@ export const updateRoute = async (req: Request, res: Response): Promise<void> =>
     const { id } = req.params;
     const { code, name, description, distance_km, base_price, status } = req.body;
 
-    const existing = await query<any[]>('SELECT id FROM routes WHERE id = ? LIMIT 1', [id]);
+    const existing = await query<any[]>('SELECT id FROM routes WHERE id = $1 LIMIT 1', [id]);
 
     if (existing.length === 0) {
       res.status(404).json({
         statusCode: 404,
         success: false,
-        message: `Không tìm thấy tuyến xe có ID = ${id} trong CSDL MySQL!`,
+        message: `Không tìm thấy tuyến xe có ID = ${id} trong CSDL PostgreSQL!`,
       });
       return;
     }
 
-    await query(
-      `UPDATE routes
-       SET code = COALESCE(?, code),
-           name = COALESCE(?, name),
-           description = COALESCE(?, description),
-           distance_km = COALESCE(?, distance_km),
-           status = COALESCE(?, status)
-       WHERE id = ?`,
-      [code ? code.trim().toUpperCase() : null, name ? name.trim() : null, description, distance_km, status, id]
-    );
-
-    if (base_price !== undefined) {
-      await query(
-        `INSERT INTO fares (id, route_id, fareType, ticket_type, amount, is_active)
-         VALUES (UUID(), ?, 'FLAT_FARE', 'SINGLE', ?, 1)`,
-        [id, base_price]
-      );
+    const stations = req.body.stations;
+    if (
+      stations !== undefined &&
+      (!Array.isArray(stations) ||
+        stations.some(
+          (station: RouteStopInput) =>
+            !station.name?.trim() || !Number.isInteger(Number(station.order))
+        ))
+    ) {
+      res.status(400).json({
+        statusCode: 400,
+        success: false,
+        message: 'Danh sách trạm phải chứa tên và thứ tự hợp lệ.',
+      });
+      return;
     }
+
+    await transaction(async client => {
+      await client.query(
+        `UPDATE routes
+         SET code = COALESCE($1, code),
+             name = COALESCE($2, name),
+             description = COALESCE($3, description),
+             distance_km = COALESCE($4, distance_km),
+             status = COALESCE($5, status)
+         WHERE id = $6`,
+        [
+          code ? code.trim().toUpperCase() : null,
+          name ? name.trim() : null,
+          description,
+          distance_km,
+          status,
+          id,
+        ]
+      );
+
+      if (base_price !== undefined) {
+        await client.query(
+          "UPDATE fares SET is_active = FALSE WHERE route_id = $1 AND ticket_type = 'SINGLE'",
+          [id]
+        );
+        await client.query('UPDATE routes SET base_price = $1 WHERE id = $2', [base_price, id]);
+        await client.query(
+          `INSERT INTO fares (id, route_id, fare_type, ticket_type, amount, is_active)
+           VALUES (gen_random_uuid()::text, $1, 'FLAT_FARE', 'SINGLE', $2, TRUE)`,
+          [id, base_price]
+        );
+      }
+
+      if (stations) {
+        await replaceRouteStops(client, id, stations);
+      }
+    });
 
     res.status(200).json({
       statusCode: 200,
       success: true,
-      message: 'Cập nhật tuyến xe thành công trong MySQL!',
+      message: 'Cập nhật tuyến xe thành công trong PostgreSQL!',
     });
   } catch (err: any) {
-    console.error('Lỗi API updateRoute:', err);
+    logger.error('route_update_failed', {
+      table: 'routes',
+      operation: 'update',
+      route_id: req.params.id ?? '',
+      error: err,
+    });
     res.status(500).json({
       statusCode: 500,
       success: false,
@@ -188,7 +332,7 @@ export const deleteRoute = async (req: Request, res: Response): Promise<void> =>
   try {
     const { id } = req.params;
 
-    const existing = await query<any[]>('SELECT id FROM routes WHERE id = ? LIMIT 1', [id]);
+    const existing = await query<any[]>('SELECT id FROM routes WHERE id = $1 LIMIT 1', [id]);
 
     if (existing.length === 0) {
       res.status(404).json({
@@ -199,15 +343,20 @@ export const deleteRoute = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    await query('UPDATE routes SET deleted_at = NOW(3), status = "INACTIVE" WHERE id = ?', [id]);
+    await query("UPDATE routes SET deleted_at = NOW(), status = 'INACTIVE' WHERE id = $1", [id]);
 
     res.status(200).json({
       statusCode: 200,
       success: true,
-      message: 'Xóa tuyến xe thành công khỏi CSDL MySQL!',
+      message: 'Xóa tuyến xe thành công khỏi CSDL PostgreSQL!',
     });
   } catch (err: any) {
-    console.error('Lỗi API deleteRoute:', err);
+    logger.error('route_delete_failed', {
+      table: 'routes',
+      operation: 'delete',
+      route_id: req.params.id ?? '',
+      error: err,
+    });
     res.status(500).json({
       statusCode: 500,
       success: false,
@@ -233,22 +382,27 @@ export const assignStopToRoute = async (req: Request, res: Response): Promise<vo
 
     await query(
       `INSERT INTO route_stops (id, route_id, stop_id, stop_order, distance_from_start_km, estimated_time_minutes)
-       VALUES (UUID(), ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE
-         stop_id = VALUES(stop_id),
-         stop_order = VALUES(stop_order),
-         distance_from_start_km = VALUES(distance_from_start_km),
-         estimated_time_minutes = VALUES(estimated_time_minutes)`,
+       VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5)
+       ON CONFLICT (route_id, stop_order) DO UPDATE SET
+         stop_id = EXCLUDED.stop_id,
+         distance_from_start_km = EXCLUDED.distance_from_start_km,
+         estimated_time_minutes = EXCLUDED.estimated_time_minutes`,
       [id, stop_id, stop_order, distance_from_start_km, estimated_minutes]
     );
 
     res.status(200).json({
       statusCode: 200,
       success: true,
-      message: 'Gán trạm dừng vào tuyến thành công trong MySQL!',
+      message: 'Gán trạm dừng vào tuyến thành công trong PostgreSQL!',
     });
   } catch (err: any) {
-    console.error('Lỗi API assignStopToRoute:', err);
+    logger.error('route_stop_assign_failed', {
+      table: 'route_stops',
+      operation: 'insert',
+      route_id: req.params.id ?? '',
+      stop_id: String(req.body?.stopId ?? ''),
+      error: err,
+    });
     res.status(500).json({
       statusCode: 500,
       success: false,

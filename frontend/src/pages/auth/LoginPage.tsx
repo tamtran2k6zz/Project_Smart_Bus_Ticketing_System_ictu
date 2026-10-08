@@ -59,29 +59,6 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const setDemoAccount = (role: 'PASSENGER' | 'DRIVER' | 'MANAGER' | 'ADMIN') => {
-    clearError();
-    setFormError(null);
-    switch (role) {
-      case 'ADMIN':
-        setIdentifier('admin@smartbus.ictu.vn');
-        setPassword('Admin@12345');
-        break;
-      case 'MANAGER':
-        setIdentifier('manager@smartbus.ictu.vn');
-        setPassword('Manager@123');
-        break;
-      case 'DRIVER':
-        setIdentifier('0987654321');
-        setPassword('Driver@123');
-        break;
-      case 'PASSENGER':
-        setIdentifier('khachhang@gmail.com');
-        setPassword('User@123');
-        break;
-    }
-  };
-
   return (
     <div className="login-card">
       <div className="login-header">
@@ -89,24 +66,6 @@ export const LoginPage: React.FC = () => {
         <p className="login-subtitle">
           Đăng nhập vào hệ thống điều hành xe buýt thông minh SmartBus ICTU
         </p>
-      </div>
-
-      <div className="demo-role-box">
-        <div className="demo-role-label">⚡ Chọn tài khoản mẫu (Sprint 1 Review):</div>
-        <div className="demo-role-buttons">
-          <button type="button" className="demo-btn" onClick={() => setDemoAccount('ADMIN')}>
-            Admin
-          </button>
-          <button type="button" className="demo-btn" onClick={() => setDemoAccount('MANAGER')}>
-            Quản lý
-          </button>
-          <button type="button" className="demo-btn" onClick={() => setDemoAccount('DRIVER')}>
-            Tài xế
-          </button>
-          <button type="button" className="demo-btn" onClick={() => setDemoAccount('PASSENGER')}>
-            Hành khách
-          </button>
-        </div>
       </div>
 
       {(formError || error) && (
