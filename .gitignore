@@ -1,15 +1,46 @@
+# Dependencies and generated output
 node_modules/
 dist/
 coverage/
-.env
-.env*.local
-.env.local
-.DS_Store
+*.tsbuildinfo
 *.log
-.gemini/
+.cache/
+.npm-cache/
+.playwright/
+playwright-report/
+test-results/
+dependency-audit.json
 .vercel/
 supabase/.temp/
-.vercel
+
+# Private environment files; keep shareable configuration templates
 .env*
-.agents/skills/
-*.tsbuildinfo
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.p12
+*.pfx
+*service-account*.json
+/DB_URL & JWT.docx
+
+# Local agent, editor, workspace, and workflow configuration
+.agent/
+.agents/
+.codex/
+.gemini/
+.vscode/
+.idea/
+.postman/
+.github/
+skills-lock.json
+
+# OS files, temporary files, and backups
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
