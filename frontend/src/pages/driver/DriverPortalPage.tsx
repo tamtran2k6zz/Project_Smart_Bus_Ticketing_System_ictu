@@ -8,8 +8,6 @@ import type { BusRoute } from '../../types/route';
 
 import { getApiUrl, apiFetch } from '../../api/client';
 
-
-
 import type {
 
   ApiRoute,
@@ -23,10 +21,7 @@ import type {
 } from '../../types/api';
 
 import { getErrorMessage } from '../../utils/errorMessage';
-
 import TicketQrScanner from '../../components/driver/TicketQrScanner';
-
-
 
 
 
@@ -45,6 +40,81 @@ interface VerifiedTicketSummary {
 }
 
 
+
+type VerifyFeedbackType = 'success' | 'warning' | 'error';
+
+interface VerifyFeedback {
+  type: VerifyFeedbackType;
+  message: string;
+}
+
+let verifyAudioContext: AudioContext | null = null;
+
+function getVerifyAudioContext(): AudioContext | null {
+  if (typeof window === 'undefined' || typeof window.AudioContext !== 'function') {
+    return null;
+  }
+
+  if (!verifyAudioContext || verifyAudioContext.state === 'closed') {
+    verifyAudioContext = new window.AudioContext();
+  }
+
+  return verifyAudioContext;
+}
+
+// Mở khóa AudioContext ngay trong thao tác của tài xế để trình duyệt mobile cho phép phát tiếng sau khi API trả kết quả.
+function prepareVerifyFeedbackAudio(): void {
+  const context = getVerifyAudioContext();
+  if (context?.state === 'suspended') {
+    void context.resume().catch(() => undefined);
+  }
+}
+
+function playVerifyFeedbackSound(type: VerifyFeedbackType): void {
+  const context = getVerifyAudioContext();
+  if (!context) return;
+
+  const sequences: Record<VerifyFeedbackType, Array<{ frequency: number; duration: number }>> = {
+    success: [
+      { frequency: 740, duration: 0.12 },
+      { frequency: 980, duration: 0.16 },
+    ],
+    warning: [
+      { frequency: 560, duration: 0.14 },
+      { frequency: 560, duration: 0.14 },
+    ],
+    error: [
+      { frequency: 330, duration: 0.16 },
+      { frequency: 220, duration: 0.2 },
+    ],
+  };
+
+  const play = () => {
+    if (context.state !== 'running') return;
+
+    let startAt = context.currentTime + 0.01;
+    for (const note of sequences[type]) {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(note.frequency, startAt);
+      gain.gain.setValueAtTime(0.0001, startAt);
+      gain.gain.exponentialRampToValueAtTime(0.12, startAt + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startAt + note.duration);
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start(startAt);
+      oscillator.stop(startAt + note.duration + 0.02);
+      startAt += note.duration + 0.055;
+    }
+  };
+
+  if (context.state === 'running') {
+    play();
+  } else {
+    void context.resume().then(play).catch(() => undefined);
+  }
+}
 
 export const DriverPortalPage: React.FC = () => {
 
@@ -69,8 +139,8 @@ export const DriverPortalPage: React.FC = () => {
   const [isVerifying, setIsVerifying] = useState(false);
 
   const [verifiedList, setVerifiedList] = useState<VerifiedTicketSummary[]>([]);
-
   const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
+  const [verifyFeedback, setVerifyFeedback] = useState<VerifyFeedback | null>(null);
 
 
 
@@ -200,22 +270,24 @@ export const DriverPortalPage: React.FC = () => {
 
 
 
-  // Xử lý soát vé QR vào cơ sở dữ liệu (US 15)
-
-  const handleVerifyTicket = async (
-    e?: React.FormEvent,
-    codeOverride?: string,
-  ) => {
+  // Xử lý soát vé QR và phản hồi trực quan/âm thanh theo kết quả API.
+  const handleVerifyTicket = async (e?: React.FormEvent, codeOverride?: string) => {
     if (e) e.preventDefault();
+    prepareVerifyFeedbackAudio();
 
     const code = (codeOverride ?? verifyCode).trim();
-
     if (!code) {
-      alert('Vui lòng nhập chuỗi mã QR hoặc mã vé (VD: TKT-...)!');
+      const message = 'Vui lòng nhập chuỗi mã QR hoặc mã vé (VD: TKT-...)!';
+      setVerifyResult(null);
+      setVerifyFeedback({ type: 'error', message });
+      playVerifyFeedbackSound('error');
       return;
     }
 
+    setVerifyFeedback(null);
+    setVerifyResult(null);
     setIsVerifying(true);
+
     try {
       const res = await apiFetch(getApiUrl('/api/v1/ticketing/verify'), {
         method: 'POST',
@@ -223,63 +295,49 @@ export const DriverPortalPage: React.FC = () => {
         body: JSON.stringify({ code }),
       });
 
-
-
       const json = await res.json();
-
       if (!res.ok) {
-
-        throw new Error(json.message || 'Mã vé không tồn tại hoặc đã hết hạn trong CSDL cơ sở dữ liệu!');
-
+        throw new Error(
+          json.message || 'Mã vé không hợp lệ hoặc đã hết hạn. Vui lòng kiểm tra lại.',
+        );
       }
 
-
-
-      const result = json.data || json;
-
+      const result = (json.data || json) as TicketVerificationResult;
       setVerifyResult(result);
 
-
+      if (result.isAlreadyCheckedIn) {
+        const message = result.message || 'Vé này đã được soát trước đó.';
+        setVerifyFeedback({ type: 'warning', message });
+        playVerifyFeedbackSound('warning');
+      } else {
+        const message = result.message || 'Vé hợp lệ. Soát vé thành công.';
+        setVerifyFeedback({ type: 'success', message });
+        playVerifyFeedbackSound('success');
+      }
 
       if (result.ticket) {
-
         setVerifiedList((prev) => [
-
           {
-
-            code: result.ticket.ticketCode,
-
-            passenger: result.ticket.user?.fullName || 'Khách vãng lai',
-
-            seat: result.ticket.seatNumber,
-
+            code: result.ticket?.ticketCode || code,
+            passenger: result.ticket?.user?.fullName || 'Khách vãng lai',
+            seat: result.ticket?.seatNumber || '—',
             time: new Date().toLocaleTimeString('vi-VN'),
-
             status: result.isAlreadyCheckedIn ? 'Đã quét trước đó' : 'Hợp lệ ✓',
-
           },
-
           ...prev.slice(0, 4),
-
         ]);
-
       }
 
       setVerifyCode('');
-
     } catch (err: unknown) {
-
-      alert(getErrorMessage(err, 'Không thể soát vé.'));
-
+      const message = getErrorMessage(err, 'Không thể soát vé. Vui lòng thử lại.');
+      setVerifyResult(null);
+      setVerifyFeedback({ type: 'error', message });
+      playVerifyFeedbackSound('error');
     } finally {
-
       setIsVerifying(false);
-
     }
-
   };
-
-
 
   // Báo cáo sự cố vào cơ sở dữ liệu (US 11)
 
@@ -447,7 +505,7 @@ export const DriverPortalPage: React.FC = () => {
 
             href="/landing.html"
 
-            target="\_blank"
+            target="_blank"
 
             rel="noopener noreferrer"
 
@@ -637,7 +695,10 @@ export const DriverPortalPage: React.FC = () => {
                   <button
                     type="button"
                     className="secondary-button"
-                    onClick={() => setIsQrScannerOpen(true)}
+                    onClick={() => {
+                      prepareVerifyFeedbackAudio();
+                      setIsQrScannerOpen(true);
+                    }}
                     style={{
                       height: '48px',
                       padding: '0 22px',
@@ -674,111 +735,115 @@ export const DriverPortalPage: React.FC = () => {
                 )}
               </div>
 
-
-
-              {/* Kết quả kiểm tra */}
-
-              {verifyResult && (
-
+              {/* Kết quả kiểm tra: xanh khi hợp lệ, vàng khi đã quét, đỏ khi lỗi */}
+              {verifyFeedback && (
                 <div
-
                   className="liquid-glass-strong"
-
+                  role="status"
+                  aria-live="polite"
                   style={{
-
                     padding: '24px',
-
                     borderRadius: '18px',
-
-                    border: verifyResult.isAlreadyCheckedIn
-
-                      ? '1px solid rgba(251, 191, 36, 0.4)'
-
-                      : '1px solid rgba(16, 185, 129, 0.4)',
-
-                    background: verifyResult.isAlreadyCheckedIn
-
-                      ? 'rgba(251, 191, 36, 0.08)'
-
-                      : 'rgba(16, 185, 129, 0.08)',
-
+                    border:
+                      verifyFeedback.type === 'success'
+                        ? '1px solid rgba(16, 185, 129, 0.5)'
+                        : verifyFeedback.type === 'warning'
+                          ? '1px solid rgba(251, 191, 36, 0.5)'
+                          : '1px solid rgba(239, 68, 68, 0.55)',
+                    background:
+                      verifyFeedback.type === 'success'
+                        ? 'rgba(16, 185, 129, 0.12)'
+                        : verifyFeedback.type === 'warning'
+                          ? 'rgba(251, 191, 36, 0.1)'
+                          : 'rgba(239, 68, 68, 0.12)',
                     marginBottom: '28px',
-
+                    transition: 'background 180ms ease, border-color 180ms ease',
                   }}
-
                 >
-
                   <div
-
                     style={{
-
                       fontSize: '18px',
-
-                      fontWeight: 600,
-
-                      color: verifyResult.isAlreadyCheckedIn ? '#fbbf24' : '#34d399',
-
+                      fontWeight: 700,
+                      color:
+                        verifyFeedback.type === 'success'
+                          ? '#34d399'
+                          : verifyFeedback.type === 'warning'
+                            ? '#fbbf24'
+                            : '#f87171',
                       display: 'flex',
-
                       alignItems: 'center',
-
                       gap: '8px',
-
-                      marginBottom: '14px',
-
+                      marginBottom: verifyResult?.ticket ? '16px' : 0,
                     }}
-
                   >
-
-                    <span>{verifyResult.isAlreadyCheckedIn ? '⚠️' : '✓'}</span>
-
-                    {verifyResult.message}
-
+                    <span aria-hidden="true">
+                      {verifyFeedback.type === 'success'
+                        ? '✓'
+                        : verifyFeedback.type === 'warning'
+                          ? '⚠️'
+                          : '✕'}
+                    </span>
+                    <span>{verifyFeedback.message}</span>
                   </div>
 
-
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', fontSize: '14px', color: 'rgba(255, 255, 255, 0.85)' }}>
-
-                    <div>
-
-                      <span style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '12px', display: 'block' }}>HÀNH KHÁCH</span>
-
-                      <strong>{verifyResult.ticket?.user?.fullName || 'Khách vãng lai'}</strong>
-
+                  {verifyResult?.ticket && (
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                        gap: '16px',
+                        fontSize: '14px',
+                        color: 'rgba(255, 255, 255, 0.85)',
+                      }}
+                    >
+                      <div>
+                        <span style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '12px', display: 'block' }}>
+                          HÀNH KHÁCH
+                        </span>
+                        <strong>{verifyResult.ticket.user?.fullName || 'Khách vãng lai'}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '12px', display: 'block' }}>
+                          TUYẾN XE
+                        </span>
+                        <strong>{verifyResult.ticket.trip?.route?.name || 'Tuyến buýt nội đô'}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '12px', display: 'block' }}>
+                          VỊ TRÍ GHẾ
+                        </span>
+                        <strong style={{ color: '#38bdf8' }}>
+                          Ghế số: {verifyResult.ticket.seatNumber || '—'}
+                        </strong>
+                      </div>
+                      <div>
+                        <span style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '12px', display: 'block' }}>
+                          TRẠNG THÁI VÉ
+                        </span>
+                        <span
+                          className="status-badge"
+                          style={{
+                            color:
+                              verifyFeedback.type === 'success'
+                                ? '#34d399'
+                                : verifyFeedback.type === 'warning'
+                                  ? '#fbbf24'
+                                  : '#f87171',
+                            borderColor:
+                              verifyFeedback.type === 'success'
+                                ? 'rgba(16, 185, 129, 0.4)'
+                                : verifyFeedback.type === 'warning'
+                                  ? 'rgba(251, 191, 36, 0.4)'
+                                  : 'rgba(239, 68, 68, 0.4)',
+                          }}
+                        >
+                          {verifyResult.ticket.status || '—'}
+                        </span>
+                      </div>
                     </div>
-
-                    <div>
-
-                      <span style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '12px', display: 'block' }}>TUYẾN XE</span>
-
-                      <strong>{verifyResult.ticket?.trip?.route?.name || 'Tuyến buýt nội đô'}</strong>
-
-                    </div>
-
-                    <div>
-
-                      <span style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '12px', display: 'block' }}>VỊ TRÍ GHẾ</span>
-
-                      <strong style={{ color: '#38bdf8' }}>Ghế số: {verifyResult.ticket?.seatNumber}</strong>
-
-                    </div>
-
-                    <div>
-
-                      <span style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '12px', display: 'block' }}>TRẠNG THÁI VÉ</span>
-
-                      <span className="status-badge active">{verifyResult.ticket?.status}</span>
-
-                    </div>
-
-                  </div>
-
+                  )}
                 </div>
-
               )}
-
-
 
               {/* Lịch sử quét gần đây */}
 
@@ -832,7 +897,14 @@ export const DriverPortalPage: React.FC = () => {
 
                           <td>
 
-                            <span className="status-badge active">{item.status}</span>
+                            <span
+                              className={`status-badge ${item.status === 'Hợp lệ ✓' ? 'active' : ''}`}
+                              style={{
+                                color: item.status === 'Hợp lệ ✓' ? '#34d399' : '#fbbf24',
+                              }}
+                            >
+                              {item.status}
+                            </span>
 
                           </td>
 
