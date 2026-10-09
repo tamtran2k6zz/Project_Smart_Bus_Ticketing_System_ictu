@@ -136,6 +136,22 @@ describe('demo business transactions', () => {
       'không gắn ghế'
     );
   });
+  it('previews voucher totals that match the created booking', async () => {
+    const h = await bookingApi.createHold('t-1-0-0', 'u0', [], 2);
+    expect(await bookingApi.previewVoucher(h.id, 'u0', ' smart10 ')).toEqual({
+      code: 'SMART10',
+      percent: 10,
+      subtotal: 30000,
+      discount: 3000,
+      total: 27000,
+    });
+    await expect(bookingApi.previewVoucher(h.id, 'u0', 'BUYT5K')).rejects.toThrow(
+      'Voucher không tồn tại'
+    );
+    await expect(bookingApi.previewVoucher(h.id, 'u1', 'SMART10')).rejects.toThrow('Giữ chỗ');
+    const b = await bookingApi.createBooking(h.id, 'u0', 'Minh Anh', '0901234560', 'smart10');
+    expect(b).toMatchObject({ total: 27000, discount: 3000, voucher: 'SMART10' });
+  });
   it('issues no QR for pending/failed, is idempotent after confirmed payment', async () => {
     const { b, p } = await book();
     expect(await ticketsApi.list('u0')).toHaveLength(0);
