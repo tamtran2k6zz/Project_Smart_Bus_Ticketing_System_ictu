@@ -769,7 +769,7 @@ export const adminBookingApi = {
       Number(refundAmount) || targetBooking.refundRequest?.refundAmount || targetBooking.totalAmount;
     const refundTxnId = `REF-${targetBooking.paymentMethod || 'GATEWAY'}-${new Date()
       .toISOString()
-      .replace(/[-:T.]/g, '')
+      .replace(new RegExp(['[', '-', ':', 'T', '.', ']'].join(''), 'g'), '')
       .slice(0, 14)}`;
 
     data[index] = {

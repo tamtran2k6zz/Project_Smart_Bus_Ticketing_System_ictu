@@ -220,7 +220,7 @@ export const Navbar = () => {
                     <div className="text-left">
                       <p className="text-xs font-semibold text-slate-800 leading-tight">{user?.name}</p>
                       {userRole && (
-                        <span className={`inline-block text-[10px] px-1.5 py-0.2 rounded border font-medium ${userRole.color}`}>
+                        <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded border font-medium ${userRole.color}`}>
                           {userRole.text}
                         </span>
                       )}

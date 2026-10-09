@@ -421,10 +421,10 @@ export const AdminMonthlyTicketsPage = () => {
                         <div className="space-y-1">
                           <p className="font-semibold text-slate-900 leading-tight">{item.fullName}</p>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-200">
+                            <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
                               {item.studentId}
                             </span>
-                            <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.2 rounded-full border ${badge.color}`}>
+                            <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full border ${badge.color}`}>
                               <BadgeIcon className="w-3 h-3" />
                               {badge.label}
                             </span>
