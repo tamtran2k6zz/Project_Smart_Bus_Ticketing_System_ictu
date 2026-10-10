@@ -3,14 +3,14 @@
   "buildCommand": "npm --prefix backend run build && npm --prefix frontend run build",
   "outputDirectory": "frontend/dist",
   "functions": {
-    "api/adapter.js": {
+    "verceladapter/adapter.js": {
       "maxDuration": 30
     }
   },
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "/api/adapter"
+      "destination": "/verceladapter/adapter"
     },
     {
       "source": "/(.*)",
