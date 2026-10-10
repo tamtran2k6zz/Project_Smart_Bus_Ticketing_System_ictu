@@ -1,4 +1,4 @@
-import app from '../src/app';
+import app from '../backend/src/app';
 
 export const config = { maxDuration: 30 };
 
