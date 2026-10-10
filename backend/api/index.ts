@@ -1,12 +1,6 @@
-let app;
-try {
-  // @ts-ignore
-  app = require('../dist/app').default || require('../dist/app');
-} catch {
-  // @ts-ignore
-  app = require('../src/app').default || require('../src/app');
-}
-
 export const config = { maxDuration: 30 };
 
-export default app;
+export default async function handler(req: any, res: any) {
+  const app = require('../dist/app').default || require('../dist/app');
+  return app(req, res);
+}
