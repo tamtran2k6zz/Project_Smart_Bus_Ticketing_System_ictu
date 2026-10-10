@@ -1,4 +1,5 @@
-const app = require('../dist/app');
+import app from '../src/app';
 
-module.exports = app;
-module.exports.config = { maxDuration: 30 };
+export const config = { maxDuration: 30 };
+
+export default app;
