@@ -1,4 +1,4 @@
-const app = require('../dist/app');
+const app = require('../backend/dist/app');
 
 module.exports = app;
 module.exports.config = {
