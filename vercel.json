@@ -3,14 +3,15 @@
   "buildCommand": "npm --prefix backend run build && npm --prefix frontend run build",
   "outputDirectory": "frontend/dist",
   "functions": {
-    "api/index.ts": {
-      "maxDuration": 30
+    "backend/api/index.ts": {
+      "maxDuration": 30,
+      "includeFiles": "backend/src/**"
     }
   },
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "/api/index"
+      "destination": "/backend/api/index"
     },
     {
       "source": "/(.*)",
