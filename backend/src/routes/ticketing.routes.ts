@@ -422,11 +422,6 @@ router.post(
           [reservation.ticket_id]
         );
         await client.query(
-          `UPDATE trips SET status='COMPLETED'
-           WHERE id=$1 AND status IN ('SCHEDULED','IN_TRANSIT')`,
-          [reservation.trip_id]
-        );
-        await client.query(
           `UPDATE trip_seats SET status='BOOKED',locked_at=NULL,lock_expires_at=NULL,
            locked_by_user_id=NULL,redis_lock_id=NULL WHERE ticket_id=$1`,
           [reservation.ticket_id]
@@ -455,14 +450,13 @@ router.post(
 
       res.json({
         success: true,
-        message:
-          'Đã mô phỏng thanh toán QR, xác nhận vé và hoàn thành chuyến. Không có khoản tiền thật được chuyển.',
+        message: 'Đã mô phỏng thanh toán QR và xác nhận vé. Không có khoản tiền thật được chuyển.',
         data: {
           ticketId: completed.ticketId,
           tripId: completed.tripId,
           paymentStatus: 'SUCCESS',
           ticketStatus: 'BOOKED',
-          tripStatus: 'COMPLETED',
+          tripStatus: 'SCHEDULED',
         },
       });
     } catch (error) {
@@ -785,12 +779,22 @@ router.post(
       } = await dbPool.query(
         `SELECT t.id,t.trip_id,t.user_id,t.seat_number,t.status AS ticket_status,
               p.order_id,p.payment_method,p.amount,p.status AS payment_status,
-              p.gateway_transaction_id,p.refund_request_id,p.paid_at,p.redis_lock_id
-       FROM tickets t LEFT JOIN payment_transactions p ON p.ticket_id=t.id WHERE t.id=$1`,
+              p.gateway_transaction_id,p.refund_request_id,p.paid_at,p.redis_lock_id,
+              tr.departure_time
+       FROM tickets t 
+       LEFT JOIN payment_transactions p ON p.ticket_id=t.id 
+       JOIN trips tr ON tr.id=t.trip_id 
+       WHERE t.id=$1`,
         [req.params.id]
       );
       if (!ticket) {
         res.status(404).json({ success: false, message: 'Không tìm thấy vé.' });
+        return;
+      }
+      if (ticket.departure_time && new Date(ticket.departure_time).getTime() <= Date.now()) {
+        res
+          .status(400)
+          .json({ success: false, message: 'Không thể hủy vé sau khi chuyến xe đã khởi hành.' });
         return;
       }
       if (req.user?.role !== 'ADMIN' && ticket.user_id !== req.user?.id) {

@@ -51,6 +51,7 @@ export const searchTrips = async (req: Request, res: Response): Promise<void> =>
       WHERE r.status = 'ACTIVE'
         AND t.status = 'SCHEDULED'
         AND t.departure_time >= NOW()
+        AND origin_rs.stop_order < dest_rs.stop_order
     `;
     const params: any[] = [origin_stop_id, destination_stop_id];
 
