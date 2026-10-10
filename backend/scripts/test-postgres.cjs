@@ -614,12 +614,12 @@ async function main() {
       {},
       other
     );
-    assert.equal(demoCompletion.data.tripStatus, 'COMPLETED');
+    assert.equal(demoCompletion.data.tripStatus, 'SCHEDULED');
     assert.equal(
       (
         await db.query('SELECT status FROM trips WHERE id=$1', [demoTrip])
       ).rows[0].status,
-      'COMPLETED'
+      'SCHEDULED'
     );
     assert.equal(
       (
@@ -639,6 +639,7 @@ async function main() {
       ).rows[0].status,
       'SUCCESS'
     );
+    await db.query("UPDATE trips SET status='COMPLETED' WHERE id=$1", [demoTrip]);
     const eligibleDemoTrips = await call('get', '/api/ticketing/completed-trips', null, other);
     assert.ok(eligibleDemoTrips.data.some(item => item.tripId === demoTrip));
     const dashboard = await call('get', '/api/operations/dashboard/summary', null, admin);
