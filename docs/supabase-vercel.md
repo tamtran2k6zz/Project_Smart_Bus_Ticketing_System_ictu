@@ -14,25 +14,23 @@ codex mcp login supabase
 npx vercel login
 ```
 
-Complete each browser authorization. Confirm MCP authentication using `/mcp` in Codex. The Supabase skills are already installed in `.agents/skills`.
+Complete each browser authorization. Confirm MCP authentication using `/mcp` in Codex. Local agent configuration is excluded from Git.
 
 ## 2. Configure private connection strings
 
 In the Supabase project's **Connect** dialog, copy the **Transaction pooler** URL for `DATABASE_URL` and the **Session pooler** URL for `DIRECT_URL`. Keep the provided host and username; do not infer the pooler host from the region. Percent-encode special characters in the database password.
 
-Use the repository-root `.env.example` as a template. Set `DATABASE_URL` to the Transaction pooler URL and `DIRECT_URL` to the Session pooler URL for local migrations/imports. Do not overwrite the old MySQL connection until it has been copied to `MYSQL_SOURCE_URL` for import. Use `sslmode=verify-full`. If the client cannot validate the certificate chain, download the project's CA certificate and set `NODE_EXTRA_CA_CERTS` to its path. Do not turn off certificate validation.
+Use the repository-root `.env.example` as a template. Set `DATABASE_URL` to the Transaction pooler URL and `DIRECT_URL` to the Session pooler URL for local PostgreSQL migrations. Use `sslmode=verify-full`. If the client cannot validate the certificate chain, download the project's CA certificate and set `NODE_EXTRA_CA_CERTS` to its path. Do not turn off certificate validation.
 
 | Variable | Purpose | Vercel runtime |
 | --- | --- | --- |
 | `DATABASE_URL` | Transaction pooler, port 6543. Must be `postgresql://` | Required |
-| `DIRECT_URL` | Session pooler/direct connection (port 5432) for migrations and import | Local only |
+| `DIRECT_URL` | Session pooler/direct connection (port 5432) for PostgreSQL migrations | Local only |
 | `PORT` | API port, always `5000` in this project | Required |
 | `CORS_ORIGIN` | Comma-separated origins, no spaces | Required |
 | `JWT_SECRET` | Private random secret, at least 32 characters | Required |
 | `LOG_LEVEL` | `debug`, `info` (default), `warn`, `error` | Optional |
 | `DB_POOL_MAX` | Per-function pool size; start at `2` | Recommended |
-| `MYSQL_SOURCE_URL` | Existing MySQL database for one-time import | Local only |
-| `MYSQL_SOURCE_TIMEZONE` | Timezone of old MySQL DATETIME values; defaults to `Asia/Ho_Chi_Minh` | Local only |
 | `REDIS_URL` | Shared Redis for cross-instance 10-minute seat locks. Also accepts `REDIS_HOST`/`REDIS_PORT`/`REDIS_PASSWORD` | Optional; empty means PostgreSQL row locks only |
 | `PAYMENT_PUBLIC_BASE_URL` | Public HTTPS origin the gateways call back into (tunnel or Vercel domain). No trailing slash | Required for real gateway tests |
 | `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET` | VNPay merchant credentials for signed payment and refund requests | Required to enable VNPay |
@@ -141,17 +139,9 @@ All 14 application tables have RLS enabled and deny `anon`/`authenticated` acces
 
 The later payment migration adds the payment transaction ledger and reservation expiry fields. Apply it using the same migration runner before enabling gateway payments. The active Express booking API retains database row-locking and adds Redis `SET NX` locks when `REDIS_URL` is configured. A shared Redis service is needed for those cross-instance locks on Vercel; PostgreSQL seat locking remains the concurrency guard if Redis is not configured.
 
-## 4. Import existing data or bootstrap an empty project
+## 4. Bootstrap a PostgreSQL project
 
-Back up MySQL and stop application writes during the final import/cutover. Keep the source running for read access. From `backend`:
-
-```powershell
-npm run db:import:mysql
-```
-
-The importer supports the legacy MySQL tables listed in `backend/scripts/import-mysql.cjs` (plus the four standard roles). It reads a consistent MySQL snapshot, writes a single PostgreSQL transaction, retains IDs and bcrypt hashes, converts booleans/timestamps, and verifies row counts. It requires empty destination application tables (the four seeded roles are allowed). Unknown source tables/columns, conflicting emails, duplicate active seat sales, orphaned references, or a different role mapping abort the import. It never deletes or updates source data.
-
-If starting empty, skip import. Set private `ADMIN_EMAIL` and `ADMIN_PASSWORD` (12+ characters) locally, then run:
+After applying the PostgreSQL migrations, set private `ADMIN_EMAIL` and `ADMIN_PASSWORD` (12+ characters) locally. From `backend`, run:
 
 ```powershell
 npm run db:create-admin
@@ -161,11 +151,13 @@ Remove `ADMIN_PASSWORD` afterward. This creates a new administrator and never ov
 
 ## 5. Configure and deploy Vercel
 
-Use repository root as the Vercel **Root Directory**, **Other** as the framework preset, and Node.js 22. Repository `vercel.json` supplies installation/build/output settings:
+Use repository root as the Vercel **Root Directory**, **Other** as the framework preset, and Node.js 22. Repository `vercel.json` explicitly selects two builders because the serverless entrypoint lives inside `backend`:
 
-- Install root, backend, and frontend packages using their lockfiles.
-- Compile the Express backend and build the frontend to `frontend/dist`.
-- Route `/api/*` to `api/index.ts` before the SPA fallback.
+- `@vercel/node` builds `backend/api/index.ts` using the backend package and its lockfile. The entrypoint imports `../src/app`.
+- `@vercel/static-build` runs from root `package.json`, installs the root packages automatically, then runs `npm --prefix frontend ci && npm run build:frontend` to build `frontend/dist`. This mounts static files at the site root.
+- Route `/api` and `/api/*` to `backend/api/index.ts`, serve existing static files, and then fall back to `index.html` for frontend routes.
+
+The explicit `builds` configuration is a legacy Vercel option used here to support the nested API entrypoint in one deployment. Do not add a `functions` property alongside it. No root-level `api` folder is needed.
 
 In the target project's **Settings → Environment Variables**, set `DATABASE_URL`, `JWT_SECRET`, and `DB_POOL_MAX=2` for Production. Set Preview separately to a test database. Remove old `VITE_API_URL`/`VITE_API_BASE_URL` overrides so requests use the same Vercel origin. The Supabase URL is a database endpoint, not a replacement for the Express API URL.
 
@@ -214,6 +206,6 @@ On Vercel verify `/api/health` reports `CONNECTED_POSTGRESQL`, then test login, 
 
 ## Rollback
 
-Keep the previous deployment and MySQL backup/volume. Before any new PostgreSQL writes, rollback can restore the previous Vercel deployment and its old API configuration. After new writes, reconcile those records before switching back; rolling back application code alone would lose access to newly created data. Do not run `docker compose down -v` against the old installation.
+Keep the previous deployment and a PostgreSQL backup. Restore the previous Vercel deployment when rolling back application code, and verify it supports the current database schema. Reconcile any newer database writes before restoring a database backup.
 
 Sources: [Supabase connection methods](https://supabase.com/docs/guides/database/connecting-to-postgres), [Vercel Node.js functions](https://vercel.com/docs/functions/runtimes/node-js).

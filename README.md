@@ -156,7 +156,7 @@ Hệ thống sử dụng mô hình kiến trúc Serverless Micro-Architecture k�
                      ▼                                           ▼
        ┌───────────────────────────┐               ┌───────────────────────────┐
        │   Frontend SPA (dist/)    │               │    Serverless Function    │
-       │   React 19 + CSS         │               │      (api/index.ts)       │
+       │   React 19 + CSS         │               │  (backend/api/index.ts)   │
        │   Client-side Routing     │               │   Express RESTful Engine  │
        └───────────────────────────┘               └─────────────┬─────────────┘
                                                                  │
@@ -404,13 +404,11 @@ Kiểm thử tự động và kiểm tra trình duyệt dùng API/cổng giả l
 
 ```plaintext
 Project_Smart_Bus_Ticketing_System_ictu/
-├── .vercel/                           # Cấu hình liên kết dự án Vercel
-├── api/
-│   └── index.ts                       # Entrypoint Vercel Serverless Function cho Express
 ├── backend/
+│   ├── api/
+│   │   └── index.ts                   # Entrypoint Vercel Serverless Function cho Express
 │   ├── scripts/
 │   │   ├── migrate-postgres.cjs       # Trình thực thi Migration PostgreSQL
-│   │   ├── import-mysql.cjs           # Script chuyển đổi dữ liệu MySQL -> PostgreSQL
 │   │   ├── test-postgres.cjs          # Kiểm thử API với PostgreSQL nhúng
 │   │   └── create-admin.cjs           # Tiện ích tạo tài khoản quản trị viên
 │   ├── src/
@@ -472,6 +470,14 @@ Project_Smart_Bus_Ticketing_System_ictu/
 ├── vercel.json                        # Cấu hình điều phối Deployment trên Vercel
 └── README.md                          # Tài liệu hướng dẫn đồ án
 ```
+
+Các cấu hình local (`.agents`, `.agent`, `.vscode`, `.postman`),
+file môi trường riêng, tài liệu chứa DB URL/JWT và kết quả build/test được loại
+khỏi Git. Các mẫu `.env.example` vẫn được chia sẻ. Workflow
+`.github/workflows/ci.yml` được giữ trong Git để tự động kiểm tra lint, test
+và build khi push hoặc mở pull request vào `main`/`develop`. Có thể kiểm tra
+trước khi push bằng `npm run lint`, `npm test`, `npm run build` và
+`npm --prefix backend run test:postgres`.
 
 ---
 
@@ -594,7 +600,7 @@ vào PowerShell mà không bị lỗi cú pháp:
 |  2  | **Nguyễn Hoàng Đức**   | **Frontend Developer**       | Layout Auth, State Management (`AuthContext`), UI Đăng nhập & RBAC   |
 |  3  | **Hà Quang Vinh**      | **Frontend Developer**       | Quản trị tuyến & Sắp xếp trạm dừng xe buýt kéo thả (`@dnd-kit`)      |
 |  4  | **Triệu Văn Thiệp**    | **Frontend Developer**       | Giao diện Trang chủ, Tra cứu thông tin tuyến xe & Kết quả tìm kiếm   |
-|  5  | **La Công Tuấn**       | **Backend Developer**        | Kiến trúc Backend API, Xử lý Đặt vé, Sơ đồ ghế, Vé tháng, Lịch chạy & Báo cáo thống kê |
+|  5  | **La Công Tuấn**       | **Backend Developer**        | Kiến trúc Backend API, Xử lý Đặt vé, Sơ đồ ghế & Sinh mã QR          |
 |  6  | **Tào Hoàng Minh Vũ**  | **Backend Developer**        | Thiết kế CSDL PostgreSQL, Migration Supabase, Bảng mã UTF-8          |
 |  7  | **Nguyễn Minh Đức**    | **Backend Developer**        | API Tìm kiếm chuyến xe (`US01`) & Tối ưu hóa truy vấn CSDL           |
 |  8  | **Mạch Thị Ngọc Ánh**  | **Quality Assurance (QA)**   | Kiểm thử chất lượng phần mềm, lập Test Case, soát vé QR              |

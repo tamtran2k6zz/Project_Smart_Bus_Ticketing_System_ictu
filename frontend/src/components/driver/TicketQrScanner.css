@@ -1,0 +1,108 @@
+.driver-qr-scanner {
+  width: 100%;
+  margin-top: 16px;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow:
+    0 12px 36px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-sizing: border-box;
+}
+
+.driver-qr-scanner__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.driver-qr-scanner__header strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #ffffff;
+  font-size: 16px;
+}
+
+.driver-qr-scanner__header p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 12px;
+}
+
+.driver-qr-scanner__close {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 9999px;
+  background: rgba(239, 68, 68, 0.08);
+  color: #fca5a5;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.driver-qr-scanner__close:hover {
+  background: rgba(239, 68, 68, 0.16);
+}
+
+.driver-qr-scanner__viewport {
+  width: min(100%, 420px);
+  margin: 0 auto;
+  overflow: hidden;
+  border-radius: 16px;
+  background: #000000;
+}
+
+.driver-qr-scanner__viewport video {
+  display: block;
+  width: 100% !important;
+  height: auto !important;
+  object-fit: cover;
+  border-radius: 14px;
+}
+
+.driver-qr-scanner__viewport #driver-qr-reader__scan_region {
+  min-height: 0;
+}
+
+.driver-qr-scanner__viewport img {
+  max-width: 100%;
+}
+
+.driver-qr-scanner__message {
+  margin-top: 12px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+}
+
+.driver-qr-scanner__error {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.08);
+  color: #fca5a5;
+  font-size: 12px;
+}
+
+@media (max-width: 680px) {
+  .driver-qr-scanner {
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  .driver-qr-scanner__header {
+    align-items: flex-start;
+  }
+
+  .driver-qr-scanner__close {
+    padding: 7px 11px;
+  }
+
+  .driver-qr-scanner__viewport {
+    width: 100%;
+  }
+}
