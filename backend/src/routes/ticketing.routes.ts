@@ -450,8 +450,7 @@ router.post(
 
       res.json({
         success: true,
-        message:
-          'Đã mô phỏng thanh toán QR và xác nhận vé. Không có khoản tiền thật được chuyển.',
+        message: 'Đã mô phỏng thanh toán QR và xác nhận vé. Không có khoản tiền thật được chuyển.',
         data: {
           ticketId: completed.ticketId,
           tripId: completed.tripId,
@@ -793,7 +792,9 @@ router.post(
         return;
       }
       if (ticket.departure_time && new Date(ticket.departure_time).getTime() <= Date.now()) {
-        res.status(400).json({ success: false, message: 'Không thể hủy vé sau khi chuyến xe đã khởi hành.' });
+        res
+          .status(400)
+          .json({ success: false, message: 'Không thể hủy vé sau khi chuyến xe đã khởi hành.' });
         return;
       }
       if (req.user?.role !== 'ADMIN' && ticket.user_id !== req.user?.id) {
