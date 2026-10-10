@@ -3,14 +3,14 @@
   "buildCommand": "npm --prefix backend run build && npm --prefix frontend run build",
   "outputDirectory": "frontend/dist",
   "functions": {
-    "vdapter/adapter.js": {
+    "api/index.js": {
       "maxDuration": 30
     }
   },
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "/vdapter/adapter"
+      "destination": "/api/index"
     },
     {
       "source": "/(.*)",
