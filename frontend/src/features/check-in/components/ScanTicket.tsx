@@ -1,15 +1,16 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import type { Html5Qrcode } from 'html5-qrcode';
-import { Camera, ScanLine } from 'lucide-react';
+import { Camera, RefreshCw, ScanLine, TicketCheck, Users } from 'lucide-react';
 import { useSession } from '@/store/session.store';
 import { operationsApi } from '@/features/operations/services/operations.api';
-import { validateTicket } from '../services/checkin.api';
+import { listCheckedInPassengers, validateTicket } from '../services/checkin.api';
 import { PageTitle, Card, Button, Field, Message, AsyncState } from '@/components/ui/Ui';
 import { dateTime, errorText } from '@/utils/format';
 import type { ValidationResult } from '../types';
-import { useQueryClient } from '@tanstack/react-query';
+import styles from './CheckinRoster.module.css';
+
 export function ScanTicket() {
   const user = useSession(s => s.user)!,
     client = useQueryClient(),
@@ -25,11 +26,25 @@ export function ScanTicket() {
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false),
     [camera, setCamera] = useState(false);
+  const checkedInQuery = useQuery({
+    queryKey: ['checked-in-passengers', tripId],
+    queryFn: () => listCheckedInPassengers(tripId),
+    enabled: Boolean(tripId),
+    // Polling lets an additional scanner tab refresh the roster without reloading the page.
+    refetchInterval: 3000,
+    refetchOnWindowFocus: true,
+  });
+  const checkedInTickets = checkedInQuery.data ?? [];
+  const checkedInPassengerCount = checkedInTickets.reduce(
+    (total, ticket) => total + ticket.quantity,
+    0
+  );
   const elementId = 'qr-camera-' + useId().replace(/:/g, '');
   const scanner = useRef<Html5Qrcode | null>(null),
     mounted = useRef(true),
     starting = useRef(false),
     checking = useRef(false);
+
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -42,12 +57,14 @@ export function ScanTicket() {
           .catch(() => undefined);
     };
   }, []);
+
   async function stopCamera() {
     const current = scanner.current;
     if (current?.isScanning) await current.stop();
     current?.clear();
     if (mounted.current) setCamera(false);
   }
+
   async function validate(value: string) {
     if (checking.current) return;
     checking.current = true;
@@ -61,6 +78,7 @@ export function ScanTicket() {
       const r = await validateTicket(user.id, tripId, value);
       if (mounted.current) {
         setResult(r);
+        // Update counts/list immediately after a successful scan; polling also picks up other tabs.
         await client.invalidateQueries();
       }
     } catch (e) {
@@ -70,6 +88,7 @@ export function ScanTicket() {
       if (mounted.current) setBusy(false);
     }
   }
+
   async function startCamera() {
     if (!tripId) {
       setError('Chọn chuyến trước khi bật camera.');
@@ -104,12 +123,13 @@ export function ScanTicket() {
       starting.current = false;
     }
   }
+
   return (
     <>
       <PageTitle
         eyebrow="NHÂN VIÊN · XÁC THỰC VÉ"
         title="Soát vé QR"
-        description="Dịch vụ kiểm tra đúng chuyến, thời hạn và trạng thái sử dụng trước khi ghi nhận."
+        description="Kiểm tra đúng chuyến, thời hạn và trạng thái vé trước khi ghi nhận hành khách lên xe."
       />
       <AsyncState
         query={query}
@@ -125,6 +145,7 @@ export function ScanTicket() {
                 onChange={e => {
                   setTripId(e.target.value);
                   setResult(undefined);
+                  setError('');
                 }}
               >
                 <option value="">Chọn chuyến</option>
@@ -159,8 +180,7 @@ export function ScanTicket() {
               </Button>
             )}
             <p className="muted">
-              Camera chỉ được yêu cầu khi bấm Bật camera. Mã demo phải được soát trên chuyến được
-              phân công.
+              Camera chỉ được yêu cầu khi bấm Bật camera. QR phải thuộc chuyến được phân công.
             </p>
           </Card>
           <Card>
@@ -195,10 +215,99 @@ export function ScanTicket() {
               </Message>
             )}
             <p className="muted">
-              Mỗi QR chỉ sử dụng một lần. Khi ngoại tuyến, hệ thống không tự báo vé hợp lệ.
+              Vé không hợp lệ hoặc đã soát sẽ không làm tăng số khách đã xác nhận lên xe.
             </p>
           </Card>
         </div>
+
+        <Card className={styles.roster}>
+          <div className={styles.rosterHeader}>
+            <div>
+              <h2>Kiểm đếm khách đã soát vé</h2>
+              <p>Danh sách tự cập nhật sau mỗi lượt quét và làm mới định kỳ.</p>
+            </div>
+            <span className={styles.liveTag}>
+              <span className={styles.liveDot} aria-hidden="true" />
+              CẬP NHẬT TRỰC TIẾP
+            </span>
+          </div>
+
+          <div className={styles.stats} aria-live="polite" aria-atomic="true">
+            <div className={styles.stat}>
+              <span className={styles.statIcon}>
+                <Users size={21} />
+              </span>
+              <div>
+                <div className={styles.statLabel}>Hành khách đã soát</div>
+                <div className={styles.statValue}>{checkedInPassengerCount}</div>
+              </div>
+            </div>
+            <div className={styles.stat}>
+              <span className={styles.statIcon}>
+                <TicketCheck size={21} />
+              </span>
+              <div>
+                <div className={styles.statLabel}>Vé đã xác nhận</div>
+                <div className={styles.statValue}>{checkedInTickets.length}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.listHeader}>
+            <h3>Danh sách vé hợp lệ</h3>
+            <small>
+              {checkedInQuery.isFetching && <RefreshCw size={12} className="inlineIcon" />}{' '}
+              Làm mới mỗi 3 giây
+            </small>
+          </div>
+
+          {!tripId ? (
+            <div className={styles.emptyState}>
+              <strong>Chưa chọn chuyến</strong>
+              Chọn chuyến được phân công để xem danh sách khách đã soát vé.
+            </div>
+          ) : checkedInQuery.isError ? (
+            <Message error>Không tải được danh sách soát vé: {errorText(checkedInQuery.error)}</Message>
+          ) : checkedInQuery.isPending ? (
+            <div className={styles.emptyState}>Đang tải danh sách đã soát…</div>
+          ) : checkedInTickets.length === 0 ? (
+            <div className={styles.emptyState}>
+              <strong>Chưa có khách nào được soát vé</strong>
+              Khi quét thành công QR của chuyến này, danh sách sẽ tự cập nhật tại đây.
+            </div>
+          ) : (
+            <ul className={styles.list}>
+              {checkedInTickets.map(ticket => (
+                <li className={styles.ticketRow} key={ticket.ticketId}>
+                  <div className={styles.passengerInfo}>
+                    <div className={styles.passengerName}>{ticket.passengerName}</div>
+                    <div className={styles.ticketMeta}>
+                      <span>
+                        {ticket.seatNumbers.length > 0
+                          ? 'Ghế ' + ticket.seatNumbers.join(', ')
+                          : 'Không áp dụng số ghế'}
+                      </span>
+                      <span>
+                        {ticket.checkedInAt
+                          ? 'Đã soát lúc ' +
+                            new Date(ticket.checkedInAt).toLocaleTimeString('vi-VN', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit',
+                            })
+                          : 'Đã soát trước đó'}
+                      </span>
+                    </div>
+                    <div className={styles.ticketCode}>Mã vé: {ticket.ticketCode}</div>
+                  </div>
+                  <span className={styles.ticketCount}>
+                    {ticket.quantity} khách
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
       </AsyncState>
     </>
   );
