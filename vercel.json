@@ -4,12 +4,8 @@
   "outputDirectory": "frontend/dist",
   "functions": {
     "api/adapter.js": {
-<<<<<<< HEAD
       "maxDuration": 30,
       "includeFiles": "backend/dist/**"
-=======
-      "maxDuration": 30
->>>>>>> 38383959780a839f5a5a877cfd7f471018847d6e
     }
   },
   "rewrites": [

@@ -154,7 +154,8 @@ async function getRouteStopsForTrip(
   const rows = await query<
     Array<{ id: string; name: string; latitude: number; longitude: number; sequence: number }>
   >(
-    `SELECT bs.id, bs.name, bs.latitude, bs.longitude, rs.stop_order AS sequence
+    `SELECT bs.id, bs.name, bs.latitude::double precision AS latitude,
+            bs.longitude::double precision AS longitude, rs.stop_order AS sequence
      FROM trips t
      JOIN route_stops rs ON rs.route_id = t.route_id
      JOIN bus_stops bs ON bs.id = rs.stop_id
