@@ -18,7 +18,7 @@ Cập nhật ngày **11/10/2026**, theo mã nguồn `main` sau bản sửa confl
 - Backend có quản lý tuyến/trạm/xe/lịch chạy/nhân sự, phân công tài xế, vé tháng, ưu đãi, thông báo, phản ánh và báo cáo. Quyền được kiểm tra tại API.
 - Khôi phục mật khẩu trực tuyến hiện trả HTTP 503. ZaloPay và mua vé không chọn ghế chưa được hỗ trợ trong luồng API hiện tại. Lựa chọn `Card` dùng luồng VNPay.
 
-Các kiểm tra cục bộ đã đạt: typecheck, lint, build, **66 test backend**, **53 test Vitest frontend**, **8 test theme** và **272 kiểm tra API/database**, bao gồm hợp đồng frontend và email. Kết quả này dùng database PostgreSQL nhúng, gateway và SMTP giả lập; nghiệm thu thanh toán/email thật cần cấu hình dịch vụ và kiểm tra riêng.
+Các kiểm tra cục bộ đã đạt: typecheck, lint, build, **66 test backend**, **59 test Vitest frontend**, **8 test theme** và **297 kiểm tra API/database**, bao gồm hợp đồng frontend và email. Kết quả này dùng database PostgreSQL nhúng, gateway và SMTP giả lập; nghiệm thu thanh toán/email thật cần cấu hình dịch vụ và kiểm tra riêng.
 
 ## Mục lục
 
@@ -240,6 +240,8 @@ Trạng thái email `sent` nghĩa SMTP chấp nhận thư. Luồng và hướng 
 ## Thanh toán và soát vé
 
 - **API frontend mới:** MoMo hoặc VNPay; lựa chọn `Card` được xử lý qua VNPay. Gateway merchant phải được cấu hình ở backend.
+- **Tiếp tục hoặc đổi thanh toán:** khi giao dịch đang chờ và giữ chỗ còn hiệu lực, khách có thể mở lại cổng hiện tại hoặc chọn phương thức khác. Đổi cổng tạo mã giao dịch mới, giữ nguyên ghế và thời hạn giữ chỗ. Xác nhận thành công đến muộn từ giao dịch cũ đi qua luồng hoàn tiền, không phát hành thêm vé. Vé đã thanh toán và giữ chỗ hết hạn không được đổi cổng.
+- **Lỗi khởi tạo cổng:** API trả 502 kèm hướng dẫn thử lại hoặc đổi phương thức; checkout không khóa khách vì bản ghi thanh toán còn ở trạng thái chờ. Thiếu thông tin merchant vẫn cần được cấu hình trên môi trường chạy backend/Vercel.
 - **Frontend demo:** có thể chọn kết quả thanh toán mô phỏng. Thao tác này chỉ cập nhật dữ liệu demo trong trình duyệt.
 - **API legacy QR demo:** `POST /api/v1/ticketing/bookings` yêu cầu `paymentMethod` rõ ràng: `MOMO`, `VNPAY` hoặc `QR`; thiếu/sai phương thức trả 400. `QR` tạo giữ chỗ `RESERVED/PENDING`. Endpoint `/bookings/:ticketId/demo-complete` chỉ bật khi `PAYMENT_DEMO_ENABLED=true` ngoài production; xác nhận vé và giữ nguyên trạng thái chuyến.
 

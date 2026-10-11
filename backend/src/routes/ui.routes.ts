@@ -520,17 +520,44 @@ router.post(
       const {
         rows: [locked],
       } = await client.query('SELECT ticket_id FROM ui_bookings WHERE id=$1 FOR UPDATE', [b.id]);
+      let existingPayment: any;
       if (locked.ticket_id) {
         const {
           rows: [p],
-        } = await client.query('SELECT * FROM payment_transactions WHERE ticket_id=$1', [
-          locked.ticket_id,
-        ]);
-        if (p.status === 'PENDING' && p.payment_method === method) return locked.ticket_id;
-        fail('Giao dịch cũ đã đóng hoặc dùng cổng khác. Vui lòng đặt lại.', 409);
+        } = await client.query(
+          `SELECT p.*,t.status AS ticket_status
+          FROM payment_transactions p JOIN tickets t ON t.id=p.ticket_id
+          WHERE p.ticket_id=$1 FOR UPDATE OF p,t`,
+          [locked.ticket_id]
+        );
+        if (p?.status === 'SUCCESS' && ['BOOKED', 'CHECKED_IN'].includes(p.ticket_status))
+          return locked.ticket_id;
+        if (p?.status !== 'PENDING' || p.ticket_status !== 'RESERVED')
+          fail('Giao dịch đã đóng. Vui lòng đặt lại.', 409);
+        existingPayment = p;
       }
       const h = await getHold(b.hold_id, req.user!.id, client);
       if (h.status !== 'active') fail('Giữ chỗ hết hạn.', 409);
+      if (locked.ticket_id) {
+        if (existingPayment.payment_method === method && existingPayment.payment_url)
+          return locked.ticket_id;
+        // Keep each gateway order immutable. A late success for the cancelled ticket
+        // follows the existing late-payment refund flow instead of issuing a second ticket.
+        // Without a saved URL, the provider may have accepted an earlier timed-out request;
+        // retry with a new order instead of reusing an ambiguous MoMo order id.
+        await client.query("UPDATE payment_transactions SET status='FAILED' WHERE ticket_id=$1", [
+          locked.ticket_id,
+        ]);
+        await client.query(
+          "UPDATE tickets SET status='CANCELLED',reservation_expires_at=NULL WHERE id=$1",
+          [locked.ticket_id]
+        );
+        await client.query(
+          `UPDATE trip_seats SET ticket_id=NULL
+          WHERE ticket_id=$1 AND status='LOCKED' AND locked_by_user_id=$2`,
+          [locked.ticket_id, req.user!.id]
+        );
+      }
       const ticket = await reserveSeatForPayment(
         h.tripId,
         h.seatIds[0],
@@ -569,19 +596,30 @@ router.post(
       return ticket.id;
     });
     let updated = await ownBooking(b.id, req.user!.id);
+    if (updated.ticket_id !== ticketId)
+      fail('Phương thức thanh toán đã thay đổi. Vui lòng thử lại.', 409);
+    if (bookingDto(updated).status === 'paid') return paymentDto(updated);
     if (!updated.payment_url) {
-      const url = await gateway.createPaymentUrl(
-        method,
-        ticketId,
-        Number(b.total),
-        req.ip?.replace(/^::ffff:/, '') || '127.0.0.1'
-      );
+      let url: string;
+      try {
+        url = await gateway.createPaymentUrl(
+          method,
+          ticketId,
+          Number(b.total),
+          req.ip?.replace(/^::ffff:/, '') || '127.0.0.1'
+        );
+      } catch {
+        fail('Không khởi tạo được cổng thanh toán. Hãy thử lại hoặc chọn phương thức khác.', 502);
+      }
       await query(
         'UPDATE payment_transactions SET payment_url=$1 WHERE ticket_id=$2 AND payment_url IS NULL',
         [url, ticketId]
       );
       updated = await ownBooking(b.id, req.user!.id);
     }
+    if (updated.ticket_id !== ticketId)
+      fail('Phương thức thanh toán đã thay đổi. Vui lòng thử lại.', 409);
+    if (bookingDto(updated).status === 'expired') fail('Giữ chỗ hết hạn.', 409);
     return paymentDto(updated);
   })
 );

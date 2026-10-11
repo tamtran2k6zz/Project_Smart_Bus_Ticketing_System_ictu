@@ -28,8 +28,14 @@ module.exports = async ({
   const passenger = registered.data.tokens.accessToken;
   assert.equal(registered.data.user.emailVerified, false);
   assert.equal(registered.data.emailSent, false);
-  await call('post', prefix + '/holds', {tripId:'unverified',seatIds:['A01'],quantity:1},passenger,403);
-  await db.query('UPDATE users SET email_verified_at=NOW() WHERE id=$1',[registered.data.user.id]);
+  await call(
+    'post',
+    prefix + '/holds',
+    { tripId: 'unverified', seatIds: ['A01'], quantity: 1 },
+    passenger,
+    403
+  );
+  await db.query('UPDATE users SET email_verified_at=NOW() WHERE id=$1', [registered.data.user.id]);
   const trip = (
     await call(
       'post',
@@ -81,6 +87,231 @@ module.exports = async ({
   assert.ok(catalog.stops.some(s => s.id === stops[0]));
   const session = await call('get', prefix + '/auth/session', null, passenger);
   assert.ok(session.data.id);
+  // Changing gateway replaces the attempt, but keeps the original seats and deadline.
+  const switchingHold = await call(
+    'post',
+    prefix + '/holds',
+    { tripId: trip, seatIds: ['A08', 'A09'], quantity: 2 },
+    passenger
+  );
+  const switchingBooking = await call(
+    'post',
+    prefix + '/bookings',
+    { holdId: switchingHold.id, name: 'Đổi thanh toán', phone: '0901234567' },
+    passenger
+  );
+  const originalPayment = await call(
+    'post',
+    prefix + '/payments',
+    { bookingId: switchingBooking.id, gateway: 'MoMo' },
+    passenger
+  );
+  await call(
+    'post',
+    prefix + '/payments',
+    { bookingId: switchingBooking.id, gateway: 'VNPay' },
+    other,
+    404
+  );
+  const switchedPayment = await call(
+    'post',
+    prefix + '/payments',
+    { bookingId: switchingBooking.id, gateway: 'VNPay' },
+    passenger
+  );
+  assert.equal(switchedPayment.gateway, 'VNPay');
+  assert.notEqual(switchedPayment.id, originalPayment.id);
+  const restoredPayment = await call(
+    'post',
+    prefix + '/payments',
+    { bookingId: switchingBooking.id, gateway: 'MoMo' },
+    passenger
+  );
+  assert.notEqual(restoredPayment.id, originalPayment.id);
+  assert.equal(
+    (await call('get', prefix + '/holds/' + switchingHold.id, null, passenger)).expiresAt,
+    switchingHold.expiresAt
+  );
+  assert.equal(
+    (
+      await db.query(
+        "SELECT count(*)::int AS n FROM trip_seats WHERE ticket_id=$1 AND status='LOCKED'",
+        [restoredPayment.id]
+      )
+    ).rows[0].n,
+    2
+  );
+  // A success arriving from an obsolete URL is refunded; it cannot confirm the new booking.
+  await call(
+    'post',
+    '/api/v1/ticketing/payments/momo/ipn',
+    momoCallback(originalPayment.id, 30000, 90002),
+    null
+  );
+  assert.equal(
+    (
+      await db.query('SELECT status FROM payment_transactions WHERE ticket_id=$1', [
+        originalPayment.id,
+      ])
+    ).rows[0].status,
+    'REFUNDED'
+  );
+  assert.equal(
+    (await call('get', prefix + '/bookings/' + switchingBooking.id, null, passenger)).status,
+    'pending'
+  );
+  await call(
+    'post',
+    '/api/v1/ticketing/payments/momo/ipn',
+    momoCallback(restoredPayment.id, 30000, 90003),
+    null
+  );
+  assert.equal(
+    (await call('get', prefix + '/bookings/' + switchingBooking.id, null, passenger)).status,
+    'paid'
+  );
+  assert.equal(
+    (
+      await call(
+        'post',
+        prefix + '/payments',
+        { bookingId: switchingBooking.id, gateway: 'VNPay' },
+        passenger
+      )
+    ).id,
+    restoredPayment.id
+  );
+  // A provider/configuration failure after reservation must allow retry and switching.
+  const retryHold = await call(
+    'post',
+    prefix + '/holds',
+    { tripId: trip, seatIds: ['B08'], quantity: 1 },
+    passenger
+  );
+  const retryBooking = await call(
+    'post',
+    prefix + '/bookings',
+    { holdId: retryHold.id, name: 'Thử lại thanh toán', phone: '0901234567' },
+    passenger
+  );
+  const accessKey = process.env.MOMO_ACCESS_KEY;
+  process.env.MOMO_ACCESS_KEY = '';
+  try {
+    await call(
+      'post',
+      prefix + '/payments',
+      { bookingId: retryBooking.id, gateway: 'MoMo' },
+      passenger,
+      502
+    );
+  } finally {
+    process.env.MOMO_ACCESS_KEY = accessKey;
+  }
+  const incompletePayment = await call(
+    'get',
+    prefix + '/bookings/' + retryBooking.id + '/payment',
+    null,
+    passenger
+  );
+  assert.equal(incompletePayment.status, 'pending');
+  assert.equal(incompletePayment.redirectUrl, undefined);
+  const retriedPayment = await call(
+    'post',
+    prefix + '/payments',
+    { bookingId: retryBooking.id, gateway: 'MoMo' },
+    passenger
+  );
+  assert.notEqual(retriedPayment.id, incompletePayment.id);
+  assert.ok(retriedPayment.redirectUrl);
+  const retrySwitched = await call(
+    'post',
+    prefix + '/payments',
+    { bookingId: retryBooking.id, gateway: 'Card' },
+    passenger
+  );
+  assert.equal(retrySwitched.gateway, 'VNPay');
+  assert.notEqual(retrySwitched.id, retriedPayment.id);
+  assert.equal(
+    (
+      await call(
+        'post',
+        prefix + '/payments',
+        { bookingId: retryBooking.id, gateway: 'VNPay' },
+        passenger
+      )
+    ).id,
+    retrySwitched.id
+  );
+  await db.query("UPDATE ui_holds SET expires_at=NOW()-INTERVAL '1 second' WHERE id=$1", [
+    retryHold.id,
+  ]);
+  await call(
+    'post',
+    prefix + '/payments',
+    { bookingId: retryBooking.id, gateway: 'Card' },
+    passenger,
+    409
+  );
+  await call(
+    'post',
+    prefix + '/payments',
+    { bookingId: retryBooking.id, gateway: 'MoMo' },
+    passenger,
+    409
+  );
+
+  // A slower first request must not redirect the browser to the replaced gateway.
+  const raceHold = await call(
+    'post',
+    prefix + '/holds',
+    { tripId: trip, seatIds: ['B09'], quantity: 1 },
+    passenger
+  );
+  const raceBooking = await call(
+    'post',
+    prefix + '/bookings',
+    { holdId: raceHold.id, name: 'Hai tab thanh toán', phone: '0901234567' },
+    passenger
+  );
+  const { PaymentGatewayService } = require('../dist/services/payment-gateway.service');
+  const createUrl = PaymentGatewayService.prototype.createPaymentUrl;
+  let releaseUrl, notifyStarted;
+  const blockedUrl = new Promise(resolve => {
+    releaseUrl = resolve;
+  });
+  const urlStarted = new Promise(resolve => {
+    notifyStarted = resolve;
+  });
+  PaymentGatewayService.prototype.createPaymentUrl = async function (method, ...args) {
+    if (method === 'MOMO') {
+      notifyStarted();
+      await blockedUrl;
+    }
+    return createUrl.call(this, method, ...args);
+  };
+  try {
+    const firstRequest = request(app)
+      .post(prefix + '/payments')
+      .set('Authorization', 'Bearer ' + passenger)
+      .send({ bookingId: raceBooking.id, gateway: 'MoMo' })
+      .then(response => response);
+    await urlStarted;
+    const activePayment = await call(
+      'post',
+      prefix + '/payments',
+      { bookingId: raceBooking.id, gateway: 'VNPay' },
+      passenger
+    );
+    releaseUrl();
+    assert.equal((await firstRequest).status, 409);
+    assert.equal(
+      (await call('get', prefix + '/bookings/' + raceBooking.id + '/payment', null, passenger)).id,
+      activePayment.id
+    );
+  } finally {
+    releaseUrl();
+    PaymentGatewayService.prototype.createPaymentUrl = createUrl;
+  }
   const hold = await call(
     'post',
     prefix + '/holds',

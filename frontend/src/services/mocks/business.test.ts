@@ -32,6 +32,18 @@ async function paid(seat = '01') {
   return result;
 }
 describe('demo business transactions', () => {
+  it('switches pending payment without extending the hold or confirming an obsolete attempt', async () => {
+    const { h, b, p } = await book();
+    expect((await paymentApi.start(b.id, 'u0', 'MoMo')).id).toBe(p.id);
+    const switched = await paymentApi.start(b.id, 'u0', 'VNPay');
+    expect(switched.gateway).toBe('VNPay');
+    expect(switched.id).not.toBe(p.id);
+    expect((await bookingApi.hold(h.id, 'u0')).expiresAt).toBe(h.expiresAt);
+    expect((await paymentApi.confirmDemo(p.id, 'u0', 'paid')).status).toBe('canceled');
+    expect((await bookingApi.booking(b.id, 'u0')).status).toBe('pending');
+    await paymentApi.confirmDemo(switched.id, 'u0', 'paid');
+    expect(await ticketsApi.list('u0')).toHaveLength(1);
+  });
   it('finds ordered intermediate stops and persists the selected journey through checkout', async () => {
     const results = await bookingApi.search({
       from: 'Đại học ICTU',

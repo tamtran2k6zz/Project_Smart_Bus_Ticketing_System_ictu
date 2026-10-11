@@ -17,7 +17,8 @@ export const paymentApi = {
         if (!hold || hold.status !== 'active' || !['pending', 'failed'].includes(b.status))
           throw new Error('Đặt vé đã hết hạn hoặc đã hủy.');
         const existing = db.payments.find(p => p.bookingId === bookingId && p.status === 'pending');
-        if (existing) return existing;
+        if (existing?.gateway === gateway) return existing;
+        if (existing) existing.status = 'canceled';
         const p: Payment = {
           id: uid('p'),
           bookingId,

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { CreditCard, ShieldCheck } from 'lucide-react';
@@ -38,6 +38,10 @@ export function Checkout() {
     queryFn: () => paymentApi.latest(bookingId, user.id),
     refetchInterval: 4000,
   });
+  const savedGateway = payment.data?.gateway;
+  useEffect(() => {
+    if (savedGateway) setGateway(savedGateway);
+  }, [payment.data?.id, savedGateway]);
   const hold = useQuery({
     queryKey: ['hold', query.data?.holdId, user.id],
     queryFn: () => bookingApi.hold(query.data!.holdId, user.id),
@@ -46,6 +50,12 @@ export function Checkout() {
   const start = useAction(
     async () => {
       const p = await paymentApi.start(bookingId, user.id, gateway);
+      if (p.status !== 'pending') {
+        navigate('/payment/result?bookingId=' + bookingId);
+        return;
+      }
+      if (!appConfig.demo && !p.redirectUrl)
+        throw new Error('Chưa có liên kết thanh toán. Hãy thử lại hoặc chọn phương thức khác.');
       if (p.redirectUrl && !appConfig.demo) {
         const url = new URL(p.redirectUrl);
         if (url.protocol !== 'https:') throw new Error('URL cổng thanh toán không an toàn.');
@@ -63,7 +73,11 @@ export function Checkout() {
   });
   const b = query.data,
     canPay =
-      b && ['pending', 'failed'].includes(b.status) && !expired && hold.data?.status === 'active';
+      b && ['pending', 'failed'].includes(b.status) && !expired && hold.data?.status === 'active',
+    busy = start.isPending || confirm.isPending || payment.isPending || payment.isError,
+    sameGateway =
+      savedGateway === gateway ||
+      (!appConfig.demo && savedGateway === 'VNPay' && gateway === 'Card');
   return (
     <>
       <PageTitle
@@ -104,13 +118,19 @@ export function Checkout() {
                         name="gateway"
                         checked={gateway === value}
                         onChange={() => setGateway(value)}
-                        disabled={!canPay || payment.data?.status === 'pending'}
+                        disabled={!canPay || busy}
                       />
                       <CreditCard size={19} />
                       {value === 'Card' ? 'Thẻ ngân hàng' : value}
                     </label>
                   ))}
                 </div>
+                {payment.data?.status === 'pending' && canPay && (
+                  <p className="muted">
+                    Giao dịch {savedGateway} đang chờ thanh toán. Bạn có thể tiếp tục hoặc chọn
+                    phương thức khác trong thời gian giữ chỗ.
+                  </p>
+                )}
                 <ActionMessage action={start} />
                 <ActionMessage action={confirm} />
                 <Message error>
@@ -124,11 +144,14 @@ export function Checkout() {
                 {b.status === 'paid' ? (
                   <LinkButton to={'/payment/result?bookingId=' + b.id}>Xem kết quả</LinkButton>
                 ) : (
-                  <Button
-                    disabled={!canPay || start.isPending || payment.data?.status === 'pending'}
-                    onClick={() => start.mutate(undefined)}
-                  >
-                    Khởi tạo {appConfig.demo ? 'giao dịch demo' : 'thanh toán'} · {money(b.total)}
+                  <Button disabled={!canPay || busy} onClick={() => start.mutate(undefined)}>
+                    {payment.data?.status === 'pending'
+                      ? sameGateway
+                        ? 'Tiếp tục thanh toán'
+                        : 'Đổi phương thức & thanh toán'
+                      : 'Khởi tạo ' + (appConfig.demo ? 'giao dịch demo' : 'thanh toán')}
+                    {' · '}
+                    {money(b.total)}
                   </Button>
                 )}
                 {appConfig.demo && payment.data?.status === 'pending' && canPay && (
@@ -150,7 +173,7 @@ export function Checkout() {
                         <Button
                           key={status}
                           variant={status === 'paid' ? 'primary' : 'secondary'}
-                          disabled={confirm.isPending}
+                          disabled={busy}
                           onClick={() => confirm.mutate(status)}
                         >
                           {label}
