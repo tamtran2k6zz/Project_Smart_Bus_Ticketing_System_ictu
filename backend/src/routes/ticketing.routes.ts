@@ -86,20 +86,19 @@ async function confirmPayment(
     }
     if (!['PENDING', 'FAILED'].includes(payment.status)) return 'INVALID';
 
-    const {
-      rows: [seat],
-    } = await client.query(
-      `SELECT status, ticket_id FROM trip_seats WHERE trip_id=$1 AND seat_number=$2 FOR UPDATE`,
-      [payment.trip_id, payment.seat_number]
+    const { rows: seats } = await client.query(
+      `SELECT status FROM trip_seats WHERE trip_id=$1 AND ticket_id=$2 FOR UPDATE`,
+      [payment.trip_id, payment.ticket_id]
     );
 
-    const seatTakenByOther =
-      seat &&
-      ['BOOKED', 'CHECKED_IN'].includes(seat.status) &&
-      seat.ticket_id !== payment.ticket_id;
+    // The UI can reserve multiple seats on one ticket. Never reclaim a seat
+    // that has since been released or assigned to another customer's booking.
+    const seatsUnavailable =
+      seats.length !== Number(payment.quantity) ||
+      seats.some(seat => !['LOCKED', 'BOOKED', 'CHECKED_IN'].includes(seat.status));
 
     const expired =
-      seatTakenByOther ||
+      seatsUnavailable ||
       payment.ticket_status === 'CANCELLED' ||
       (payment.reservation_expires_at &&
         new Date(payment.reservation_expires_at).getTime() + 15 * 60 * 1000 <= Date.now());
@@ -118,8 +117,8 @@ async function confirmPayment(
     );
     await client.query(
       `UPDATE trip_seats SET status='BOOKED',ticket_id=$1,locked_at=NULL,lock_expires_at=NULL,
-       locked_by_user_id=NULL,redis_lock_id=NULL WHERE trip_id=$2 AND seat_number=$3`,
-      [payment.ticket_id, payment.trip_id, payment.seat_number]
+       locked_by_user_id=NULL,redis_lock_id=NULL WHERE ticket_id=$1 AND trip_id=$2`,
+      [payment.ticket_id, payment.trip_id]
     );
     await client.query('UPDATE trips SET booked_seats=booked_seats+$2 WHERE id=$1', [
       payment.trip_id,

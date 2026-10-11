@@ -722,6 +722,12 @@ async function main() {
       ).rows[0].status,
       'PENDING'
     );
+    // Preserve main's short callback grace period while the seats still belong
+    // to this reservation and have not been released or reassigned.
+    await db.query(
+      "UPDATE tickets SET reservation_expires_at=NOW()-INTERVAL '1 minute' WHERE id=$1",
+      [vnpayReservation.ticketId]
+    );
     const vnpayReturn = await request(app)
       .get('/api/v1/ticketing/payments/vnpay/return')
       .query({ ...vnpayPayload, path: 'v1/ticketing/payments/vnpay/return' });

@@ -374,6 +374,16 @@ module.exports = async ({
     (await call('get', prefix + '/holds/' + hold.id, null, passenger)).status,
     'converted'
   );
+  assert.equal(
+    (
+      await db.query(
+        "SELECT count(*)::int AS n FROM trip_seats WHERE ticket_id=$1 AND status='BOOKED'",
+        [payment.id]
+      )
+    ).rows[0].n,
+    2,
+    'A confirmed two-seat payment must book both seats'
+  );
   let ticket = (await call('get', prefix + '/tickets', null, passenger)).find(
     t => t.bookingId === booking.id
   );
