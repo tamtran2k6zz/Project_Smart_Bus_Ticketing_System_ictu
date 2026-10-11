@@ -86,12 +86,17 @@ async function confirmPayment(
     }
     if (!['PENDING', 'FAILED'].includes(payment.status)) return 'INVALID';
 
-    const { rows: [seat] } = await client.query(
+    const {
+      rows: [seat],
+    } = await client.query(
       `SELECT status, ticket_id FROM trip_seats WHERE trip_id=$1 AND seat_number=$2 FOR UPDATE`,
       [payment.trip_id, payment.seat_number]
     );
 
-    const seatTakenByOther = seat && ['BOOKED', 'CHECKED_IN'].includes(seat.status) && seat.ticket_id !== payment.ticket_id;
+    const seatTakenByOther =
+      seat &&
+      ['BOOKED', 'CHECKED_IN'].includes(seat.status) &&
+      seat.ticket_id !== payment.ticket_id;
 
     const expired =
       seatTakenByOther ||
