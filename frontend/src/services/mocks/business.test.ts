@@ -177,8 +177,12 @@ describe('demo business transactions', () => {
     expect((await validateTicket('u4', tripId, 'invalid')).valid).toBe(false);
     expect((await validateTicket('u4', 't1', t.token)).message).toContain('chuyến khác');
     await expect(validateTicket('u1', tripId, t.token)).rejects.toThrow('phân công');
+    expect((await validateTicket('u4', tripId, t.token)).message).toContain('Chuyến chưa mở');
+    const originalTime = Date.now();
+    vi.setSystemTime(new Date(Date.parse((await bookingApi.trip(tripId)).departure) - 10 * 60000));
     expect((await validateTicket('u4', tripId, t.token)).valid).toBe(true);
     expect((await validateTicket('u4', tripId, t.token)).message).toContain('đã được sử dụng');
+    vi.setSystemTime(new Date(originalTime));
     await paid('02');
     const t2 = (await ticketsApi.list('u0'))[0];
     vi.setSystemTime(new Date(Date.parse(t2.expiresAt) + 1000));

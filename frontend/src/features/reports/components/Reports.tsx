@@ -174,11 +174,15 @@ export function Reports() {
                       <p>
                         {money(r.total)}{' '}
                         <Badge tone={r.refund === 'pending' ? 'amber' : 'green'}>
-                          {r.refund === 'pending' ? 'Chờ hoàn' : 'Đã hoàn demo'}
+                          {r.refund === 'pending'
+                            ? 'Chờ hoàn'
+                            : appConfig.demo
+                              ? 'Đã hoàn demo'
+                              : 'Đã hoàn tiền'}
                         </Badge>
                       </p>
                     </div>
-                    {r.refund === 'pending' && (
+                    {appConfig.demo && r.refund === 'pending' && (
                       <Button
                         variant="secondary"
                         disabled={refund.isPending}

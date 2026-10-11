@@ -15,5 +15,7 @@ export interface User {
   phone: string;
   role: Role;
   active: boolean;
+  emailVerified?: boolean;
+  emailVerificationNotice?: string;
   permissions: Permission[];
 }

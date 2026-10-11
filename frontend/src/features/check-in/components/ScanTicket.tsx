@@ -27,8 +27,8 @@ export function ScanTicket() {
     [busy, setBusy] = useState(false),
     [camera, setCamera] = useState(false);
   const checkedInQuery = useQuery({
-    queryKey: ['checked-in-passengers', tripId],
-    queryFn: () => listCheckedInPassengers(tripId),
+    queryKey: ['checked-in-passengers', tripId, user.id],
+    queryFn: () => listCheckedInPassengers(tripId, user.id),
     enabled: Boolean(tripId),
     // Polling lets an additional scanner tab refresh the roster without reloading the page.
     refetchInterval: 3000,
@@ -256,8 +256,8 @@ export function ScanTicket() {
           <div className={styles.listHeader}>
             <h3>Danh sách vé hợp lệ</h3>
             <small>
-              {checkedInQuery.isFetching && <RefreshCw size={12} className="inlineIcon" />}{' '}
-              Làm mới mỗi 3 giây
+              {checkedInQuery.isFetching && <RefreshCw size={12} className="inlineIcon" />} Làm mới
+              mỗi 3 giây
             </small>
           </div>
 
@@ -267,7 +267,9 @@ export function ScanTicket() {
               Chọn chuyến được phân công để xem danh sách khách đã soát vé.
             </div>
           ) : checkedInQuery.isError ? (
-            <Message error>Không tải được danh sách soát vé: {errorText(checkedInQuery.error)}</Message>
+            <Message error>
+              Không tải được danh sách soát vé: {errorText(checkedInQuery.error)}
+            </Message>
           ) : checkedInQuery.isPending ? (
             <div className={styles.emptyState}>Đang tải danh sách đã soát…</div>
           ) : checkedInTickets.length === 0 ? (
@@ -300,9 +302,7 @@ export function ScanTicket() {
                     </div>
                     <div className={styles.ticketCode}>Mã vé: {ticket.ticketCode}</div>
                   </div>
-                  <span className={styles.ticketCount}>
-                    {ticket.quantity} khách
-                  </span>
+                  <span className={styles.ticketCount}>{ticket.quantity} khách</span>
                 </li>
               ))}
             </ul>

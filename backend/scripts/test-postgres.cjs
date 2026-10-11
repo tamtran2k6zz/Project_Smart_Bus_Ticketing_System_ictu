@@ -6,6 +6,7 @@ const { createServer } = require('node:http');
 const { PGlite } = require('@electric-sql/pglite');
 const request = require('supertest');
 process.env.JWT_SECRET = 'test-only-secret-at-least-32-characters-long';
+process.env.ENABLE_DEMO_PAYMENTS = 'true';
 process.env.MOMO_PARTNER_CODE = 'test-partner';
 process.env.MOMO_ACCESS_KEY = 'test-access-key';
 process.env.MOMO_SECRET_KEY = 'test-secret-key';
@@ -38,6 +39,7 @@ async function main() {
   delete process.env.REDIS_HOST;
   delete process.env.REDIS_PORT;
   delete process.env.REDIS_PASSWORD;
+  delete process.env.SMTP_HOST;
   const gatewayServer = createServer((req, res) => {
     let body = '';
     req.setEncoding('utf8');
@@ -83,12 +85,31 @@ async function main() {
   const app = require('../dist/app').default;
   let checks = 0;
   const call = async (method, url, body, token, status = 200) => {
+    // Existing paid-seat fixtures now explicitly reserve QR and confirm using the
+    // opt-in LOCAL demo endpoint. Production rejection is tested separately.
+    const paidFixture =
+      method === 'post' &&
+      /^\/api\/(v1\/)?ticketing\/bookings$/.test(url) &&
+      body?.paymentMethod === undefined;
+    if (paidFixture) body = { ...body, paymentMethod: 'QR' };
+    if (url.endsWith('/verify')) body = { ...body, manual: true };
     let r = request(app)[method](url);
     if (token) r = r.set('Authorization', 'Bearer ' + token);
     if (body) r = r.send(body);
     const response = await r;
     assert.equal(response.status, status, JSON.stringify(response.body));
     checks++;
+    if (paidFixture && response.status === 201) {
+      const id = response.body.ticketId;
+      const paid = await request(app)
+        .post('/api/ticketing/bookings/' + id + '/demo-complete')
+        .set('Authorization', 'Bearer ' + token)
+        .send({});
+      assert.equal(paid.status, 200, JSON.stringify(paid.body));
+      response.body.qrCode =
+        'SMARTBUS-QR-' +
+        (await db.query('SELECT ticket_code FROM tickets WHERE id=$1', [id])).rows[0].ticket_code;
+    }
     return response.body;
   };
   const momoCallback = (orderId, amount, transId) => {
@@ -141,6 +162,8 @@ async function main() {
     const passenger = first.data.tokens.accessToken;
     const second = await register('other@example.test');
     const other = second.data.tokens.accessToken;
+    // Paid-seat fixtures are already verified; verification itself is exercised separately.
+    await db.query('UPDATE users SET email_verified_at=NOW() WHERE id=ANY($1::text[])', [[first.data.user.id, second.data.user.id]]);
     await db.query("UPDATE users SET role='ADMIN',role_id=1 WHERE id=$1", [first.data.user.id]);
     const login = await call('post', '/api/auth/login', {
       email: 'passenger@example.test',
@@ -224,7 +247,12 @@ async function main() {
       `/api/routes/${routeWithStops}`,
       {
         stations: [
-          { id: firstSavedStop.stopId, name: firstSavedStop.name, address: firstSavedStop.address, order: 2 },
+          {
+            id: firstSavedStop.stopId,
+            name: firstSavedStop.name,
+            address: firstSavedStop.address,
+            order: 2,
+          },
           { name: 'Trạm tự tạo 2', address: 'Địa chỉ 2', order: 1 },
         ],
       },
@@ -313,13 +341,7 @@ async function main() {
     const [{ ticket_code: bookedTicketCode }] = (
       await db.query('SELECT ticket_code FROM tickets WHERE id=$1', [booked.ticketId])
     ).rows;
-    await call(
-      'get',
-      `/api/v1/tickets/${encodeURIComponent(bookedTicketCode)}`,
-      null,
-      null,
-      401
-    );
+    await call('get', `/api/v1/tickets/${encodeURIComponent(bookedTicketCode)}`, null, null, 401);
     const ticketDetails = await call(
       'get',
       `/api/v1/tickets/${encodeURIComponent(bookedTicketCode)}`,
@@ -330,13 +352,7 @@ async function main() {
     assert.equal(ticketDetails.seat_code, 'A01');
     assert.equal(ticketDetails.route_name, 'Tuyến cập nhật');
     assert.match(ticketDetails.qr_code_base64, /^data:image\/png;base64,/);
-    await call(
-      'get',
-      `/api/v1/tickets/${encodeURIComponent(bookedTicketCode)}`,
-      null,
-      other,
-      403
-    );
+    await call('get', `/api/v1/tickets/${encodeURIComponent(bookedTicketCode)}`, null, other, 403);
     assert.equal(
       (await db.query('SELECT user_id FROM tickets WHERE id=$1', [booked.ticketId])).rows[0]
         .user_id,
@@ -349,6 +365,10 @@ async function main() {
       passenger,
       409
     );
+    await db.query(
+      "UPDATE trips SET departure_time=NOW()+INTERVAL '10 minutes',arrival_time=NOW()+INTERVAL '70 minutes' WHERE id=$1",
+      [trip]
+    );
     assert.equal(
       (await call('post', '/api/ticketing/verify', { code: booked.qrCode }, admin))
         .isAlreadyCheckedIn,
@@ -360,6 +380,10 @@ async function main() {
       true
     );
     await call('post', '/api/ticketing/verify', { code: booked.qrCode }, other, 403);
+    await db.query(
+      "UPDATE trips SET departure_time='2099-01-01T01:00:00Z',arrival_time='2099-01-01T02:00:00Z' WHERE id=$1",
+      [trip]
+    );
     const qrReservation = await call(
       'post',
       '/api/ticketing/bookings',
@@ -372,9 +396,10 @@ async function main() {
     assert.equal(qrReservation.data.payment.paymentUrl, undefined);
     assert.equal(
       (
-        await db.query('SELECT payment_method,amount,status FROM payment_transactions WHERE order_id=$1', [
-          qrReservation.ticketId,
-        ])
+        await db.query(
+          'SELECT payment_method,amount,status FROM payment_transactions WHERE order_id=$1',
+          [qrReservation.ticketId]
+        )
       ).rows[0].payment_method,
       'QR'
     );
@@ -535,10 +560,17 @@ async function main() {
         request(app)
           .post('/api/ticketing/bookings')
           .set('Authorization', 'Bearer ' + token)
-          .send({ tripId: trip, seatNumber: 'A03' })
+          .send({ tripId: trip, seatNumber: 'A03', paymentMethod: 'QR' })
       )
     );
     assert.deepEqual(competing.map(r => r.status).sort(), [201, 409]);
+    const winner = competing.findIndex(r => r.status === 201);
+    await call(
+      'post',
+      '/api/ticketing/bookings/' + competing[winner].body.ticketId + '/demo-complete',
+      {},
+      [passenger, other][winner]
+    );
     checks++;
     await assert.rejects(
       db.query(
@@ -616,9 +648,7 @@ async function main() {
     );
     assert.equal(demoCompletion.data.tripStatus, 'SCHEDULED');
     assert.equal(
-      (
-        await db.query('SELECT status FROM trips WHERE id=$1', [demoTrip])
-      ).rows[0].status,
+      (await db.query('SELECT status FROM trips WHERE id=$1', [demoTrip])).rows[0].status,
       'SCHEDULED'
     );
     assert.equal(
@@ -632,10 +662,9 @@ async function main() {
     );
     assert.equal(
       (
-        await db.query(
-          'SELECT status FROM payment_transactions WHERE ticket_id=$1',
-          [demoReservation.ticketId]
-        )
+        await db.query('SELECT status FROM payment_transactions WHERE ticket_id=$1', [
+          demoReservation.ticketId,
+        ])
       ).rows[0].status,
       'SUCCESS'
     );
@@ -645,10 +674,7 @@ async function main() {
     const dashboard = await call('get', '/api/operations/dashboard/summary', null, admin);
     assert.equal(Number(dashboard.summary.totalRoutes), 2);
     assert.equal(dashboard.tripOccupancy[0].routeCode, 'TEST');
-    assert.equal(
-      dashboard.tripOccupancy.find(item => item.id === demoTrip).status,
-      'COMPLETED'
-    );
+    assert.equal(dashboard.tripOccupancy.find(item => item.id === demoTrip).status, 'COMPLETED');
     await call(
       'patch',
       `/api/users/${second.data.user.id}/discount-approval`,
@@ -674,17 +700,21 @@ async function main() {
     );
 
     // Vé BOOKED trên đúng chuyến → check-in thành công + log VALID.
+    await db.query(
+      "UPDATE trips SET status='SCHEDULED',departure_time=NOW()+INTERVAL '10 minutes',arrival_time=NOW()+INTERVAL '70 minutes' WHERE id=$1",
+      [demoTrip]
+    );
     const sprint3Checkin = await call(
       'post',
       '/api/tickets/validate-qr',
-      { code: demoTicketCode, tripId: demoTrip },
+      { code: demoTicketCode, tripId: demoTrip, manual: true },
       admin
     );
     assert.equal(sprint3Checkin.isAlreadyCheckedIn, false);
     assert.ok(sprint3Checkin.validationId);
     assert.equal(
-      (await db.query('SELECT status FROM tickets WHERE id=$1', [demoReservation.ticketId]))
-        .rows[0].status,
+      (await db.query('SELECT status FROM tickets WHERE id=$1', [demoReservation.ticketId])).rows[0]
+        .status,
       'CHECKED_IN'
     );
     assert.equal(
@@ -701,7 +731,7 @@ async function main() {
     const sprint3Rescan = await call(
       'post',
       '/api/tickets/validate-qr',
-      { code: demoTicketCode, tripId: demoTrip },
+      { code: demoTicketCode, tripId: demoTrip, manual: true },
       admin
     );
     assert.equal(sprint3Rescan.isAlreadyCheckedIn, true);
@@ -829,8 +859,22 @@ async function main() {
           "SELECT count(*)::int AS n FROM pg_tables WHERE schemaname='public' AND rowsecurity"
         )
       ).rows[0].n,
-      17
+      28
     );
+    await require('./test-ui-contract.cjs')({
+      app,
+      db,
+      call,
+      request,
+      route,
+      stops,
+      admin,
+      passenger,
+      other,
+      second,
+      momoCallback,
+    });
+    await require('./test-email-contract.cjs')({ app,db,call,request,route,admin,momoCallback });
     await call('delete', `/api/routes/${route}`, null, admin);
     await call('delete', `/api/routes/${routeWithStops}`, null, admin);
     assert.equal((await call('get', '/api/routes')).data.length, 0);

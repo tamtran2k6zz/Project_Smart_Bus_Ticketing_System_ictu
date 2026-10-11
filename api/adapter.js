@@ -1,4 +1,4 @@
-const app = require('../backend/dist/app');
+const { default: app } = require('../backend/dist/app');
 
 module.exports = app;
 module.exports.config = {
