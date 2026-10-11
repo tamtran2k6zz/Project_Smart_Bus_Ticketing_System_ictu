@@ -171,7 +171,12 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     const identifier = req.body.identifier || req.body.email;
     const { password } = req.body;
 
-    if (!identifier || !password) {
+    if (
+      typeof identifier !== 'string' ||
+      !identifier.trim() ||
+      typeof password !== 'string' ||
+      !password
+    ) {
       res.status(400).json({
         statusCode: 400,
         success: false,
@@ -181,6 +186,10 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     }
 
     const cleanIdentifier = identifier.trim().toLowerCase();
+    const phoneIdentifier = cleanIdentifier.replace(/^\+84/, '0');
+    const internationalPhone = /^0\d{9}$/.test(phoneIdentifier)
+      ? '+84' + phoneIdentifier.slice(1)
+      : phoneIdentifier;
 
     // Tìm kiếm trực tiếp trong CSDL PostgreSQL theo email hoặc số điện thoại
     let users: any[] = [];
@@ -190,18 +199,18 @@ export const login = async (req: Request, res: Response): Promise<void> => {
                 COALESCE(r.name, u.role, 'PASSENGER') AS role_name
          FROM users u
          LEFT JOIN roles r ON u.role_id = r.id
-         WHERE LOWER(u.email) = $1 OR u.phone_number = $2
+         WHERE LOWER(u.email) = $1 OR u.phone_number IN ($2, $3)
          LIMIT 1`,
-        [cleanIdentifier, identifier.trim()]
+        [cleanIdentifier, phoneIdentifier, internationalPhone]
       );
     } catch {
       users = await query<any[]>(
         `SELECT u.id, u.full_name, u.email, u.phone_number, u.password_hash, u.status, u.email_verified_at,
                 COALESCE(u.role, 'PASSENGER') AS role_name
          FROM users u
-         WHERE LOWER(u.email) = $1 OR u.phone_number = $2
+         WHERE LOWER(u.email) = $1 OR u.phone_number IN ($2, $3)
          LIMIT 1`,
-        [cleanIdentifier, identifier.trim()]
+        [cleanIdentifier, phoneIdentifier, internationalPhone]
       );
     }
 

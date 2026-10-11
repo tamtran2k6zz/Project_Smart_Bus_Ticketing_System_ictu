@@ -10,9 +10,11 @@ import { authApi } from '../services/auth.api';
 import { roleLabels } from '@/configs/permissions';
 import { Button, Field, Message } from '@/components/ui/Ui';
 import { errorText } from '@/utils/format';
-import type { Role, User } from '../types';
+import type { User } from '../types';
+import { apiTestAccounts, demoTestAccounts } from '../testAccounts';
+import s from './AuthForm.module.css';
 const schema = z.object({
-  email: z.email('Email không hợp lệ'),
+  email: z.string().trim(),
   password: z.string(),
   name: z.string(),
   phone: z.string(),
@@ -26,9 +28,23 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' | 'forgot' }) {
     [success, setSuccess] = useState(''),
     [busy, setBusy] = useState(false);
   const form = useForm<z.infer<typeof schema>>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(
+      schema.extend({
+        email:
+          mode === 'login'
+            ? z
+                .string()
+                .trim()
+                .refine(
+                  value => z.email().safeParse(value).success || /^(0|\+84)\d{9}$/.test(value),
+                  'Nhập email hoặc số điện thoại hợp lệ'
+                )
+            : z.email('Email không hợp lệ').trim(),
+      })
+    ),
     defaultValues: { email: '', password: '', name: '', phone: '' },
   });
+  const testAccounts = appConfig.demo ? demoTestAccounts : apiTestAccounts;
   const finish = (user: User) => {
     setUser(user);
     client.clear();
@@ -116,13 +132,23 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' | 'forgot' }) {
             </Field>
           </>
         )}
-        <Field label="Email" error={form.formState.errors.email?.message}>
-          <input type="email" autoComplete="email" {...form.register('email')} />
+        <Field
+          label={mode === 'login' ? 'Email hoặc số điện thoại' : 'Email'}
+          error={form.formState.errors.email?.message}
+        >
+          <input
+            type={mode === 'login' ? 'text' : 'email'}
+            autoComplete={mode === 'login' ? 'username' : 'email'}
+            placeholder={mode === 'login' ? 'Nhập email hoặc số điện thoại' : undefined}
+            disabled={busy}
+            {...form.register('email')}
+          />
         </Field>
         {mode !== 'forgot' && (
           <Field label="Mật khẩu" error={form.formState.errors.password?.message}>
             <input
               type="password"
+              disabled={busy}
               autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
               {...form.register('password')}
             />
@@ -146,28 +172,34 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' | 'forgot' }) {
         </Link>
         {mode === 'login' && <Link to="/forgot-password">Quên mật khẩu?</Link>}
       </div>
-      {appConfig.demo && mode === 'login' && (
-        <>
+      {(appConfig.demo || appConfig.quickLogin) && mode === 'login' && (
+        <section className={s.quickLogin} aria-labelledby="quick-login-title">
           <hr className="divider" />
-          <p>Trải nghiệm demo theo vai trò</p>
-          <div className="grid">
-            {(['PASSENGER', 'DRIVER', 'MANAGER', 'FINANCE', 'ADMIN'] as Role[]).map(role => (
+          <h2 id="quick-login-title">Đăng nhập nhanh để test</h2>
+          <p>Chọn tài khoản mẫu để đăng nhập bằng số điện thoại.</p>
+          <div className={s.accounts}>
+            {testAccounts.map(account => (
               <Button
-                key={role}
+                key={account.role}
+                type="button"
+                className={s.account}
                 variant="secondary"
                 disabled={busy}
-                onClick={() => run(() => authApi.demoLogin(role))}
+                onClick={() => {
+                  form.clearErrors();
+                  form.setValue('email', account.phone);
+                  form.setValue('password', account.password);
+                  void run(() => authApi.login(account.phone, account.password));
+                }}
               >
-                {roleLabels[role]}
+                <strong>{roleLabels[account.role]}</strong>
+                <span>{account.phone}</span>
+                <small>{account.email}</small>
               </Button>
             ))}
           </div>
-          <p>
-            Email mẫu: passenger@smartbus.demo
-            <br />
-            Mật khẩu: SmartBus123!
-          </p>
-        </>
+          {appConfig.demo && <p>Mật khẩu demo: SmartBus123!</p>}
+        </section>
       )}
     </div>
   );

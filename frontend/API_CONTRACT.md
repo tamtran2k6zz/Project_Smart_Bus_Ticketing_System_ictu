@@ -5,7 +5,7 @@ Base URL mặc định /api/smartbus/v1; tất cả response là JSON trực ti�
 | Endpoint                          | Body / response                                                                                       |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | GET /catalog                      | {routes: Route[], stops: Stop[], vehicles: Vehicle[], trips: Trip[]}                                  |
-| POST /auth/login                  | {email,password} → User; đặt cookie session                                                           |
+| POST /auth/login                  | {identifier,password} → User; identifier là email hoặc số điện thoại (`0…` / `+84…`); JWT Bearer lưu trong sessionStorage |
 | POST /auth/register               | {name,email,phone,password} → User; chỉ PASSENGER                                                     |
 | GET /auth/session                 | User đã xác minh, permissions và active từ server                                                     |
 | POST /auth/logout                 | Hủy cookie session                                                                                    |

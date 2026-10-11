@@ -89,6 +89,21 @@ Các tài khoản này thuộc dữ liệu trình duyệt. Chạy thử: tìm ch
 
 ## Chạy API bằng Node.js và Vite
 
+Trang `/login` nhận **email hoặc số điện thoại** và mật khẩu. Số điện thoại Việt Nam có thể nhập dạng `0…` hoặc `+84…`.
+
+Để hiển thị các nút **Đăng nhập nhanh để test** trên một bản triển khai API, đặt `VITE_ENABLE_QUICK_LOGIN=true` lúc build. Nút tự điền số điện thoại/mật khẩu của tài khoản mẫu và gọi API đăng nhập bình thường. Môi trường development và demo luôn hiển thị các nút. Bản production mặc định ẩn nếu không bật biến này.
+
+Các tài khoản seed đã đối chiếu với database ngày 11/10/2026:
+
+| Vai trò | Email | Số điện thoại | Mật khẩu mẫu |
+| --- | --- | --- | --- |
+| Quản trị viên | `admin@smartbus.ictu.vn` | `0981112233` | `Admin@12345` |
+| Điều hành | `manager@smartbus.ictu.vn` | `0982223344` | `Manager@123` |
+| Tài xế | `driver@smartbus.ictu.vn` | `0987654321` | `Driver@123` |
+| Hành khách | `khachhang@gmail.com` | `0912345678` | `User@123` |
+
+Các nút API chỉ dùng 4 tài khoản seed trên; không lấy tài khoản cá nhân hoặc tài khoản tạo trong quá trình test. Database hiện không có tài khoản seed FINANCE. Khi đổi mật khẩu hoặc vô hiệu hóa tài khoản mẫu, nút tương ứng sẽ báo lỗi từ API.
+
 ### 1. Cài dependency và cấu hình backend
 
 Từ thư mục gốc repository:

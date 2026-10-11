@@ -4,18 +4,22 @@ import { rolePermissions } from '@/configs/permissions';
 import type { Role, User } from '../types';
 export const authApi = {
   session: (id: string) => service<User>('/auth/session', db => requireUser(db, id)),
-  login: (email: string, password: string) =>
+  login: (identifier: string, password: string) =>
     service<User>(
       '/auth/login',
       db => {
-        const user = db.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+        const value = identifier.trim().toLowerCase();
+        const normalizePhone = (phone: string) => phone.trim().replace(/^\+84/, '0');
+        const user = db.users.find(
+          u => u.email.toLowerCase() === value || normalizePhone(u.phone) === normalizePhone(value)
+        );
         if (!user || db.credentials[user.id] !== password || !user.active)
-          throw new Error('Email hoặc mật khẩu không đúng.');
+          throw new Error('Email, số điện thoại hoặc mật khẩu không đúng.');
         audit(db, user.name, 'Đăng nhập');
         return user;
       },
       'POST',
-      { email, password }
+      { identifier: identifier.trim(), password }
     ),
   demoLogin: (role: Role) => authApi.login(role.toLowerCase() + '@smartbus.demo', 'SmartBus123!'),
   register: (name: string, email: string, phone: string, password: string) =>

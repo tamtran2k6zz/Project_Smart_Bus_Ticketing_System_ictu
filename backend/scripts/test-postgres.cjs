@@ -166,7 +166,13 @@ async function main() {
       call(
         'post',
         '/api/auth/register',
-        { full_name: 'Kiểm thử', email, password: 'TestPassword@123', role },
+        {
+          full_name: 'Kiểm thử',
+          email,
+          password: 'TestPassword@123',
+          role,
+          ...(email === 'passenger@example.test' ? { phone_number: '0891234567' } : {}),
+        },
         null,
         201
       );
@@ -176,13 +182,42 @@ async function main() {
     const second = await register('other@example.test');
     const other = second.data.tokens.accessToken;
     // Paid-seat fixtures are already verified; verification itself is exercised separately.
-    await db.query('UPDATE users SET email_verified_at=NOW() WHERE id=ANY($1::text[])', [[first.data.user.id, second.data.user.id]]);
+    await db.query('UPDATE users SET email_verified_at=NOW() WHERE id=ANY($1::text[])', [
+      [first.data.user.id, second.data.user.id],
+    ]);
     await db.query("UPDATE users SET role='ADMIN',role_id=1 WHERE id=$1", [first.data.user.id]);
     const login = await call('post', '/api/auth/login', {
       email: 'passenger@example.test',
       password: 'TestPassword@123',
     });
     const admin = login.data.tokens.accessToken;
+    for (const identifier of ['0891234567', '+84891234567']) {
+      const phoneLogin = await call('post', '/api/auth/login', {
+        identifier,
+        password: 'TestPassword@123',
+      });
+      assert.equal(phoneLogin.data.user.id, first.data.user.id);
+    }
+    await call(
+      'post',
+      '/api/auth/login',
+      {
+        identifier: '0891234567',
+        password: 'incorrect',
+      },
+      null,
+      401
+    );
+    await call(
+      'post',
+      '/api/auth/login',
+      {
+        identifier: { phone: '0891234567' },
+        password: 'TestPassword@123',
+      },
+      null,
+      400
+    );
     await call('get', '/api/auth/me', null, admin);
     await call(
       'post',
@@ -450,7 +485,13 @@ async function main() {
       passenger
     );
     assert.equal(pendingDetails.qr_code_base64, null);
-    await call('post', '/api/tickets/validate-qr', { code: pending.ticketCode, manual: true }, admin, 409);
+    await call(
+      'post',
+      '/api/tickets/validate-qr',
+      { code: pending.ticketCode, manual: true },
+      admin,
+      409
+    );
     await call('post', `/api/v1/ticketing/tickets/${pending.ticketId}/cancel`, {}, passenger);
     const pendingCancelled = await call(
       'get',
@@ -1144,7 +1185,15 @@ async function main() {
       second,
       momoCallback,
     });
-    await require('./test-email-contract.cjs')({ app,db,call,request,route,admin,momoCallback });
+    await require('./test-email-contract.cjs')({
+      app,
+      db,
+      call,
+      request,
+      route,
+      admin,
+      momoCallback,
+    });
     await call('delete', `/api/routes/${route}`, null, admin);
     await call('delete', `/api/routes/${routeWithStops}`, null, admin);
     assert.equal((await call('get', '/api/routes')).data.length, 0);

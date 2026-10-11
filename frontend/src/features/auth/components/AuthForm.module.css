@@ -1,0 +1,36 @@
+.quickLogin h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.quickLogin p {
+  font-size: 13px;
+}
+
+.accounts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.accounts .account {
+  flex-direction: column;
+  gap: 5px;
+  padding: 14px 8px;
+  min-width: 0;
+}
+
+.account span {
+  font-size: 13px;
+}
+
+.account small {
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 380px) {
+  .accounts {
+    grid-template-columns: 1fr;
+  }
+}
