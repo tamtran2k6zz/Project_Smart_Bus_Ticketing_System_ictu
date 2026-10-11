@@ -1,5 +1,10 @@
 import type { Route, Stop } from '@/features/operations/types';
 import type { Trip } from '../types';
+export function boardingDeparture(trip: Trip, route?: Route, stopId?: string) {
+  const index = route?.stopIds.indexOf(stopId ?? route.stopIds[0]) ?? -1;
+  const minutes = route?.stopMinutes?.[index] ?? 0;
+  return new Date(Date.parse(trip.departure) + minutes * 60000).toISOString();
+}
 /** Ordered stop matching also supports optional one-sided searches. */
 export function journeyStops(route: Route, stops: Stop[], from = '', to = '') {
   const names = route.stopIds.map(id => stops.find(s => s.id === id)?.name);

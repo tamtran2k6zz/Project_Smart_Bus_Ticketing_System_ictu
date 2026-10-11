@@ -13,6 +13,7 @@ import { paths } from '@/configs/routes';
 const LandingPage = lazy(() => import('@/pages/LandingPage'));
 const TripsPage = lazy(() => import('@/pages/TripsPage'));
 const AuthPage = lazy(() => import('@/pages/AuthPage'));
+const VerifyEmailPage = lazy(() => import('@/features/auth/components/VerifyEmail'));
 const BookingPage = lazy(() => import('@/pages/BookingPage'));
 const PaymentPage = lazy(() => import('@/pages/PaymentPage'));
 const TicketsPage = lazy(() => import('@/pages/TicketsPage'));
@@ -67,6 +68,7 @@ export default function AppRouter() {
             <Route path="*" element={<StatusPage code={404} />} />
           </Route>
           <Route element={<AuthLayout />}>
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
             <Route path={paths.login} element={<AuthPage mode="login" />} />
             <Route path={paths.register} element={<AuthPage mode="register" />} />
             <Route path={paths.forgot} element={<AuthPage mode="forgot" />} />

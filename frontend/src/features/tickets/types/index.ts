@@ -6,6 +6,8 @@ export interface Ticket {
   token: string;
   expiresAt: string;
   status: 'valid' | 'used' | 'canceled';
+  /** Thời điểm soát vé thành công trong dữ liệu demo. */
+  checkedInAt?: string;
   request?: 'cancel' | 'exchange';
   exchangeTripId?: string;
 }

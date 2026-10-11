@@ -4,7 +4,7 @@ import { LinkButton } from '@/components/ui/Ui';
 import { HeroBusVisual } from './HeroBusVisual';
 import { useHeroAnimation } from '../hooks/useHeroAnimation';
 import s from './Hero.module.css';
-export function HeroSection() {
+export function HeroSection({ trackingUrl = '/trips' }: { trackingUrl?: string }) {
   const root = useRef<HTMLElement>(null);
   useHeroAnimation(root);
   return (
@@ -28,7 +28,7 @@ export function HeroSection() {
           </p>
           <div className={s.actions} data-hero-cta>
             <LinkButton to="/trips">Tra cứu chuyến xe</LinkButton>
-            <LinkButton to="/tracking/t1" secondary>
+            <LinkButton to={trackingUrl} secondary>
               Theo dõi xe
             </LinkButton>
           </div>

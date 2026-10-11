@@ -3,7 +3,8 @@ import { WebSocketServer, WebSocket } from 'ws';
 import jwt from 'jsonwebtoken';
 import { readEnv } from '../config/env';
 import { appLogger } from '../config/logger';
-import { saveTripLocation, shouldThrottleGpsUpdate } from './gps.service';
+import { shouldThrottleGpsUpdate } from './gps.service';
+import { updateTripLocation } from './location-update.service';
 
 const logger = appLogger.child('websocket-gateway');
 
@@ -111,11 +112,11 @@ export function setupWebSocketGateway(server: HttpServer): WebSocketServer {
           }
 
           // Day 12: Save to Redis/cache
-          await saveTripLocation(tripId, {
-            latitude: Number(latitude),
-            longitude: Number(longitude),
-            speed: speed !== undefined ? Number(speed) : undefined,
-            heading: heading !== undefined ? Number(heading) : undefined,
+          await updateTripLocation(tripId, ws.userId!, ws.role!, {
+            latitude,
+            longitude,
+            speed,
+            heading,
           });
 
           // Broadcast to all subscribers in trip room
@@ -139,6 +140,9 @@ export function setupWebSocketGateway(server: HttpServer): WebSocketServer {
         }
       } catch (err) {
         logger.error('ws_message_error', { error: err });
+        ws.send(
+          JSON.stringify({ error: 'Không thể cập nhật vị trí. Kiểm tra phân công và tọa độ.' })
+        );
       }
     });
 

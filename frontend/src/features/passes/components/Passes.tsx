@@ -48,7 +48,11 @@ export function Passes() {
       <PageTitle
         eyebrow="ĐI LẠI THƯỜNG XUYÊN"
         title="Vé tháng & ưu đãi"
-        description="Quản lý tuyến quen thuộc và thời hạn sử dụng. Giá dưới đây là chính sách demo."
+        description={
+          appConfig.demo
+            ? 'Quản lý tuyến quen thuộc và thời hạn sử dụng. Giá dưới đây là chính sách demo.'
+            : 'Gửi hồ sơ ưu đãi để nhà xe xét duyệt. Vé tháng trực tuyến chưa mở bán.'
+        }
       />
       <div className="grid">
         <div className="stack">
@@ -58,8 +62,14 @@ export function Passes() {
               <h3>Đăng ký vé tháng</h3>
             </div>
             <p className="muted">
-              Demo: {money(250000)} / 30 ngày. Hồ sơ được duyệt: {money(150000)}. Không thu tiền
-              thật.
+              {appConfig.demo ? (
+                <>
+                  Demo: {money(250000)} / 30 ngày. Hồ sơ được duyệt: {money(150000)}. Không thu tiền
+                  thật.
+                </>
+              ) : (
+                'Vui lòng liên hệ nhà xe để đăng ký vé tháng và xác nhận giá áp dụng.'
+              )}
             </p>
             <Field label="Tuyến đăng ký">
               <select value={route} onChange={e => setRoute(e.target.value)}>
@@ -75,7 +85,7 @@ export function Passes() {
             </Field>
             <Button
               style={{ marginTop: 18 }}
-              disabled={!route}
+              disabled={!route || !appConfig.demo}
               onClick={() => setConfirm({ routeId: route })}
             >
               Đăng ký {appConfig.demo ? 'demo' : ''}
@@ -100,6 +110,7 @@ export function Passes() {
                 </p>
                 <Button
                   variant="secondary"
+                  disabled={!appConfig.demo}
                   onClick={() => setConfirm({ routeId: p.routeId, id: p.id })}
                 >
                   Gia hạn thêm 30 ngày

@@ -72,7 +72,7 @@ export function checkGeofencing(
 ): { stopId: string; stopName: string; distanceMeters: number } | null {
   let nearest: { stopId: string; stopName: string; distanceMeters: number } | null = null;
   for (const stop of stops) {
-    if (!stop.latitude || !stop.longitude) continue;
+    if (!Number.isFinite(stop.latitude) || !Number.isFinite(stop.longitude)) continue;
     const distance = calculateHaversineDistance(
       currentLat,
       currentLon,

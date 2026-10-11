@@ -32,6 +32,10 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' | 'forgot' }) {
   const finish = (user: User) => {
     setUser(user);
     client.clear();
+    if (!appConfig.demo && user.role === 'PASSENGER' && !user.emailVerified) {
+      navigate('/verify-email', { replace: true, state: { notice: user.emailVerificationNotice } });
+      return;
+    }
     const redirect = params.get('redirect');
     let target =
       user.role === 'DRIVER'
@@ -69,7 +73,9 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' | 'forgot' }) {
       </h1>
       <p>
         {mode === 'forgot'
-          ? 'Nhập email để gửi yêu cầu khôi phục.'
+          ? appConfig.demo
+            ? 'Nhập email để gửi yêu cầu khôi phục.'
+            : 'Khôi phục mật khẩu trực tuyến chưa mở. Vui lòng liên hệ nhà xe để được hỗ trợ tài khoản.'
           : 'Quản lý vé và hành trình của bạn trong một nơi.'}
       </p>
       <form
@@ -124,13 +130,13 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' | 'forgot' }) {
         )}
         <Message error>{error}</Message>
         <Message>{success}</Message>
-        <Button disabled={busy}>
+        <Button disabled={busy || (mode === 'forgot' && !appConfig.demo)}>
           {busy
             ? 'Đang xử lý…'
             : mode === 'login'
               ? 'Đăng nhập'
               : mode === 'register'
-                ? 'Đăng ký'
+                ? 'Đăng ký & xác minh email'
                 : 'Gửi yêu cầu'}
         </Button>
       </form>

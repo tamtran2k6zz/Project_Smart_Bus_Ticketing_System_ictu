@@ -16,7 +16,7 @@ router.get(
     try {
       const trips = await query<any[]>(
         `SELECT t.id, b.plate_number AS "busPlate", t.departure_time AS "departureTime", t.arrival_time AS "arrivalTime",
-              b.total_seats AS "totalSeats", (SELECT COUNT(*) FROM tickets tk WHERE tk.trip_id=t.id AND tk.status IN ('BOOKED','CHECKED_IN')) AS "bookedSeats", t.status,
+              b.total_seats AS "totalSeats", (SELECT COALESCE(SUM(tk.quantity),0) FROM tickets tk WHERE tk.trip_id=t.id AND tk.status IN ('BOOKED','CHECKED_IN')) AS "bookedSeats", t.status,
               r.code AS "routeCode", r.name AS "routeName", t.base_price AS "basePrice"
        FROM trips t
        JOIN routes r ON t.route_id = r.id
@@ -25,17 +25,19 @@ router.get(
       );
 
       const [{ totalRevenue }] = await query<any[]>(
-        `SELECT COALESCE(SUM(tk.fare_amount), 0) AS "totalRevenue"
+        `SELECT COALESCE(SUM(p.amount), 0) AS "totalRevenue"
          FROM tickets tk
          JOIN trips t ON tk.trip_id = t.id
-         WHERE t.status = 'COMPLETED' AND tk.status IN ('BOOKED', 'CHECKED_IN')`
+         JOIN payment_transactions p ON p.ticket_id=tk.id
+         WHERE p.status='SUCCESS'`
       );
 
       const [{ totalTicketsBooked }] = await query<any[]>(
-        `SELECT COUNT(tk.id) AS "totalTicketsBooked"
+        `SELECT COALESCE(SUM(tk.quantity),0) AS "totalTicketsBooked"
          FROM tickets tk
          JOIN trips t ON tk.trip_id = t.id
-         WHERE t.status = 'COMPLETED' AND tk.status IN ('BOOKED', 'CHECKED_IN')`
+         JOIN payment_transactions p ON p.ticket_id=tk.id
+         WHERE p.status='SUCCESS' AND tk.status IN ('BOOKED', 'CHECKED_IN')`
       );
 
       const [{ totalRoutes }] = await query<any[]>(

@@ -28,6 +28,13 @@ export interface Hold {
   price: number;
   status: 'active' | 'expired' | 'converted' | 'released';
 }
+export interface VoucherPreview {
+  code: string;
+  percent: number;
+  subtotal: number;
+  discount: number;
+  total: number;
+}
 export interface Booking {
   boardingStopId?: string;
   alightingStopId?: string;
@@ -46,4 +53,5 @@ export interface Booking {
   createdAt: string;
   refund: 'none' | 'pending' | 'refunded';
   invoiceRequested?: boolean;
+  ticketEmailStatus?: 'pending' | 'processing' | 'sent' | 'skipped' | 'failed';
 }

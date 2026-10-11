@@ -128,7 +128,7 @@ export function Tracking() {
                 <MapPin size={19} />
                 {connected ? last?.nextStop : 'Chờ dữ liệu'}
               </h3>
-              <p className="price">{connected ? last?.eta + ' phút' : '—'}</p>
+              <p className="price">{connected && last?.eta != null ? last.eta + ' phút' : '—'}</p>
               <p className="muted">Thời gian dự kiến, có thể thay đổi theo tình hình tuyến.</p>
               {user ? (
                 <Button disabled={subscribe.isPending} onClick={() => subscribe.mutate(undefined)}>

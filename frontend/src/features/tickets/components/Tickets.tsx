@@ -6,6 +6,8 @@ import { QrCode, Download, MapPin } from 'lucide-react';
 import { useSession } from '@/store/session.store';
 import { ticketsApi } from '../services/tickets.api';
 import { bookingApi } from '@/features/booking/services/booking.api';
+import { PriceBreakdown } from '@/features/booking/components/PriceBreakdown';
+import { receiptPriceLines } from '@/features/booking/utils/price';
 import { operationsApi } from '@/features/operations/services/operations.api';
 import { paymentApi } from '@/features/payments/services/payment.api';
 import { createPdf, download } from '@/features/reports/services/export';
@@ -26,6 +28,7 @@ import { useAction } from '@/hooks/useAction';
 import { appConfig } from '@/configs/app.config';
 import { useNow } from '@/hooks/useNow';
 import { ticketState } from '../utils/status';
+import { boardingDeparture } from '@/features/booking/utils/journey';
 export function TicketQr({ token }: { token: string }) {
   const [src, setSrc] = useState(''),
     [error, setError] = useState('');
@@ -166,7 +169,9 @@ function BookingHistory() {
                         {b.refund === 'pending'
                           ? 'Chờ hoàn tiền'
                           : b.refund === 'refunded'
-                            ? 'Đã hoàn tiền demo'
+                            ? appConfig.demo
+                              ? 'Đã hoàn tiền demo'
+                              : 'Đã hoàn tiền'
                             : ''}
                       </small>
                     </td>
@@ -212,20 +217,18 @@ export function TicketDetail() {
   const invoice = useAction(async () => {
     const b = booking.data!;
     await paymentApi.invoice(b.id, user.id);
-    if (appConfig.demo) {
-      const blob = await createPdf('SmartBus · Biên nhận DEMO', [
-        'KHÔNG PHẢI HÓA ĐƠN ĐIỆN TỬ HỢP LỆ',
+    const blob = await createPdf(
+      appConfig.demo ? 'SmartBus · Biên nhận DEMO' : 'SmartBus · Biên nhận thanh toán',
+      [
+        'BIÊN NHẬN THANH TOÁN — KHÔNG THAY THẾ HÓA ĐƠN ĐIỆN TỬ THUẾ',
         'Mã đặt vé: ' + b.id,
         'Khách hàng: ' + b.name,
         'Số vé: ' + b.quantity,
-        'Tổng tiền: ' + money(b.total),
+        ...receiptPriceLines(b),
         'Ngày: ' + dateTime(b.createdAt),
-      ]);
-      download(blob, 'smartbus-demo-receipt.pdf');
-    } else {
-      const result = await paymentApi.realInvoice(b.id);
-      window.open(result.url, '_blank', 'noopener,noreferrer');
-    }
+      ]
+    );
+    download(blob, appConfig.demo ? 'smartbus-demo-receipt.pdf' : 'smartbus-receipt.pdf');
   }, 'Đã yêu cầu chứng từ.');
   const ticket = query.data,
     trip = catalog.data?.trips.find(t => t.id === ticket?.tripId),
@@ -236,6 +239,13 @@ export function TicketDetail() {
     !ticket.request &&
     trip &&
     Date.parse(trip.departure) > Date.now() + 1800000;
+  // Giải thích vì sao không hiện nút hủy/đổi (trường hợp đang chờ xử lý đã có thông báo riêng).
+  const requestBlockedReason =
+    !ticket || !trip || eligible || ticket.request
+      ? ''
+      : ticketState(ticket, now) !== 'valid'
+        ? `Không thể yêu cầu hủy/đổi: ${statusText[ticketState(ticket, now)].toLowerCase()}.`
+        : 'Đã quá hạn gửi yêu cầu hủy/đổi: cần gửi trước giờ khởi hành ít nhất 30 phút.';
   return (
     <>
       <PageTitle
@@ -253,12 +263,16 @@ export function TicketDetail() {
                 </Badge>
                 {appConfig.demo && <Badge>QR Demo</Badge>}
               </div>
-              {ticketState(ticket, now) === 'valid' ? (
+              {ticketState(ticket, now) === 'valid' && !ticket.request ? (
                 <TicketQr token={ticket.token} />
               ) : (
-                <Message error>QR không khả dụng: {statusText[ticketState(ticket, now)]}.</Message>
+                <Message error>
+                  QR không khả dụng:{' '}
+                  {ticket.request ? 'đang chờ duyệt hủy/đổi' : statusText[ticketState(ticket, now)]}
+                  .
+                </Message>
               )}
-              {ticketState(ticket, now) === 'valid' && (
+              {ticketState(ticket, now) === 'valid' && !ticket.request && (
                 <Field label="Token vé — dùng nhập mã thủ công">
                   <input value={ticket.token} readOnly onFocus={e => e.target.select()} />
                 </Field>
@@ -276,7 +290,7 @@ export function TicketDetail() {
                 {catalog.data?.stops.find(s => s.id === b?.alightingStopId)?.name ||
                   route?.destination}
               </p>
-              <p>{trip && dateTime(trip.departure)}</p>
+              <p>{trip && dateTime(boardingDeparture(trip, route, b?.boardingStopId))}</p>
               <AsyncState query={booking}>
                 {b && (
                   <>
@@ -288,14 +302,16 @@ export function TicketDetail() {
                       {b.quantity} vé ·{' '}
                       {b.seatIds.length ? 'Ghế ' + b.seatIds.join(', ') : 'Không gắn ghế'}
                     </p>
-                    <p className="price">{money(b.total)}</p>
+                    <PriceBreakdown booking={b} totalLabel="Tổng thanh toán" />
                     <p className="muted">
                       Hoàn tiền:{' '}
                       {b.refund === 'none'
                         ? 'Chưa có yêu cầu'
                         : b.refund === 'pending'
                           ? 'Đang chờ xử lý'
-                          : 'Đã hoàn tiền demo'}
+                          : appConfig.demo
+                            ? 'Đã hoàn tiền demo'
+                            : 'Đã hoàn tiền'}
                     </p>
                   </>
                 )}
@@ -331,6 +347,7 @@ export function TicketDetail() {
                     </Button>
                   </div>
                 )}
+                {requestBlockedReason && <p className="muted">{requestBlockedReason}</p>}
               </div>
             </Card>
           </div>
@@ -342,10 +359,32 @@ export function TicketDetail() {
         title={modal === 'cancel' ? 'Yêu cầu hủy vé' : 'Yêu cầu đổi chuyến'}
       >
         <p className="muted">
-          Chính sách demo: gửi trước khởi hành 30 phút. Hủy được duyệt sẽ trả chỗ về chuyến và tạo
-          khoản hoàn chờ xử lý. Đổi được duyệt giữ nguyên giá, chọn chỗ trống trên chuyến cùng tuyến
-          và loại vé.
+          Gửi yêu cầu trước khởi hành ít nhất 30 phút. Khi được duyệt, hủy vé sẽ hoàn tiền qua cổng
+          thanh toán rồi trả ghế về chuyến. Đổi vé áp dụng cho chuyến cùng tuyến, cùng giá còn đủ
+          ghế. QR tạm ngừng sử dụng trong lúc chờ duyệt.
         </p>
+        {modal === 'cancel' && b && (
+          <div className="stack" style={{ gap: 8, margin: '16px 0' }}>
+            <PriceBreakdown booking={b} totalLabel="Số tiền đã thanh toán" />
+            <hr className="divider" />
+            <div className="between">
+              <span className="muted">Phí hủy</span>
+              <span>{appConfig.demo ? 'Điều hành xác nhận khi duyệt' : money(0)}</span>
+            </div>
+            <div className="between">
+              <strong>Số tiền hoàn dự kiến</strong>
+              <span>
+                {money(b.total)}
+                {appConfig.demo ? ' − phí hủy' : ''}
+              </span>
+            </div>
+            <p className="muted" style={{ margin: 0 }}>
+              {appConfig.demo
+                ? 'Số tiền hoàn chính xác sẽ được thông báo khi yêu cầu hủy được duyệt.'
+                : 'Hoàn toàn bộ số tiền đã thanh toán sau khi nhà xe duyệt và cổng thanh toán xác nhận.'}
+            </p>
+          </div>
+        )}
         {modal === 'exchange' && (
           <Field label="Chuyến muốn đổi">
             <select value={target} onChange={e => setTarget(e.target.value)}>
@@ -356,6 +395,8 @@ export function TicketDetail() {
                     t.id !== trip?.id &&
                     t.routeId === trip?.routeId &&
                     t.seatMode === trip?.seatMode &&
+                    (appConfig.demo || t.price === trip?.price) &&
+                    t.status === 'scheduled' &&
                     Date.parse(t.departure) > Date.now() &&
                     t.available >= (b?.quantity || 1)
                 )

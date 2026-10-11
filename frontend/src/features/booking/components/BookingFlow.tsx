@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,6 +12,7 @@ import { JourneySummary } from './JourneySummary';
 import { useSession } from '@/store/session.store';
 import { useBookingDraft } from '@/store/booking.store';
 import { useAction } from '@/hooks/useAction';
+import { appConfig } from '@/configs/app.config';
 import {
   Card,
   Button,
@@ -129,6 +130,26 @@ export function BookingFlow() {
     resolver: zodResolver(schema),
     defaultValues: { name: user.name, phone: user.phone, voucher: '' },
   });
+  // Xem trước voucher khi đang gõ (chờ 300ms sau lần gõ cuối) để thấy ngay số tiền giảm.
+  const voucherInput = form.watch('voucher').trim().toUpperCase();
+  const [voucherCode, setVoucherCode] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => setVoucherCode(voucherInput), 300);
+    return () => clearTimeout(timer);
+  }, [voucherInput]);
+  const preview = useQuery({
+    queryKey: ['voucher-preview', holdId, user.id, voucherCode, hold.data?.quantity],
+    queryFn: () => bookingApi.previewVoucher(holdId, user.id, voucherCode),
+    enabled: active && !!voucherCode,
+    retry: false,
+  });
+  const voucherChecking =
+    active && !!voucherInput && (voucherInput !== voucherCode || preview.isFetching);
+  const voucherError =
+    active && !!voucherCode && !voucherChecking && preview.isError
+      ? preview.error.message
+      : undefined;
+  const voucherResult = active && voucherCode && !voucherChecking ? preview.data : undefined;
   const book = useAction(async (v: z.infer<typeof schema>) => {
     if (journeyChanged) throw new Error('Hành trình đã thay đổi. Giải phóng giữ chỗ và chọn lại.');
     const b = await bookingApi.createBooking(holdId, user.id, v.name, v.phone, v.voucher);
@@ -144,6 +165,12 @@ export function BookingFlow() {
         description="Tồn chỗ và giá được xác nhận bởi dịch vụ khi bạn giữ chỗ."
       />
       <AsyncState query={query}>
+        {!appConfig.demo && !user.emailVerified && (
+          <Card>
+            <p>Email chưa xác minh. Vui lòng xác minh trước khi giữ chỗ và đặt vé.</p>
+            <Link to="/verify-email">Xác minh email</Link>
+          </Card>
+        )}
         {trip && (
           <div className="grid">
             <Card>
@@ -229,7 +256,10 @@ export function BookingFlow() {
               {!active ? (
                 <Button
                   disabled={
-                    holdAction.isPending || quantity < 1 || Date.parse(trip.departure) <= Date.now()
+                    holdAction.isPending ||
+                    quantity < 1 ||
+                    Date.parse(trip.departure) <= Date.now() ||
+                    (!appConfig.demo && !user.emailVerified)
                   }
                   onClick={() => holdAction.mutate(undefined)}
                 >
@@ -284,17 +314,65 @@ export function BookingFlow() {
                   <Field label="Số điện thoại" error={form.formState.errors.phone?.message}>
                     <input autoComplete="tel" {...form.register('phone')} />
                   </Field>
-                  <Field label="Mã ưu đãi" hint="Demo: SMART10 giảm 10%">
-                    <input placeholder="Nhập mã nếu có" {...form.register('voucher')} />
+                  <Field
+                    label="Mã ưu đãi"
+                    hint={
+                      appConfig.demo
+                        ? 'Demo: SMART10 giảm 10%'
+                        : 'Nhập mã do nhà xe cung cấp nếu có.'
+                    }
+                    error={voucherError}
+                  >
+                    <input
+                      placeholder="Nhập mã nếu có"
+                      autoComplete="off"
+                      style={{ textTransform: 'uppercase' }}
+                      {...form.register('voucher')}
+                    />
                   </Field>
+                  {voucherInput && !active && (
+                    <p className="muted" style={{ margin: 0 }}>
+                      Giữ chỗ trước để kiểm tra mã và xem số tiền được giảm.
+                    </p>
+                  )}
+                  {voucherChecking && (
+                    <p className="muted" role="status" style={{ margin: 0 }}>
+                      Đang kiểm tra mã…
+                    </p>
+                  )}
+                  {voucherResult && (
+                    <div className="stack" role="status" style={{ gap: 6 }}>
+                      <div className="between">
+                        <span className="muted">Tạm tính</span>
+                        <span>{money(voucherResult.subtotal)}</span>
+                      </div>
+                      <div className="between">
+                        <span>
+                          Ưu đãi {voucherResult.code} (−{voucherResult.percent}%)
+                        </span>
+                        <strong>− {money(voucherResult.discount)}</strong>
+                      </div>
+                      <div className="between">
+                        <strong>Tổng thanh toán</strong>
+                        <strong className="price">{money(voucherResult.total)}</strong>
+                      </div>
+                    </div>
+                  )}
                   <ActionMessage action={book} />
                   <Message error>{hold.error ? String(hold.error.message) : ''}</Message>
-                  <Button disabled={!active || journeyChanged || book.isPending}>
+                  <Button
+                    disabled={
+                      !active ||
+                      journeyChanged ||
+                      book.isPending ||
+                      voucherChecking ||
+                      !!voucherError
+                    }
+                  >
                     {book.isPending ? 'Đang tạo đặt vé…' : 'Tiếp tục thanh toán'}
                   </Button>
                   <p className="muted">
-                    Bạn xác nhận đã kiểm tra thông tin và chính sách hủy/đổi demo trước khi tiếp
-                    tục.
+                    Bạn xác nhận đã kiểm tra thông tin và chính sách hủy/đổi trước khi tiếp tục.
                   </p>
                 </form>
               </Card>
