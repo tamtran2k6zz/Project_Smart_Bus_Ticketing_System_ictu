@@ -103,13 +103,14 @@ export default function AppRouter() {
                 </Route>
                 {(
                   [
+                    { section: 'fleet', path: 'fleet', permission: 'operations' },
                     { section: 'promotions', path: 'promotions', permission: 'promotions' },
                     { section: 'eligibility', path: 'eligibility', permission: 'eligibility' },
                     { section: 'users', path: 'users', permission: 'users' },
                     { section: 'audit', path: 'audit-logs', permission: 'audit' },
                     { section: 'support', path: 'support', permission: 'support' },
                   ] as {
-                    section: 'promotions' | 'eligibility' | 'users' | 'audit' | 'support';
+                    section: 'promotions' | 'eligibility' | 'users' | 'audit' | 'support' | 'fleet';
                     path: string;
                     permission: Permission;
                   }[]
@@ -119,6 +120,8 @@ export default function AppRouter() {
                   </Route>
                 ))}
                 <Route path="vouchers" element={<Navigate to="/admin/promotions" replace />} />
+                <Route path="monitoring" element={<Navigate to="/admin/fleet" replace />} />
+                <Route path="fleet-monitoring" element={<Navigate to="/admin/fleet" replace />} />
               </Route>
             </Route>
             <Route

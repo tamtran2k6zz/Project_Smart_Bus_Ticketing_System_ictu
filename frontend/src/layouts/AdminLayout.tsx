@@ -12,13 +12,16 @@ import {
   ScrollText,
   MessageSquare,
   BadgeCheck,
+  Radio,
 } from 'lucide-react';
 import { PortalShell } from './PortalShell';
 import { can } from '@/configs/permissions';
 import { useSession } from '@/store/session.store';
 import type { Permission } from '@/features/auth/types';
+
 export const adminNavigation = [
   { to: '/admin', label: 'Tổng quan', icon: LayoutDashboard },
+  { to: '/admin/fleet', label: 'Giám sát đội xe', icon: Radio, permission: 'operations' },
   { to: '/admin/routes', label: 'Tuyến & giá vé', icon: Route, permission: 'operations' },
   { to: '/admin/stops', label: 'Trạm dừng', icon: MapPin, permission: 'operations' },
   { to: '/admin/schedules', label: 'Lịch chạy', icon: CalendarDays, permission: 'operations' },
@@ -42,6 +45,7 @@ export const adminNavigation = [
     permission: 'support',
   },
 ];
+
 export default function AdminLayout() {
   const user = useSession(state => state.user);
   return (

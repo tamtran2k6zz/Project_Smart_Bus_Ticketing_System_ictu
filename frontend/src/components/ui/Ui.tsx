@@ -32,14 +32,16 @@ export function Logo() {
 export function Card({
   children,
   className = '',
+  style,
   ...props
 }: {
   children: ReactNode;
   className?: string;
   id?: string;
+  style?: import('react').CSSProperties;
 }) {
   return (
-    <div {...props} className={s.card + ' ' + className}>
+    <div {...props} style={style} className={s.card + ' ' + className}>
       {children}
     </div>
   );

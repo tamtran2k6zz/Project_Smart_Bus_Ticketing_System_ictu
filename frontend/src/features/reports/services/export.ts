@@ -1,6 +1,7 @@
 import type { Report } from '../types';
 import type { ReportFilter } from './reports.api';
 import { money } from '@/utils/format';
+
 export function download(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -9,17 +10,27 @@ export function download(blob: Blob, name: string) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
 export async function createPdf(title: string, lines: string[]) {
   const { jsPDF } = await import('jspdf');
   const doc = new jsPDF();
-  const response = await fetch('/fonts/report-font.ttf');
-  if (!response.ok) throw new Error('Chưa tải được font PDF tiếng Việt.');
-  const buffer = new Uint8Array(await response.arrayBuffer());
-  let binary = '';
-  for (const byte of buffer) binary += String.fromCharCode(byte);
-  doc.addFileToVFS('report.ttf', btoa(binary));
-  doc.addFont('report.ttf', 'BeVietnam', 'normal');
-  doc.setFont('BeVietnam');
+
+  try {
+    const response = await fetch('/fonts/report-font.ttf');
+    if (response.ok) {
+      const buffer = new Uint8Array(await response.arrayBuffer());
+      let binary = '';
+      for (const byte of buffer) binary += String.fromCharCode(byte);
+      doc.addFileToVFS('report.ttf', btoa(binary));
+      doc.addFont('report.ttf', 'BeVietnam', 'normal');
+      doc.setFont('BeVietnam');
+    } else {
+      doc.setFont('helvetica');
+    }
+  } catch {
+    doc.setFont('helvetica');
+  }
+
   doc.setFontSize(18);
   doc.text(title, 18, 22);
   doc.setFontSize(10);
@@ -39,21 +50,24 @@ export async function createPdf(title: string, lines: string[]) {
   }
   return doc.output('blob');
 }
+
 export async function exportReport(
   report: Report,
   filter: ReportFilter,
   format: 'xlsx' | 'pdf',
   demo: boolean
 ) {
-  const label = demo ? 'DEMO – KHÔNG PHẢI CHỨNG TỪ TÀI CHÍNH' : 'BÁO CÁO';
+  const label = demo ? 'DEMO – KHÔNG PHẢI CHỨNG TỪ TÀI CHÍNH' : 'BÁO CÁO DOANH THU XE BUÝT SMARTBUS';
   if (format === 'pdf') {
     const blob = await createPdf('SmartBus · Báo cáo doanh thu', [
       label,
-      'Kỳ: ' + filter.from + ' → ' + filter.to,
-      'Tuyến: ' + (filter.routeId || 'Tất cả'),
+      'Kỳ báo cáo: ' + filter.from + ' -> ' + filter.to,
+      'Tuyến: ' + (filter.routeId || 'Tất cả các tuyến'),
       'Doanh thu thuần (gồm khoản chưa hoàn): ' + money(report.revenue),
       'Số vé đang có hiệu lực: ' + report.tickets,
       'Tỷ lệ lấp đầy: ' + report.occupancy + '%',
+      '------------------------------------------------------------',
+      'CHI TIẾT DOANH THU THEO NGÀY VÀ TUYẾN:',
       ...report.rows.map(
         r =>
           r.date +
@@ -69,15 +83,17 @@ export async function exportReport(
           r.occupancy +
           '%'
       ),
-      'Trạng thái hoàn tiền:',
+      '------------------------------------------------------------',
+      'TRẠNG THÁI HOÀN TIỀN:',
       ...report.refunds.map(r => r.id + ' | ' + money(r.total) + ' | ' + r.refund),
     ]);
     download(blob, 'smartbus-report-' + filter.from + '.pdf');
     return;
   }
+
   const { default: ExcelJS } = await import('exceljs');
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'SmartBus';
+  workbook.creator = 'SmartBus ICTU';
   const sheet = workbook.addWorksheet('Doanh thu');
   sheet.addRow([label]);
   sheet.addRow([
@@ -113,10 +129,12 @@ export async function exportReport(
   sheet.getRow(4).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF15803D' } };
   sheet.getColumn(4).numFmt = '#,##0';
   sheet.views = [{ state: 'frozen', ySplit: 4 }];
-  const refunds = workbook.addWorksheet('Hoan tien');
+
+  const refunds = workbook.addWorksheet('Hoàn tiền');
   refunds.addRow(['Mã đặt vé', 'Số tiền VND', 'Trạng thái']);
   report.refunds.forEach(r => refunds.addRow([r.id, r.total, r.refund]));
   refunds.columns.forEach(c => (c.width = 30));
+
   const buffer = await workbook.xlsx.writeBuffer();
   download(
     new Blob([buffer], {

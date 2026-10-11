@@ -125,7 +125,11 @@ export function Reports() {
           <div className="stack" style={{ marginTop: 22 }}>
             <ReportStats report={query.data} />
             <div className="grid">
-              <RevenueChart report={query.data} />
+              <RevenueChart
+                report={query.data}
+                onExportExcel={() => exportAction.mutate('xlsx')}
+                onExportPdf={() => exportAction.mutate('pdf')}
+              />
               <OccupancyChart report={query.data} />
             </div>
             <Card>

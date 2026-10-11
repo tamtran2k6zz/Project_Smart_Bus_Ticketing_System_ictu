@@ -3,7 +3,10 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { Component, lazy, Suspense, type ReactNode } from 'react';
 import { queryClient } from '@/services/queryClient';
 import AppRouter from '@/routes/AppRouter';
+import { NetworkStatusBar } from '@/components/ui/NetworkStatusBar';
+
 const LegacyApp = lazy(() => import('./legacy-entry'));
+
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state: { error: Error | null } = { error: null };
   static getDerivedStateFromError(error: Error) {
@@ -22,6 +25,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
     );
   }
 }
+
 export default function App() {
   if (import.meta.env.VITE_LEGACY_APP === 'true')
     return (
@@ -29,9 +33,11 @@ export default function App() {
         <LegacyApp />
       </Suspense>
     );
+
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
+        <NetworkStatusBar />
         <BrowserRouter>
           <a className="skipLink" href="#main">
             Bỏ qua tới nội dung
