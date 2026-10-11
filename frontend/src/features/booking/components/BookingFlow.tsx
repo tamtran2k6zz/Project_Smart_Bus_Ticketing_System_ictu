@@ -263,7 +263,7 @@ export function BookingFlow() {
                   }
                   onClick={() => holdAction.mutate(undefined)}
                 >
-                  Giữ chỗ 10 phút
+                  ĐẶT CHỖ
                 </Button>
               ) : (
                 <Button

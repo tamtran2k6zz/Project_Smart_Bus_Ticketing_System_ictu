@@ -8,10 +8,10 @@ process.env.REDIS_URL = '';
 process.env.REDIS_HOST = '';
 const root = path.resolve(__dirname, '../..');
 const config = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'));
-assert.ok(config.functions['api/adapter.js']);
-assert.ok(fs.existsSync(path.join(root, 'api/adapter.js')));
-assert.equal(config.rewrites[0].destination, '/api/adapter');
-const app = require(path.join(root, 'api/adapter.js'));
+assert.ok(config.functions['api/index.js']);
+assert.ok(fs.existsSync(path.join(root, 'api/index.js')));
+assert.equal(config.rewrites[0].destination, '/api/index');
+const app = require(path.join(root, 'api/index.js'));
 assert.equal(typeof app, 'function');
 request(app)
   .get('/api/does-not-exist')
