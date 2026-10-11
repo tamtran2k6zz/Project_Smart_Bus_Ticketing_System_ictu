@@ -12,14 +12,14 @@ export function MapAdapter({ stops, location }: { stops: Stop[]; location?: Loca
     if (!root.current || !stops.length) return;
     const instance = L.map(root.current, { scrollWheelZoom: false, attributionControl: true });
     map.current = instance;
-    if (import.meta.env.VITE_MAP_TILE_URL)
-      L.tileLayer(import.meta.env.VITE_MAP_TILE_URL, {
-        attribution: import.meta.env.VITE_MAP_ATTRIBUTION || 'Map provider',
-      }).addTo(instance);
-    else
-      instance.attributionControl.addAttribution(
-        'SmartBus · sơ đồ tuyến minh họa, không phải nền địa lý'
-      );
+    const tileUrl =
+      import.meta.env.VITE_MAP_TILE_URL || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+    L.tileLayer(tileUrl, {
+      attribution:
+        import.meta.env.VITE_MAP_ATTRIBUTION ||
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 19,
+    }).addTo(instance);
     const coords = stops.map(stop => [stop.lat, stop.lng] as L.LatLngTuple);
     L.polyline(coords, { color: '#15803d', weight: 5 }).addTo(instance);
     stops.forEach(stop => {

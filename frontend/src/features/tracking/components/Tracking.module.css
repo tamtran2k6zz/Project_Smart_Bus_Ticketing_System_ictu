@@ -2,15 +2,7 @@
   height: 420px;
   width: 100%;
   border-radius: 13px;
-  background:
-    repeating-linear-gradient(0deg, #eff4ed 0, #eff4ed 69px, #dae4d7 70px, #eff4ed 73px),
-    repeating-linear-gradient(
-      90deg,
-      transparent 0,
-      transparent 69px,
-      #dae4d7 70px,
-      transparent 73px
-    );
+  background: #e9eee7;
   z-index: 0;
 }
 .busMarker {
@@ -40,7 +32,7 @@
   font-size: 10px;
 }
 .map :global(.leaflet-control-attribution) {
-  font-size: 8px;
+  font-size: 11px;
 }
 @media (max-width: 600px) {
   .map {

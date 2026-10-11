@@ -123,6 +123,11 @@ export function describeRedisTarget(): RedisTarget {
 export function getPublicBaseUrl(): string {
   const configured = readEnv('PAYMENT_PUBLIC_BASE_URL') || readEnv('PUBLIC_API_BASE_URL');
   if (configured) return configured.replace(/\/+$/, '');
+  // Generated deployment URLs can require Vercel authentication. Gateways need
+  // the public production domain, which also preserves the customer's session.
+  const productionUrl = readEnv('VERCEL_PROJECT_PRODUCTION_URL');
+  if (readEnv('VERCEL_ENV') === 'production' && productionUrl)
+    return `https://${productionUrl.replace(/\/+$/, '')}`;
   const vercelUrl = readEnv('VERCEL_URL');
   if (vercelUrl) return `https://${vercelUrl.replace(/\/+$/, '')}`;
   return `http://localhost:${readEnv('PORT') || '5000'}`;

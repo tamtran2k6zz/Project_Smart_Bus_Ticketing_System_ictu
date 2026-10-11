@@ -238,12 +238,23 @@ export function PaymentResult() {
         : false,
   });
   const b = query.data;
+  const unverifiedReturn =
+    !appConfig.demo &&
+    !!b &&
+    ['pending', 'expired'].includes(b.status) &&
+    ['failed', 'unverified'].includes(params.get('paymentResult') || '');
   return (
     <>
       <PageTitle
         eyebrow="KẾT QUẢ TỪ DỊCH VỤ"
-        title={b ? statusText[b.status] : 'Đang kiểm tra giao dịch'}
-        description="Trang này đọc trạng thái từ dịch vụ; callback URL không quyết định kết quả."
+        title={
+          unverifiedReturn
+            ? 'Cần kiểm tra kết quả thanh toán'
+            : b
+              ? statusText[b.status]
+              : 'Đang kiểm tra giao dịch'
+        }
+        description="Kiểm tra kết quả thanh toán và vé của bạn."
       />
       <AsyncState query={query}>
         {b && (
@@ -253,6 +264,13 @@ export function PaymentResult() {
             </Badge>
             <PriceBreakdown booking={b} totalLabel="Tổng tiền" />
             <p className="muted">Mã đặt vé: {b.id}</p>
+            {unverifiedReturn && (
+              <Message error>
+                Chưa xác minh được kết quả từ cổng thanh toán. Nếu ngân hàng đã trừ tiền, đừng thanh
+                toán lại; hãy liên hệ nhà xe kèm mã đặt vé để đối soát. Vé chỉ được cấp sau khi có
+                xác nhận hợp lệ.
+              </Message>
+            )}
             {!appConfig.demo && b.status === 'paid' && (
               <p>
                 {b.ticketEmailStatus === 'sent'
@@ -265,15 +283,26 @@ export function PaymentResult() {
             <p className="muted">
               {b.status === 'paid'
                 ? 'Vé QR của bạn đã sẵn sàng trong Vé của tôi.'
-                : b.status === 'pending'
-                  ? appConfig.demo
-                    ? 'Giao dịch đang chờ xác nhận demo tại checkout.'
-                    : 'Giao dịch đang chờ cổng thanh toán xác nhận. Vé sẽ được cấp khi thanh toán thành công.'
-                  : 'Chưa phát hành QR. Kiểm tra trạng thái giao dịch hoặc liên hệ nhà xe để được hỗ trợ.'}
+                : unverifiedReturn
+                  ? 'Bạn có thể kiểm tra lại trạng thái bên dưới. Mã đặt vé giúp nhà xe tra cứu giao dịch.'
+                  : b.status === 'pending'
+                    ? appConfig.demo
+                      ? 'Giao dịch đang chờ xác nhận demo tại checkout.'
+                      : 'Giao dịch đang chờ cổng thanh toán xác nhận. Vé sẽ được cấp khi thanh toán thành công.'
+                    : 'Chưa phát hành QR. Kiểm tra trạng thái giao dịch hoặc liên hệ nhà xe để được hỗ trợ.'}
             </p>
             <div className="row">
               <LinkButton to="/account/tickets">Vé của tôi</LinkButton>
-              {['pending', 'failed'].includes(b.status) && (
+              {b.status !== 'paid' && (
+                <Button
+                  variant="secondary"
+                  disabled={query.isFetching}
+                  onClick={() => query.refetch()}
+                >
+                  Kiểm tra lại trạng thái
+                </Button>
+              )}
+              {!unverifiedReturn && ['pending', 'failed'].includes(b.status) && (
                 <LinkButton secondary to={'/checkout/' + b.id}>
                   Trở lại thanh toán
                 </LinkButton>

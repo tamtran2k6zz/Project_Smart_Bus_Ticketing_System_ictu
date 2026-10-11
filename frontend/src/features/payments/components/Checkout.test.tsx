@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useSession } from '@/store/session.store';
-import { Checkout } from './Checkout';
+import { Checkout, PaymentResult } from './Checkout';
 
 const api = vi.hoisted(() => ({
   booking: vi.fn(),
@@ -27,13 +27,14 @@ const user = {
   emailVerified: true,
 };
 let client: QueryClient;
-function open() {
+function open(result?: string) {
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={['/checkout/b1']}>
+      <MemoryRouter initialEntries={[result || '/checkout/b1']}>
         <Routes>
           <Route path="/checkout/:bookingId" element={<Checkout />} />
+          <Route path="/payment/result" element={<PaymentResult />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>
@@ -61,6 +62,23 @@ beforeEach(() => {
   });
   api.latest.mockResolvedValue({ id: 'p1', gateway: 'MoMo', status: 'pending', amount: 20000 });
   api.start.mockRejectedValue(new Error('Cổng thanh toán đang bận.'));
+});
+
+it('explains an unverified return without treating its URL as payment confirmation', async () => {
+  open('/payment/result?paymentOrder=b1&paymentResult=failed');
+  await screen.findByText(/Chưa xác minh được kết quả từ cổng thanh toán/);
+  expect(screen.queryByRole('link', { name: 'Trở lại thanh toán' })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Kiểm tra lại trạng thái' }));
+  await waitFor(() => expect(api.booking).toHaveBeenCalledTimes(2));
+  expect(api.start).not.toHaveBeenCalled();
+});
+
+it('shows the confirmed ticket when the API is paid even if the return URL says failed', async () => {
+  const booking = await api.booking();
+  api.booking.mockResolvedValue({ ...booking, status: 'paid', ticketEmailStatus: 'sent' });
+  open('/payment/result?paymentOrder=b1&paymentResult=failed');
+  await screen.findByText('Vé QR của bạn đã sẵn sàng trong Vé của tôi.');
+  expect(screen.queryByText(/Chưa xác minh được kết quả từ cổng thanh toán/)).toBeNull();
 });
 afterEach(() => {
   cleanup();

@@ -706,11 +706,49 @@ async function main() {
         .update(vnpayQuery)
         .digest('hex'),
     };
+    const tamperedReturn = await request(app)
+      .get('/api/v1/ticketing/payments/vnpay/return')
+      .query({ ...vnpayPayload, vnp_Amount: '1', path: 'v1/ticketing/payments/vnpay/return' });
+    assert.equal(tamperedReturn.status, 302);
+    assert.equal(
+      new URL(tamperedReturn.headers.location).searchParams.get('paymentResult'),
+      'unverified'
+    );
+    assert.equal(
+      (
+        await db.query('SELECT status FROM payment_transactions WHERE order_id=$1', [
+          vnpayReservation.ticketId,
+        ])
+      ).rows[0].status,
+      'PENDING'
+    );
+    const vnpayReturn = await request(app)
+      .get('/api/v1/ticketing/payments/vnpay/return')
+      .query({ ...vnpayPayload, path: 'v1/ticketing/payments/vnpay/return' });
+    assert.equal(vnpayReturn.status, 302);
+    assert.equal(
+      new URL(vnpayReturn.headers.location).searchParams.get('paymentResult'),
+      'success'
+    );
+    assert.equal(
+      (await db.query('SELECT status FROM tickets WHERE id=$1', [vnpayReservation.ticketId]))
+        .rows[0].status,
+      'BOOKED'
+    );
+    const bookedBeforeDuplicate = (
+      await db.query('SELECT booked_seats FROM trips WHERE id=$1', [trip])
+    ).rows[0].booked_seats;
     const vnpayFormResponse = await request(app)
       .post('/api/v1/ticketing/payments/vnpay/ipn')
+      .query({ path: 'v1/ticketing/payments/vnpay/ipn' })
       .type('form')
       .send(vnpayPayload);
     assert.equal(vnpayFormResponse.status, 200, JSON.stringify(vnpayFormResponse.body));
+    assert.equal(vnpayFormResponse.body.RspCode, '00');
+    assert.equal(
+      (await db.query('SELECT booked_seats FROM trips WHERE id=$1', [trip])).rows[0].booked_seats,
+      bookedBeforeDuplicate
+    );
     assert.equal(
       (
         await db.query('SELECT status FROM payment_transactions WHERE order_id=$1', [

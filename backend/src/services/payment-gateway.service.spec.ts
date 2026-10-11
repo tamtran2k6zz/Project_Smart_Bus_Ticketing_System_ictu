@@ -102,6 +102,40 @@ describe('PaymentGatewayService', () => {
     expect(body.signature).toEqual(expect.any(String));
   });
 
+  it('verifies the gateway signature when a Vercel rewrite adds a transport query parameter', () => {
+    process.env.VNPAY_HASH_SECRET = 'isolated-test-secret';
+    const params = {
+      vnp_Amount: '4800000',
+      vnp_ResponseCode: '00',
+      vnp_TransactionStatus: '00',
+      vnp_TransactionNo: '123456',
+      vnp_TxnRef: '39707322-8c5b-427e-b061-59fecb10d5c0',
+    };
+    const signed = new URLSearchParams(
+      Object.keys(params)
+        .sort()
+        .map(key => [key, params[key as keyof typeof params]])
+    ).toString();
+    const vnp_SecureHash = createHmac('sha512', process.env.VNPAY_HASH_SECRET)
+      .update(signed)
+      .digest('hex');
+    expect(
+      service.verifyVnpayCallback({
+        ...params,
+        vnp_SecureHash,
+        path: 'v1/ticketing/payments/vnpay/return',
+      })
+    ).toBe(true);
+    expect(
+      service.verifyVnpayCallback({
+        ...params,
+        vnp_Amount: '1',
+        vnp_SecureHash,
+        path: 'v1/ticketing/payments/vnpay/return',
+      })
+    ).toBe(false);
+  });
+
   it('verifies a signed MoMo IPN payload', () => {
     process.env.MOMO_ACCESS_KEY = 'access';
     process.env.MOMO_SECRET_KEY = 'secret';

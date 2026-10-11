@@ -76,7 +76,7 @@ export function Tracking() {
         title={route?.name || 'Vị trí xe & trạm'}
         description={
           appConfig.demo
-            ? 'Vị trí và ETA mô phỏng. Nền bản đồ là sơ đồ tuyến.'
+            ? 'Vị trí xe và ETA mô phỏng trên nền bản đồ địa lý.'
             : 'Vị trí và ETA từ dịch vụ nhà xe.'
         }
         action={

@@ -248,7 +248,9 @@ async function handleVnpayCallback(req: Request, res: Response, redirect: boolea
   } catch (error) {
     logger.error('vnpay_callback_failed', { entrypoint, order_id: orderId, error });
     if (redirect) {
-      res.redirect(paymentResultRedirect(isValidOrderId(orderId) ? orderId : undefined, 'failed'));
+      res.redirect(
+        paymentResultRedirect(isValidOrderId(orderId) ? orderId : undefined, 'unverified')
+      );
     } else {
       res.status(200).json({ RspCode: '99', Message: 'Payment confirmation failed' });
     }

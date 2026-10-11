@@ -24,6 +24,8 @@ describe('config/env', () => {
     'REDIS_PASSWORD',
     'PAYMENT_PUBLIC_BASE_URL',
     'VERCEL_URL',
+    'VERCEL_PROJECT_PRODUCTION_URL',
+    'VERCEL_ENV',
     'PORT',
     'MOMO_REDIRECT_URL',
     'MOMO_IPN_URL',
@@ -45,6 +47,18 @@ describe('config/env', () => {
       source: 'REDIS_URL',
       url: 'redis://cache:6379',
     });
+  });
+
+  it('uses the stable public production domain for payment callbacks instead of a protected deployment hostname', () => {
+    process.env.VERCEL_ENV = 'production';
+    process.env.VERCEL_URL = 'bus-protected-deployment.vercel.app';
+    process.env.VERCEL_PROJECT_PRODUCTION_URL = 'bus-public.vercel.app';
+    expect(getGatewayCallbacks().vnpayReturnUrl).toBe(
+      'https://bus-public.vercel.app/api/v1/ticketing/payments/vnpay/return'
+    );
+    expect(getGatewayCallbacks().paymentResultUrl).toBe(
+      'https://bus-public.vercel.app/payment/result'
+    );
   });
 
   it('builds a URL from REDIS_HOST/PORT/PASSWORD so Redis is never silently off', () => {

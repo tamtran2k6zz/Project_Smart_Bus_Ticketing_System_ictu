@@ -36,7 +36,8 @@ export class PaymentGatewayService {
 
     const signedParams = Object.fromEntries(
       Object.entries(params).filter(
-        ([key]) => key !== 'vnp_SecureHash' && key !== 'vnp_SecureHashType'
+        ([key]) =>
+          key.startsWith('vnp_') && key !== 'vnp_SecureHash' && key !== 'vnp_SecureHashType'
       )
     );
     const expected = this.hmac('sha512', hashSecret, this.encodeSortedParams(signedParams));
