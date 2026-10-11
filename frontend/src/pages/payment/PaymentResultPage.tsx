@@ -264,15 +264,6 @@ const PaymentResultPage: React.FC = () => {
                 Xem vé
               </button>
             )}
-            {/* QR demo xác nhận thanh toán đồng thời hoàn thành chuyến, nên được đánh giá ngay */}
-            {outcome === 'SUCCESS' && detail.paymentMethod === 'QR' && (
-              <button
-                onClick={() => navigate(BOOKING_PAGE, { state: { openTab: 'feedback' } })}
-                style={styles.secondaryButton}
-              >
-                Đánh giá chuyến đi
-              </button>
-            )}
             {outcome === 'FAILED' && (
               <button onClick={handleRetry} style={styles.primaryButton}>
                 Thử lại

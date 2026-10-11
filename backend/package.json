@@ -17,6 +17,7 @@
     "db:migrate": "node scripts/migrate-postgres.cjs",
     "db:import:mysql": "node scripts/import-mysql.cjs",
     "test:postgres": "node scripts/test-postgres.cjs",
+    "test:serverless": "node scripts/test-serverless.cjs",
     "db:create-admin": "node scripts/create-admin.cjs",
     "db:seed-seats": "node scripts/seed_seats.js",
     "typecheck": "tsc --noEmit"

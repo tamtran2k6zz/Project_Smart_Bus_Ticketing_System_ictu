@@ -59,9 +59,10 @@ router.get(
       // Sprint 3: tái sử dụng helper QR của ticket.service để định dạng
       // payload đồng bộ với POST /api/v1/tickets/validate-qr. Kèm exp + nonce
       // + chữ ký HMAC-SHA256 để endpoint kiểm tra hết hạn / chống replay.
-      const qrCodeBase64 = await generateTicketQrDataUrl(
-        buildQrPayload(ticket, { withSecurity: true })
-      );
+      const qrCodeBase64 =
+        ticket.status === 'BOOKED'
+          ? await generateTicketQrDataUrl(buildQrPayload(ticket, { withSecurity: true }))
+          : null;
 
       res.json({
         ticket_code: ticket.ticket_code,

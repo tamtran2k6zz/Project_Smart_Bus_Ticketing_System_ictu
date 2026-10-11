@@ -165,7 +165,7 @@ Use repository root as the Vercel **Root Directory**, **Other** as the framework
 
 - Install root, backend, and frontend packages using their lockfiles.
 - Compile the Express backend and build the frontend to `frontend/dist`.
-- Route `/api/*` to `api/index.ts` before the SPA fallback.
+- Route `/api/*` to `/api/adapter` before the SPA fallback. The root function `api/adapter.js` loads `backend/dist/app.js`; include `backend/dist/**` in the function bundle. Run `npm --prefix backend run build` and `npm --prefix backend run test:serverless` to verify this entrypoint locally. Cloud deployment still requires a preview smoke test.
 
 In the target project's **Settings → Environment Variables**, set `DATABASE_URL`, `JWT_SECRET`, and `DB_POOL_MAX=2` for Production. Set Preview separately to a test database. Remove old `VITE_API_URL`/`VITE_API_BASE_URL` overrides so requests use the same Vercel origin. The Supabase URL is a database endpoint, not a replacement for the Express API URL.
 

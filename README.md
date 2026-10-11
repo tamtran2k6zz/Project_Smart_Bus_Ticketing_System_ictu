@@ -137,7 +137,7 @@ Cần nối xác thực phiên/cookie, tồn ghế/hold/giá server, webhook tha
 Hệ thống sử dụng mô hình kiến trúc Serverless Micro-Architecture kết hợp Single-Page Application (SPA):
 
 - **Frontend:** React 19 / Vite SPA; chế độ demo/API và giao diện mới/cũ được chọn lúc build bằng biến `VITE_*`.
-- **Backend API:** Entrypoint `api/index.ts` điều hướng toàn bộ yêu cầu `/api/*` tới Express Engine (Node.js Serverless Function).
+- **Backend API:** Entrypoint `api/adapter.js` nạp Express đã biên dịch từ `backend/dist/app.js` và nhận yêu cầu `/api/*` (Node.js Serverless Function). Entrypoint TypeScript ở `backend/api/index.ts` cũng được kiểm tra bằng `npm --prefix backend run typecheck`.
 - **Database:** **Supabase PostgreSQL** kết nối qua Transaction Pooler (PgBouncer cổng `6543`) tối ưu tài nguyên kết nối serverless; bảo mật toàn diện qua **Row-Level Security (RLS)** trên 14 bảng.
 
 ```
@@ -156,7 +156,7 @@ Hệ thống sử dụng mô hình kiến trúc Serverless Micro-Architecture k�
                      ▼                                           ▼
        ┌───────────────────────────┐               ┌───────────────────────────┐
        │   Frontend SPA (dist/)    │               │    Serverless Function    │
-       │   React 19 + CSS         │               │      (api/index.ts)       │
+       │   React 19 + CSS         │               │     (api/adapter.js)      │
        │   Client-side Routing     │               │   Express RESTful Engine  │
        └───────────────────────────┘               └─────────────┬─────────────┘
                                                                  │
@@ -237,7 +237,7 @@ Phần này mô tả nghiệp vụ của backend/giao diện cũ. Trạng thái 
 1. Vào `/passenger/booking`, chọn chuyến và một ghế trống. Nút **Tiếp tục thanh toán** mở `/payment`; bước này chưa tạo giao dịch hoặc giữ ghế.
 2. Tại `/payment`, kiểm tra thông tin đặt chỗ và chọn **VNPay**, **MoMo** hoặc **QR (demo)**. Bấm xác nhận để gọi `POST /api/v1/ticketing/bookings`; máy chủ xác định giá vé và giữ ghế tối đa 10 phút. Nút gửi được khóa trong khi xử lý để tránh tạo nhiều giao dịch khi bấm liên tiếp.
 3. Với VNPay/MoMo, trình duyệt chuyển sang URL HTTPS của cổng đã được cho phép. Kết quả được hiển thị tại `/payment/result`, đọc mã giao dịch từ `orderId` hoặc `paymentOrder` và tra cứu trạng thái từ API; không xác nhận thanh toán dựa trên query URL.
-4. Với QR demo, người dùng quay về trang đặt vé để xem QR thông tin giao dịch. QR này không chuyển tiền. Nút **Hoàn thành chuyến đi (demo)** mô phỏng xác nhận thanh toán/vé và hoàn thành chuyến trên dữ liệu chung, sau đó mở phần đánh giá.
+4. Với QR demo, người dùng quay về trang đặt vé để xem QR thông tin giao dịch. QR này không chuyển tiền. Nút **Xác nhận thanh toán (demo)** chỉ dùng khi máy chủ ngoài production đã bật `PAYMENT_DEMO_ENABLED=true`; xác nhận vé và giữ nguyên trạng thái chuyến. Chỉ đánh giá sau khi chuyến thực sự kết thúc.
 5. Trang kết quả hỗ trợ **Xem vé**, **Thử lại** khi giao dịch thất bại và tự kiểm tra giao dịch đang chờ tối đa 10 lần, mỗi 3 giây. **Xem vé** mở tab lịch sử và đánh dấu vé tương ứng; callback cũ về trang đặt vé được chuyển tiếp sang trang kết quả.
 
 Khi tải lại hoặc mở `/payment` trong cùng tab, hệ thống khôi phục bản nháp còn hạn. Nếu bản nháp không còn nhưng có phiên giao dịch đã tạo, hệ thống mở kết quả giao dịch đó. Khi chưa có dữ liệu, trang vẫn có **Quay lại** và **Chọn chuyến xe**. Nút **Quay lại** giữ đúng chuyến, ghế và voucher; ghế chỉ được chọn lại nếu API xác nhận vẫn trống.
@@ -510,10 +510,10 @@ Tất cả các API hỗ trợ đồng thời cả hai tiền tố định tuy�
 
 - `GET /trips/:tripId/seats`: Lấy sơ đồ ghế dùng bởi trang đặt vé.
 - `POST /bookings`: Frontend gửi `tripId`, `seatNumber` và `paymentMethod` (`VNPAY`, `MOMO` hoặc `QR`), kèm `voucherCode` nếu có. Máy chủ lưu giao dịch/giá vé vào PostgreSQL và giữ ghế 10 phút. Response trả về `data.payment.orderId` — UUID của giao dịch; với VNPay/MoMo còn có `data.paymentUrl`. QR demo chỉ hiển thị dữ liệu và không tự xác nhận thanh toán.
-- **Tương thích API cũ:** Nếu không truyền `paymentMethod`, backend đi theo nhánh đặt vé trực tiếp (`BOOKED`) thay vì tạo giao dịch chờ thanh toán. Luồng frontend hiện tại luôn truyền phương thức rõ ràng.
+- **Thiếu phương thức:** Nếu không truyền `paymentMethod`, backend mặc định `QR` và tạo giữ chỗ `RESERVED/PENDING`. Vé chưa thanh toán không có QR dùng để soát và không được xác nhận `BOOKED` trực tiếp.
 - `GET /my-tickets`: Lấy lịch sử vé của tài khoản đăng nhập.
-- `POST /bookings/:ticketId/demo-complete`: Mô phỏng thanh toán QR và hoàn thành chuyến; không chuyển tiền thật.
-- `POST /tickets/:ticketId/cancel`: Hủy vé/giữ chỗ và xử lý hoàn tiền nếu phù hợp.
+- `POST /bookings/:ticketId/demo-complete`: Chỉ mô phỏng thanh toán QR khi `PAYMENT_DEMO_ENABLED=true` trong môi trường ngoài production; mặc định tắt. Xác nhận vé còn hạn trên chuyến chưa khởi hành, không đổi trạng thái toàn chuyến và không chuyển tiền thật. Production luôn trả 404.
+- `POST /tickets/:ticketId/cancel`: Hủy giữ chỗ chưa thanh toán ngay; vé đã mua cần gửi trước khởi hành ít nhất 30 phút và chưa soát. Máy chủ lưu trạng thái hủy trước khi gọi hoàn tiền. Nếu provider lỗi, response có `ticketStatus=CANCELLED`, `refundPending=true`; vé không thể sử dụng, gửi lại cùng endpoint để tiếp tục hoàn tiền với cùng mã yêu cầu. Gọi lại sau hoàn tiền thành công không tạo yêu cầu hoàn mới.
 - `POST /verify`: Soát vé điện tử bằng chuỗi mã QR hoặc mã vé, đổi trạng thái `CHECKED_IN`.
 
 ### 6. Phân hệ Thanh toán (`/api/v1/ticketing`)
