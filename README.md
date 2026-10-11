@@ -1,4 +1,5 @@
-# 🚌 SmartBus — Hệ thống bán vé và quản lý xe buýt thông minh
+# <img width="37" height="42" alt="image" src="https://github.com/user-attachments/assets/e99a581d-9797-4d3d-942c-1974d42c3183" />
+ SmartBus — Hệ thống bán vé và quản lý xe buýt thông minh
 
 **Đồ án Thực tập Cơ sở 2026 — Nhóm 5 (N5 Innovators)**
 
