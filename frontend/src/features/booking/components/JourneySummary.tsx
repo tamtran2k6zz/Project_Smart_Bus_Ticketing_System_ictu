@@ -3,6 +3,8 @@ import { operationsApi } from '@/features/operations/services/operations.api';
 import { bookingApi } from '../services/booking.api';
 import { AsyncState } from '@/components/ui/Ui';
 import { dateTime } from '@/utils/format';
+import { boardingDeparture } from '../utils/journey';
+import { appConfig } from '@/configs/app.config';
 export function JourneySummary({
   tripId,
   boardingStopId,
@@ -22,8 +24,8 @@ export function JourneySummary({
           <h3>{route?.name}</h3>
           <dl className="journeySummary">
             <div>
-              <dt>Khởi hành tại đầu tuyến</dt>
-              <dd>{trip.data && dateTime(trip.data.departure)}</dd>
+              <dt>Giờ đón dự kiến tại trạm</dt>
+              <dd>{trip.data && dateTime(boardingDeparture(trip.data, route, boardingStopId))}</dd>
             </div>
             <div>
               <dt>Điểm lên xe</dt>
@@ -40,7 +42,9 @@ export function JourneySummary({
             </div>
           </dl>
           <p className="muted">
-            Giờ đón tại trạm trung gian cần nhà xe xác nhận. Giá demo áp dụng cho cả tuyến.
+            {appConfig.demo
+              ? 'Giờ đón tại trạm trung gian cần nhà xe xác nhận. Giá demo áp dụng cho cả tuyến.'
+              : 'Giờ đón dự kiến theo lịch trình trạm; theo dõi GPS để cập nhật tình hình xe. Giá vé áp dụng cho cả tuyến.'}
           </p>
         </section>
       </AsyncState>

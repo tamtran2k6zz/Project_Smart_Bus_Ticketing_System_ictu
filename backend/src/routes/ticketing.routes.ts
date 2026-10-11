@@ -1,6 +1,7 @@
+import { cancelTicket } from '../services/cancellation.service';
 import { randomUUID } from 'crypto';
 import { Request, Response, Router } from 'express';
-import { dbPool, query, transaction } from '../config/database';
+import { query, transaction } from '../config/database';
 import { getSeatsByTrip } from '../controllers/seats.controller';
 import { AuthenticatedRequest, authenticateJWT } from '../middlewares/auth';
 import { authorizeRoles } from '../middlewares/rbac';
@@ -9,7 +10,7 @@ import { validateTicketQr } from '../services/ticket.service';
 import { appLogger } from '../config/logger';
 import { getGatewayCallbacks, readEnv } from '../config/env';
 import { PaymentGatewayService, OnlinePaymentMethod } from '../services/payment-gateway.service';
-import { BookingError, bookSeat, reserveSeatForPayment } from '../services/booking';
+import { BookingError, reserveSeatForPayment } from '../services/booking';
 import { PaymentRefundError, PaymentRefundService } from '../services/payment-refund.service';
 
 const router = Router();
@@ -68,7 +69,7 @@ async function confirmPayment(
     } = await client.query(
       `SELECT p.ticket_id,p.amount,p.status,p.payment_method,p.redis_lock_id,
               t.status AS ticket_status,t.trip_id,t.seat_number,t.user_id,t.ticket_code,
-              t.reservation_expires_at
+              t.reservation_expires_at,t.quantity
        FROM payment_transactions p JOIN tickets t ON t.id=p.ticket_id
        WHERE p.order_id=$1 FOR UPDATE OF p,t`,
       [orderId]
@@ -77,7 +78,7 @@ async function confirmPayment(
       return 'INVALID';
     if (payment.status === 'REFUNDED') return 'REFUNDED';
     if (payment.status === 'SUCCESS') {
-      return payment.ticket_status === 'BOOKED' ? 'CONFIRMED' : 'LATE';
+      return ['BOOKED', 'CHECKED_IN'].includes(payment.ticket_status) ? 'CONFIRMED' : 'LATE';
     }
     if (!['PENDING', 'FAILED'].includes(payment.status)) return 'INVALID';
 
@@ -102,8 +103,9 @@ async function confirmPayment(
        locked_by_user_id=NULL,redis_lock_id=NULL WHERE ticket_id=$1`,
       [payment.ticket_id]
     );
-    await client.query('UPDATE trips SET booked_seats=booked_seats+1 WHERE id=$1', [
+    await client.query('UPDATE trips SET booked_seats=booked_seats+$2 WHERE id=$1', [
       payment.trip_id,
+      payment.quantity,
     ]);
     return 'CONFIRMED';
   });
@@ -365,6 +367,13 @@ router.get(
 
 router.post(
   '/bookings/:ticketId/demo-complete',
+  (_req, res, next) => {
+    if (process.env.NODE_ENV === 'production' || readEnv('ENABLE_DEMO_PAYMENTS') !== 'true') {
+      res.status(404).json({ success: false, message: 'Chức năng mô phỏng thanh toán đã tắt.' });
+      return;
+    }
+    next();
+  },
   authenticateJWT,
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
@@ -483,7 +492,7 @@ router.post(
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const { tripId, seatNumber } = req.body;
     const requestedPaymentMethod = req.body.paymentMethod;
-    const paymentMethod = requestedPaymentMethod ?? 'QR';
+    const paymentMethod = requestedPaymentMethod;
     const userId = req.user!.id;
     if (!tripId || typeof seatNumber !== 'string' || !seatNumber.trim()) {
       res.status(400).json({ success: false, message: 'Vui lòng chọn chuyến xe và ghế.' });
@@ -518,21 +527,6 @@ router.post(
     let reservationTicketId: string | undefined;
     let keepReservationLock = false;
     try {
-      if (requestedPaymentMethod === undefined) {
-        const ticket = await bookSeat(String(tripId), seatNumber, userId);
-        const data = {
-          ticket,
-          qrCode: `SMARTBUS-QR-${ticket.ticket_code}`,
-          ticketId: ticket.id,
-          ticketCode: ticket.ticket_code,
-          seatNumber: ticket.seat_number,
-          fareAmount: Number(ticket.fare_amount),
-          status: ticket.status,
-        };
-        res.status(201).json({ success: true, message: 'Đặt vé thành công!', data, ...data });
-        return;
-      }
-
       const ticket = await reserveSeatForPayment(
         String(tripId),
         seatNumber,
@@ -774,111 +768,36 @@ router.post(
   authenticateJWT,
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      const {
-        rows: [ticket],
-      } = await dbPool.query(
-        `SELECT t.id,t.trip_id,t.user_id,t.seat_number,t.status AS ticket_status,
-              p.order_id,p.payment_method,p.amount,p.status AS payment_status,
-              p.gateway_transaction_id,p.refund_request_id,p.paid_at,p.redis_lock_id,
-              tr.departure_time
-       FROM tickets t 
-       LEFT JOIN payment_transactions p ON p.ticket_id=t.id 
-       JOIN trips tr ON tr.id=t.trip_id 
-       WHERE t.id=$1`,
-        [req.params.id]
-      );
-      if (!ticket) {
-        res.status(404).json({ success: false, message: 'Không tìm thấy vé.' });
-        return;
-      }
-      if (ticket.departure_time && new Date(ticket.departure_time).getTime() <= Date.now()) {
-        res
-          .status(400)
-          .json({ success: false, message: 'Không thể hủy vé sau khi chuyến xe đã khởi hành.' });
-        return;
-      }
-      if (req.user?.role !== 'ADMIN' && ticket.user_id !== req.user?.id) {
-        res.status(403).json({ success: false, message: 'Bạn không có quyền hủy vé này.' });
-        return;
-      }
-      if (ticket.ticket_status === 'CHECKED_IN') {
-        res.status(400).json({ success: false, message: 'Vé đã soát, không thể hủy.' });
-        return;
-      }
-      if (ticket.ticket_status === 'CANCELLED') {
-        res.status(409).json({ success: false, message: 'Vé đã được hủy.' });
-        return;
-      }
-      if (ticket.payment_status === 'PENDING') {
-        res.status(409).json({ success: false, message: 'Thanh toán đang chờ xác nhận.' });
-        return;
-      }
-      if (ticket.payment_status === 'SUCCESS') {
-        const refundRequestId = ticket.refund_request_id || randomUUID();
-        await query(
-          `UPDATE payment_transactions SET refund_request_id=COALESCE(refund_request_id,$1)
-         WHERE order_id=$2 AND status='SUCCESS'`,
-          [refundRequestId, ticket.order_id]
-        );
-        const rows = await query<any[]>(
-          `SELECT refund_request_id FROM payment_transactions WHERE order_id=$1`,
-          [ticket.order_id]
-        );
-        await refunds.refund({
-          paymentMethod: ticket.payment_method,
-          amount: Math.round(Number(ticket.amount)),
-          gatewayTransactionId: ticket.gateway_transaction_id,
-          refundRequestId: rows[0].refund_request_id,
-          paidAt: ticket.paid_at ? new Date(ticket.paid_at) : null,
-          bookingCode: ticket.order_id,
-        });
-      }
-      await transaction(async client => {
-        if (ticket.payment_status === 'SUCCESS') {
-          await client.query(
-            "UPDATE payment_transactions SET status='REFUNDED' WHERE order_id=$1 AND status='SUCCESS'",
-            [ticket.order_id]
-          );
-        }
-        const { rowCount } = await client.query(
-          "UPDATE tickets SET status='CANCELLED' WHERE id=$1 AND status IN ('RESERVED','BOOKED')",
-          [ticket.id]
-        );
-        if (rowCount) {
-          await client.query(
-            `UPDATE trip_seats SET status='AVAILABLE',ticket_id=NULL,locked_at=NULL,
-           lock_expires_at=NULL,locked_by_user_id=NULL,redis_lock_id=NULL WHERE ticket_id=$1`,
-            [ticket.id]
-          );
-          if (ticket.ticket_status === 'BOOKED') {
-            await client.query(
-              'UPDATE trips SET booked_seats=GREATEST(booked_seats-1,0) WHERE id=$1',
-              [ticket.trip_id]
-            );
-          }
-        }
-      });
-      await releaseSeatLock(ticket.trip_id, ticket.seat_number, ticket.redis_lock_id || undefined);
+      const result = await cancelTicket(req.params.id, req.user!.id, req.user!.role);
       res.json({
         success: true,
         message: 'Đã hủy vé và xử lý hoàn tiền nếu giao dịch đã thanh toán.',
-        refundAmount: ticket.payment_status === 'SUCCESS' ? Number(ticket.amount) : 0,
+        ...result,
       });
     } catch (error: any) {
       logger.error('ticket_cancellation_failed', {
-        table: 'tickets/trip_seats/payment_transactions',
         ticket_id: req.params.id,
         user_id: req.user?.id,
         error,
       });
-      res.status(error instanceof PaymentRefundError ? error.statusCode : 500).json({
-        success: false,
-        message: error.message || 'Không thể hủy vé.',
-      });
+      res
+        .status(
+          error instanceof PaymentRefundError
+            ? error.statusCode
+            : error instanceof BookingError
+              ? error.status
+              : 500
+        )
+        .json({
+          success: false,
+          message:
+            error instanceof PaymentRefundError || error instanceof BookingError
+              ? error.message
+              : 'Không thể hủy vé.',
+        });
     }
   }
 );
-
 async function releaseExpiredHandler(req: Request, res: Response): Promise<void> {
   const secrets = [process.env.PAYMENT_CRON_SECRET, process.env.CRON_SECRET]
     .map(secret => secret?.trim())
@@ -920,7 +839,13 @@ router.post(
       // Sprint 3: delegate sang ticket.service.validateTicketQr —
       // cùng lõi với POST /api/v1/tickets/validate-qr nhưng thêm ghi log
       // kiểm toán (ticket_validation_logs) và khóa phân tán chống quét trùng.
-      const result = await validateTicketQr({ code: req.body.code, validatedBy: req.user?.id });
+      const result = await validateTicketQr({
+        code: req.body.code,
+        validatedBy: req.user?.id,
+        validatedRole: req.user?.role,
+        manual: req.body.manual === true,
+        tripId: req.body.tripId,
+      });
       res.json({ success: true, ...result });
     } catch (error: any) {
       res

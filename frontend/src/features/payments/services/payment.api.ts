@@ -1,7 +1,6 @@
 import { service } from '@/services/adapter';
 import { audit, notify, iso, uid } from '@/services/mocks/database';
 import { ownBooking, getTrip } from '@/features/booking/services/booking.api';
-import { request } from '@/services/http';
 import { appConfig } from '@/configs/app.config';
 import type { Gateway, Payment } from '../types';
 export const paymentApi = {
@@ -98,5 +97,4 @@ export const paymentApi = {
       },
       'POST'
     ),
-  realInvoice: (id: string) => request<{ url: string }>('/bookings/' + id + '/invoice'),
 };

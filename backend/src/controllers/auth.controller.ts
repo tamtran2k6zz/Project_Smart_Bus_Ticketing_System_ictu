@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { sendEmail } from '../services/email.service';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { query } from '../config/database';
@@ -105,16 +106,16 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     });
 
     const recipientEmail = email.trim().toLowerCase();
-    logger.info('account_confirmation_email_sent', {
-      recipient: recipientEmail,
-      subject: '[SmartBus ICTU] Xác nhận đăng ký tài khoản thành công',
-      message: `Xin chào ${full_name.trim()}, tài khoản SmartBus của bạn đã được khởi tạo thành công.`,
-    });
+    const emailSent = await sendEmail(
+      recipientEmail,
+      '[SmartBus ICTU] Đăng ký thành công',
+      `Xin chào ${full_name.trim()}, tài khoản SmartBus của bạn đã được khởi tạo thành công.`
+    );
 
     res.status(201).json({
       statusCode: 201,
       success: true,
-      message: `Đăng ký tài khoản thành công! Đã tự động gửi email xác nhận và thông tin tài khoản tới ${recipientEmail}.`,
+      message: 'Đăng ký tài khoản thành công!',
       data: {
         user: {
           id: newUserId,
@@ -129,8 +130,10 @@ export const register = async (req: Request, res: Response): Promise<void> => {
           tokenType: 'Bearer',
           expiresIn: 86400,
         },
-        emailSent: true,
-        emailConfirmationNotice: `Thư xác nhận đã được gửi thành công đến hộp thư ${recipientEmail}.`,
+        emailSent,
+        emailConfirmationNotice: emailSent
+          ? 'Đã gửi email xác nhận.'
+          : 'Tài khoản đã được tạo; email xác nhận chưa được gửi.',
       },
     });
   } catch (err: any) {

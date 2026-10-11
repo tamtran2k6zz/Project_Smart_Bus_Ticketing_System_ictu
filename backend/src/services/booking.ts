@@ -130,9 +130,10 @@ export async function reserveSeatForPayment(
   seatNumber: string,
   userId: string,
   paymentMethod: 'VNPAY' | 'MOMO' | 'QR',
-  redisLockId: string
+  redisLockId: string,
+  sharedClient?: PoolClient
 ) {
-  return transaction(async client => {
+  const work = async (client: PoolClient) => {
     const trip = await prepareSeats(client, tripId);
     assertBookableTrip(trip);
     const {
@@ -144,6 +145,7 @@ export async function reserveSeatForPayment(
     if (!seat) throw new BookingError(404, 'Ghế không tồn tại.');
     if (
       ['BOOKED', 'CHECKED_IN'].includes(seat.status) ||
+      (seat.status === 'LOCKED' && seat.ticket_id) ||
       (seat.status === 'LOCKED' && seat.locked_by_user_id !== userId)
     ) {
       throw new BookingError(409, 'Ghế đã được đặt hoặc đang có người giữ chỗ.');
@@ -173,7 +175,8 @@ export async function reserveSeatForPayment(
       [ticketId, paymentMethod, trip.base_price, redisLockId]
     );
     return ticket;
-  });
+  };
+  return sharedClient ? work(sharedClient) : transaction(work);
 }
 
 export async function holdSeat(tripId: string, seatNumber: string, userId: string) {

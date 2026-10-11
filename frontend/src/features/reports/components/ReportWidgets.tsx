@@ -78,7 +78,7 @@ export function OccupancyChart({ report }: { report: Report }) {
         <ResponsiveContainer>
           <LineChart data={report.rows} accessibilityLayer>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="routeId" tick={{ fontSize: 10 }} />
+            <XAxis dataKey="route" tick={{ fontSize: 10 }} />
             <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
             <Tooltip formatter={value => Number(value) + '%'} />
             <Line

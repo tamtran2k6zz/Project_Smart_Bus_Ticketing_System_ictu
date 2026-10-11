@@ -2,7 +2,7 @@ import type { Permission, Role, User } from '@/features/auth/types';
 export const rolePermissions: Record<Role, Permission[]> = {
   PASSENGER: [],
   DRIVER: ['check-in'],
-  MANAGER: ['operations', 'check-in', 'support', 'eligibility'],
+  MANAGER: ['operations', 'check-in', 'support', 'eligibility', 'reports'],
   FINANCE: ['reports', 'promotions'],
   ADMIN: [
     'operations',

@@ -43,14 +43,19 @@ export function Checkout() {
     queryFn: () => bookingApi.hold(query.data!.holdId, user.id),
     enabled: !!query.data,
   });
-  const start = useAction(async () => {
-    const p = await paymentApi.start(bookingId, user.id, gateway);
-    if (p.redirectUrl && !appConfig.demo) {
-      const url = new URL(p.redirectUrl);
-      if (url.protocol !== 'https:') throw new Error('URL cổng thanh toán không an toàn.');
-      window.location.assign(url.href);
-    }
-  }, 'Giao dịch demo đang chờ xác nhận. Chọn kết quả mô phỏng bên dưới.');
+  const start = useAction(
+    async () => {
+      const p = await paymentApi.start(bookingId, user.id, gateway);
+      if (p.redirectUrl && !appConfig.demo) {
+        const url = new URL(p.redirectUrl);
+        if (url.protocol !== 'https:') throw new Error('URL cổng thanh toán không an toàn.');
+        window.location.assign(url.href);
+      }
+    },
+    appConfig.demo
+      ? 'Giao dịch demo đang chờ xác nhận. Chọn kết quả mô phỏng bên dưới.'
+      : 'Đã khởi tạo thanh toán. Vui lòng hoàn tất tại cổng thanh toán.'
+  );
   const confirm = useAction(async (status: Payment['status']) => {
     if (!payment.data) throw new Error('Khởi tạo giao dịch trước.');
     await paymentApi.confirmDemo(payment.data.id, user.id, status);
@@ -80,7 +85,10 @@ export function Checkout() {
               <Card>
                 <h3>Chọn phương thức</h3>
                 <div className="grid">
-                  {(['MoMo', 'VNPay', 'ZaloPay', 'Card'] as Gateway[]).map(value => (
+                  {(appConfig.demo
+                    ? (['MoMo', 'VNPay', 'ZaloPay', 'Card'] as Gateway[])
+                    : (['MoMo', 'VNPay', 'Card'] as Gateway[])
+                  ).map(value => (
                     <label
                       key={value}
                       className="row"
@@ -194,7 +202,7 @@ const statusText = {
 export function PaymentResult() {
   const [params] = useSearchParams(),
     user = useSession(s => s.user)!;
-  const id = params.get('bookingId') || '';
+  const id = params.get('bookingId') || params.get('paymentOrder') || params.get('orderId') || '';
   const query = useQuery({
     queryKey: ['booking', id, user.id],
     queryFn: () => bookingApi.booking(id, user.id),
@@ -220,8 +228,10 @@ export function PaymentResult() {
               {b.status === 'paid'
                 ? 'Vé QR của bạn đã sẵn sàng trong Vé của tôi.'
                 : b.status === 'pending'
-                  ? 'Giao dịch đang chờ. Demo cần xác nhận tại checkout; hệ thống thật chờ webhook của cổng.'
-                  : 'Chưa phát hành QR. Giao dịch thất bại/hủy trong demo không thu tiền.'}
+                  ? appConfig.demo
+                    ? 'Giao dịch đang chờ xác nhận demo tại checkout.'
+                    : 'Giao dịch đang chờ cổng thanh toán xác nhận. Vé sẽ được cấp khi thanh toán thành công.'
+                  : 'Chưa phát hành QR. Kiểm tra trạng thái giao dịch hoặc liên hệ nhà xe để được hỗ trợ.'}
             </p>
             <div className="row">
               <LinkButton to="/account/tickets">Vé của tôi</LinkButton>

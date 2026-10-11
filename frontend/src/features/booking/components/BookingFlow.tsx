@@ -12,6 +12,7 @@ import { JourneySummary } from './JourneySummary';
 import { useSession } from '@/store/session.store';
 import { useBookingDraft } from '@/store/booking.store';
 import { useAction } from '@/hooks/useAction';
+import { appConfig } from '@/configs/app.config';
 import {
   Card,
   Button,
@@ -304,7 +305,15 @@ export function BookingFlow() {
                   <Field label="Số điện thoại" error={form.formState.errors.phone?.message}>
                     <input autoComplete="tel" {...form.register('phone')} />
                   </Field>
-                  <Field label="Mã ưu đãi" hint="Demo: SMART10 giảm 10%" error={voucherError}>
+                  <Field
+                    label="Mã ưu đãi"
+                    hint={
+                      appConfig.demo
+                        ? 'Demo: SMART10 giảm 10%'
+                        : 'Nhập mã do nhà xe cung cấp nếu có.'
+                    }
+                    error={voucherError}
+                  >
                     <input
                       placeholder="Nhập mã nếu có"
                       autoComplete="off"
@@ -354,8 +363,7 @@ export function BookingFlow() {
                     {book.isPending ? 'Đang tạo đặt vé…' : 'Tiếp tục thanh toán'}
                   </Button>
                   <p className="muted">
-                    Bạn xác nhận đã kiểm tra thông tin và chính sách hủy/đổi demo trước khi tiếp
-                    tục.
+                    Bạn xác nhận đã kiểm tra thông tin và chính sách hủy/đổi trước khi tiếp tục.
                   </p>
                 </form>
               </Card>
