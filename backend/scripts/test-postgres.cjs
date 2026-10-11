@@ -162,6 +162,8 @@ async function main() {
     const passenger = first.data.tokens.accessToken;
     const second = await register('other@example.test');
     const other = second.data.tokens.accessToken;
+    // Paid-seat fixtures are already verified; verification itself is exercised separately.
+    await db.query('UPDATE users SET email_verified_at=NOW() WHERE id=ANY($1::text[])', [[first.data.user.id, second.data.user.id]]);
     await db.query("UPDATE users SET role='ADMIN',role_id=1 WHERE id=$1", [first.data.user.id]);
     const login = await call('post', '/api/auth/login', {
       email: 'passenger@example.test',
@@ -857,7 +859,7 @@ async function main() {
           "SELECT count(*)::int AS n FROM pg_tables WHERE schemaname='public' AND rowsecurity"
         )
       ).rows[0].n,
-      27
+      28
     );
     await require('./test-ui-contract.cjs')({
       app,
@@ -872,6 +874,7 @@ async function main() {
       second,
       momoCallback,
     });
+    await require('./test-email-contract.cjs')({ app,db,call,request,route,admin,momoCallback });
     await call('delete', `/api/routes/${route}`, null, admin);
     await call('delete', `/api/routes/${routeWithStops}`, null, admin);
     assert.equal((await call('get', '/api/routes')).data.length, 0);

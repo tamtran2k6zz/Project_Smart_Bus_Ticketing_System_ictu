@@ -12,6 +12,11 @@ import { getGatewayCallbacks, readEnv } from '../config/env';
 import { PaymentGatewayService, OnlinePaymentMethod } from '../services/payment-gateway.service';
 import { BookingError, reserveSeatForPayment } from '../services/booking';
 import { PaymentRefundError, PaymentRefundService } from '../services/payment-refund.service';
+import {
+  queueTicketEmail,
+  deliverTicketEmail,
+  processPendingTicketEmails,
+} from '../services/ticket-email.service';
 
 const router = Router();
 const logger = appLogger.child('ticketing');
@@ -63,7 +68,7 @@ async function confirmPayment(
   gatewayTransactionId: string,
   amount: number
 ): Promise<'CONFIRMED' | 'LATE' | 'REFUNDED' | 'INVALID'> {
-  return transaction(async client => {
+  const outcome = await transaction<'CONFIRMED' | 'LATE' | 'REFUNDED' | 'INVALID'>(async client => {
     const {
       rows: [payment],
     } = await client.query(
@@ -78,6 +83,8 @@ async function confirmPayment(
       return 'INVALID';
     if (payment.status === 'REFUNDED') return 'REFUNDED';
     if (payment.status === 'SUCCESS') {
+      if (['BOOKED', 'CHECKED_IN'].includes(payment.ticket_status))
+        await queueTicketEmail(client, payment.ticket_id);
       return ['BOOKED', 'CHECKED_IN'].includes(payment.ticket_status) ? 'CONFIRMED' : 'LATE';
     }
     if (!['PENDING', 'FAILED'].includes(payment.status)) return 'INVALID';
@@ -107,8 +114,18 @@ async function confirmPayment(
       payment.trip_id,
       payment.quantity,
     ]);
+    await queueTicketEmail(client, payment.ticket_id);
     return 'CONFIRMED';
   });
+  if (outcome === 'CONFIRMED') {
+    // Email failure must never turn a confirmed payment into a failed callback.
+    try {
+      await deliverTicketEmail(orderId);
+    } catch (error) {
+      logger.error('ticket_email_retry_needed', { order_id: orderId, error });
+    }
+  }
+  return outcome;
 }
 
 async function refundLatePayment(orderId: string): Promise<void> {
@@ -813,7 +830,8 @@ async function releaseExpiredHandler(req: Request, res: Response): Promise<void>
   }
   try {
     const affectedRows = await releaseExpiredReservations();
-    res.json({ success: true, affectedRows });
+    const ticketEmailsSent = await processPendingTicketEmails(1);
+    res.json({ success: true, affectedRows, ticketEmailsSent });
   } catch (error) {
     logger.error('expiry_cleanup_failed', {
       table: 'tickets/trip_seats/payment_transactions',

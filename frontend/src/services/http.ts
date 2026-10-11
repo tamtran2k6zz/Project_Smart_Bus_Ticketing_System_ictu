@@ -55,6 +55,8 @@ export async function request<T>(
       phone: u.phoneNumber || '',
       role: u.role,
       active: u.status === 'ACTIVE',
+      emailVerified: u.emailVerified === true,
+      emailVerificationNotice: value.emailConfirmationNotice,
       permissions: rolePermissions[u.role as Role] || [],
     } as T;
   }

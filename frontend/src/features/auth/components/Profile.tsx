@@ -6,6 +6,8 @@ import { useAction } from '@/hooks/useAction';
 import { authApi } from '../services/auth.api';
 import { PageTitle, Card, Field, Button, ActionMessage, Badge } from '@/components/ui/Ui';
 import { roleLabels } from '@/configs/permissions';
+import { Link } from 'react-router-dom';
+import { appConfig } from '@/configs/app.config';
 const schema = z.object({
   name: z.string().trim().min(2, 'Họ tên ít nhất 2 ký tự'),
   phone: z.string().regex(/^(0|\+84)\d{9}$/, 'Số điện thoại không hợp lệ'),
@@ -29,6 +31,17 @@ export function Profile() {
       <Card>
         <Badge>{roleLabels[user!.role]}</Badge>
         <p className="muted">{user?.email}</p>
+        {!appConfig.demo && (
+          <p>
+            {user?.emailVerified ? (
+              'Email đã xác minh.'
+            ) : (
+              <Link to="/verify-email">
+                Email chưa xác minh — xác minh để đặt vé và nhận QR qua email
+              </Link>
+            )}
+          </p>
+        )}
         <form
           className="stack"
           style={{ maxWidth: 550 }}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -165,6 +165,12 @@ export function BookingFlow() {
         description="Tồn chỗ và giá được xác nhận bởi dịch vụ khi bạn giữ chỗ."
       />
       <AsyncState query={query}>
+        {!appConfig.demo && !user.emailVerified && (
+          <Card>
+            <p>Email chưa xác minh. Vui lòng xác minh trước khi giữ chỗ và đặt vé.</p>
+            <Link to="/verify-email">Xác minh email</Link>
+          </Card>
+        )}
         {trip && (
           <div className="grid">
             <Card>
@@ -250,7 +256,10 @@ export function BookingFlow() {
               {!active ? (
                 <Button
                   disabled={
-                    holdAction.isPending || quantity < 1 || Date.parse(trip.departure) <= Date.now()
+                    holdAction.isPending ||
+                    quantity < 1 ||
+                    Date.parse(trip.departure) <= Date.now() ||
+                    (!appConfig.demo && !user.emailVerified)
                   }
                   onClick={() => holdAction.mutate(undefined)}
                 >

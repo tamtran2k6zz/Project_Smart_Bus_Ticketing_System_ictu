@@ -206,7 +206,13 @@ export function PaymentResult() {
   const query = useQuery({
     queryKey: ['booking', id, user.id],
     queryFn: () => bookingApi.booking(id, user.id),
-    refetchInterval: q => (q.state.data?.status === 'pending' ? 3000 : false),
+    refetchInterval: q =>
+      q.state.data?.status === 'pending' ||
+      (!appConfig.demo &&
+        q.state.data?.status === 'paid' &&
+        ['pending', 'processing'].includes(q.state.data.ticketEmailStatus || 'pending'))
+        ? 5000
+        : false,
   });
   const b = query.data;
   return (
@@ -224,6 +230,15 @@ export function PaymentResult() {
             </Badge>
             <PriceBreakdown booking={b} totalLabel="Tổng tiền" />
             <p className="muted">Mã đặt vé: {b.id}</p>
+            {!appConfig.demo && b.status === 'paid' && (
+              <p>
+                {b.ticketEmailStatus === 'sent'
+                  ? `Vé và QR đã được gửi tới ${user.email}. Kiểm tra hộp thư và thư rác.`
+                  : b.ticketEmailStatus === 'failed'
+                    ? 'Chưa gửi được email vé sau các lần thử lại. Vé vẫn có trong tài khoản; vui lòng liên hệ nhà xe.'
+                    : 'Vé và QR đang chờ gửi tới email đã xác minh. Bạn vẫn có thể xem vé trong tài khoản.'}
+              </p>
+            )}
             <p className="muted">
               {b.status === 'paid'
                 ? 'Vé QR của bạn đã sẵn sàng trong Vé của tôi.'

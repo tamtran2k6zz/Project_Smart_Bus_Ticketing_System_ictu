@@ -32,6 +32,10 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' | 'forgot' }) {
   const finish = (user: User) => {
     setUser(user);
     client.clear();
+    if (!appConfig.demo && user.role === 'PASSENGER' && !user.emailVerified) {
+      navigate('/verify-email', { replace: true, state: { notice: user.emailVerificationNotice } });
+      return;
+    }
     const redirect = params.get('redirect');
     let target =
       user.role === 'DRIVER'
@@ -132,7 +136,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' | 'forgot' }) {
             : mode === 'login'
               ? 'Đăng nhập'
               : mode === 'register'
-                ? 'Đăng ký'
+                ? 'Đăng ký & xác minh email'
                 : 'Gửi yêu cầu'}
         </Button>
       </form>

@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { PoolClient } from 'pg';
 import { transaction } from '../config/database';
 import { acquireSeatLock, releaseSeatLock } from '../config/redis';
+import { assertEmailVerified } from './email-verification.service';
 
 export class BookingError extends Error {
   constructor(
@@ -134,6 +135,7 @@ export async function reserveSeatForPayment(
   sharedClient?: PoolClient
 ) {
   const work = async (client: PoolClient) => {
+    await assertEmailVerified(userId, client);
     const trip = await prepareSeats(client, tripId);
     assertBookableTrip(trip);
     const {
@@ -180,6 +182,7 @@ export async function reserveSeatForPayment(
 }
 
 export async function holdSeat(tripId: string, seatNumber: string, userId: string) {
+  await assertEmailVerified(userId);
   const redisLockId = await acquireSeatLock(tripId, seatNumber, userId);
   if (!redisLockId) throw new BookingError(409, 'Ghế đang được người khác giữ.');
   try {

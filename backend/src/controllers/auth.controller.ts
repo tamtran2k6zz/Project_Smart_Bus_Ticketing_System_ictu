@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { sendEmail } from '../services/email.service';
+import { sendVerificationEmail, validEmail } from '../services/email-verification.service';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { query } from '../config/database';
@@ -21,11 +21,21 @@ export const register = async (req: Request, res: Response): Promise<void> => {
   try {
     const { full_name, email, phone_number, password } = req.body;
 
-    if (!full_name || !email || !password) {
+    if (
+      typeof full_name !== 'string' ||
+      full_name.trim().length < 2 ||
+      !validEmail(email) ||
+      typeof password !== 'string' ||
+      password.length < 8 ||
+      password.length > 72 ||
+      (phone_number !== undefined &&
+        phone_number !== null &&
+        (typeof phone_number !== 'string' || !/^(0|\+84)\d{9}$/.test(phone_number.trim())))
+    ) {
       res.status(400).json({
         statusCode: 400,
         success: false,
-        message: 'Vui lòng cung cấp đầy đủ: Họ tên (full_name), Email và Mật khẩu (password)!',
+        message: 'Họ tên, email hoặc số điện thoại không hợp lệ; mật khẩu cần từ 8 đến 72 ký tự.',
       });
       return;
     }
@@ -106,11 +116,17 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     });
 
     const recipientEmail = email.trim().toLowerCase();
-    const emailSent = await sendEmail(
-      recipientEmail,
-      '[SmartBus ICTU] Đăng ký thành công',
-      `Xin chào ${full_name.trim()}, tài khoản SmartBus của bạn đã được khởi tạo thành công.`
-    );
+    let verification = {
+      emailSent: false,
+      emailVerified: false,
+      message:
+        'Tài khoản đã tạo; chưa gửi được email xác minh. Vui lòng gửi lại hoặc liên hệ nhà xe.',
+    };
+    try {
+      verification = await sendVerificationEmail(newUserId);
+    } catch (error) {
+      logger.error('verification_email_failed', { user_id: newUserId, error });
+    }
 
     res.status(201).json({
       statusCode: 201,
@@ -124,16 +140,15 @@ export const register = async (req: Request, res: Response): Promise<void> => {
           phoneNumber: phone_number || null,
           role: roleName,
           status: 'ACTIVE',
+          emailVerified: false,
         },
         tokens: {
           accessToken,
           tokenType: 'Bearer',
           expiresIn: 86400,
         },
-        emailSent,
-        emailConfirmationNotice: emailSent
-          ? 'Đã gửi email xác nhận.'
-          : 'Tài khoản đã được tạo; email xác nhận chưa được gửi.',
+        emailSent: verification.emailSent,
+        emailConfirmationNotice: verification.message,
       },
     });
   } catch (err: any) {
@@ -171,7 +186,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     let users: any[] = [];
     try {
       users = await query<any[]>(
-        `SELECT u.id, u.full_name, u.email, u.phone_number, u.password_hash, u.status,
+        `SELECT u.id, u.full_name, u.email, u.phone_number, u.password_hash, u.status, u.email_verified_at,
                 COALESCE(r.name, u.role, 'PASSENGER') AS role_name
          FROM users u
          LEFT JOIN roles r ON u.role_id = r.id
@@ -181,7 +196,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       );
     } catch {
       users = await query<any[]>(
-        `SELECT u.id, u.full_name, u.email, u.phone_number, u.password_hash, u.status,
+        `SELECT u.id, u.full_name, u.email, u.phone_number, u.password_hash, u.status, u.email_verified_at,
                 COALESCE(u.role, 'PASSENGER') AS role_name
          FROM users u
          WHERE LOWER(u.email) = $1 OR u.phone_number = $2
@@ -246,6 +261,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
           phoneNumber: user.phone_number,
           role: user.role_name || user.role || 'PASSENGER',
           status: user.status,
+          emailVerified: !!user.email_verified_at,
         },
         tokens: {
           accessToken,
@@ -286,7 +302,7 @@ export const getMe = async (req: AuthenticatedRequest, res: Response): Promise<v
     let users: any[] = [];
     try {
       users = await query<any[]>(
-        `SELECT u.id, u.full_name, u.email, u.phone_number, u.status,
+        `SELECT u.id, u.full_name, u.email, u.phone_number, u.status, u.email_verified_at,
                 COALESCE(r.name, u.role, 'PASSENGER') AS role_name, u.created_at
          FROM users u
          LEFT JOIN roles r ON u.role_id = r.id
@@ -296,7 +312,7 @@ export const getMe = async (req: AuthenticatedRequest, res: Response): Promise<v
       );
     } catch {
       users = await query<any[]>(
-        `SELECT u.id, u.full_name, u.email, u.phone_number, u.status,
+        `SELECT u.id, u.full_name, u.email, u.phone_number, u.status, u.email_verified_at,
                 COALESCE(u.role, 'PASSENGER') AS role_name, u.created_at
          FROM users u
          WHERE u.id = $1
@@ -326,6 +342,7 @@ export const getMe = async (req: AuthenticatedRequest, res: Response): Promise<v
         phoneNumber: user.phone_number,
         role: user.role_name || user.role,
         status: user.status,
+        emailVerified: !!user.email_verified_at,
         createdAt: user.created_at,
       },
     });

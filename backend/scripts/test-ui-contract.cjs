@@ -26,6 +26,10 @@ module.exports = async ({
   );
   assert.equal(registered.data.user.role, 'PASSENGER');
   const passenger = registered.data.tokens.accessToken;
+  assert.equal(registered.data.user.emailVerified, false);
+  assert.equal(registered.data.emailSent, false);
+  await call('post', prefix + '/holds', {tripId:'unverified',seatIds:['A01'],quantity:1},passenger,403);
+  await db.query('UPDATE users SET email_verified_at=NOW() WHERE id=$1',[registered.data.user.id]);
   const trip = (
     await call(
       'post',

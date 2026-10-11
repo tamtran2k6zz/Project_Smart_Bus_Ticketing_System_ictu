@@ -13,6 +13,7 @@ import { updateTripLocation } from '../services/location-update.service';
 import { appLogger } from '../config/logger';
 import bcrypt from 'bcrypt';
 import { sendEmail } from '../services/email.service';
+import { assertEmailVerified } from '../services/email-verification.service';
 import {
   createNotification,
   listNotifications,
@@ -74,6 +75,7 @@ const userDto = (u: any) => ({
   phone: u.phone_number ?? u.phoneNumber ?? '',
   role: u.role,
   active: u.status === 'ACTIVE',
+  emailVerified: !!u.email_verified_at,
   permissions: permissions[u.role] ?? [],
 });
 async function catalog() {
@@ -159,8 +161,8 @@ async function getHold(id: string, userId: string, client?: any) {
   };
 }
 const bookingSql = `SELECT b.*,h.user_id,h.trip_id,h.seat_ids,h.quantity,h.expires_at,h.status AS hold_status,
- h.boarding_stop_id,h.alighting_stop_id,t.status AS ticket_status,p.status AS payment_status,p.payment_method,p.payment_url,p.amount
- FROM ui_bookings b JOIN ui_holds h ON h.id=b.hold_id LEFT JOIN tickets t ON t.id=b.ticket_id LEFT JOIN payment_transactions p ON p.ticket_id=t.id`;
+ h.boarding_stop_id,h.alighting_stop_id,t.status AS ticket_status,p.status AS payment_status,p.payment_method,p.payment_url,p.amount,e.status AS ticket_email_status
+ FROM ui_bookings b JOIN ui_holds h ON h.id=b.hold_id LEFT JOIN tickets t ON t.id=b.ticket_id LEFT JOIN payment_transactions p ON p.ticket_id=t.id LEFT JOIN ticket_email_deliveries e ON e.ticket_id=t.id`;
 const bookingDto = (b: any) => ({
   id: b.id,
   holdId: b.hold_id,
@@ -175,6 +177,7 @@ const bookingDto = (b: any) => ({
   voucher: b.voucher,
   createdAt: iso(b.created_at),
   invoiceRequested: b.invoice_requested,
+  ticketEmailStatus: b.ticket_email_status ?? 'pending',
   boardingStopId: b.boarding_stop_id,
   alightingStopId: b.alighting_stop_id,
   status:
@@ -349,6 +352,7 @@ router.post(
 router.post(
   '/holds',
   api(async req => {
+    await assertEmailVerified(req.user!.id);
     const { tripId, seatIds, quantity, from, to } = req.body;
     if (
       !Array.isArray(seatIds) ||
@@ -503,6 +507,7 @@ router.get(
 router.post(
   '/payments',
   api(async req => {
+    await assertEmailVerified(req.user!.id);
     const method =
       req.body.gateway === 'MoMo'
         ? 'MOMO'

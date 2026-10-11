@@ -53,4 +53,5 @@ export interface Booking {
   createdAt: string;
   refund: 'none' | 'pending' | 'refunded';
   invoiceRequested?: boolean;
+  ticketEmailStatus?: 'pending' | 'processing' | 'sent' | 'skipped' | 'failed';
 }

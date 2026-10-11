@@ -38,6 +38,7 @@ it('maps the Express login envelope and attaches its bearer token', async () => 
           phoneNumber: '0901234567',
           role: 'PASSENGER',
           status: 'ACTIVE',
+          emailVerified: false,
         },
         tokens: { accessToken: 'signed-token' },
       },
@@ -45,7 +46,13 @@ it('maps the Express login envelope and attaches its bearer token', async () => 
   });
   expect(
     await request('/auth/login', 'POST', { email: 'a@example.test', password: 'secret' })
-  ).toMatchObject({ id: 'u1', name: 'Khách hàng', active: true, permissions: [] });
+  ).toMatchObject({
+    id: 'u1',
+    name: 'Khách hàng',
+    active: true,
+    emailVerified: false,
+    permissions: [],
+  });
   const intercept = mocked.intercept;
   expect(intercept({ headers: {} }).headers.Authorization).toBe('Bearer signed-token');
 });
