@@ -266,6 +266,10 @@ API legacy hủy vé đã mua trước khởi hành ít nhất 30 phút và chư
 
 Để nhận IPN từ merchant khi chạy local, dùng origin HTTPS công khai/tunnel trong `PAYMENT_PUBLIC_BASE_URL`, `VNPAY_IPN_URL`, `MOMO_IPN_URL`. `localhost` chỉ truy cập được từ máy local. Với frontend mới, cấu hình `PAYMENT_RESULT_URL` và `MOMO_REDIRECT_URL` tới trang `/payment/result` trên origin frontend.
 
+Trên Vercel production, đặt `PAYMENT_PUBLIC_BASE_URL` bằng tên miền chính công khai (ví dụ `https://smart-bus-ticketing-system.vercel.app`); không dùng hostname riêng của deployment có lớp đăng nhập Vercel. Callback VNPay chỉ ký các trường `vnp_*`, bỏ qua tham số routing và vẫn kiểm chữ ký, số tiền, mã đơn. Trang kết quả đọc trạng thái từ backend; `paymentResult=unverified` chỉ thông báo chưa xác minh, không tự cấp vé hay báo đã thu tiền.
+
+GPS dùng nền OpenStreetMap France/HOT, phù hợp với website đồ án công khai, phi thương mại và lưu lượng thấp theo [chính sách nguồn bản đồ](https://www.openstreetmap.fr/usage/). Điểm xe vẫn lấy từ dịch vụ GPS; nền bản đồ không tạo tín hiệu GPS mới. Khi đưa vào kinh doanh, cấu hình `VITE_MAP_TILE_URL` và `VITE_MAP_ATTRIBUTION` theo nhà cung cấp của bạn. Tile được tải trực tiếp bởi trình duyệt, không tải hàng loạt hoặc lưu qua proxy.
+
 ## Các đường dẫn giao diện
 
 | Khu vực    | Đường dẫn                                                                                                                                                                     |
