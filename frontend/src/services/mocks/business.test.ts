@@ -106,6 +106,70 @@ describe('demo business transactions', () => {
       true
     );
   });
+  it('rejects schedule edits that overlap an existing staff assignment', async () => {
+    await operationsApi.save('assignments', 'u4', {
+      tripId,
+      vehicleId: 'v1',
+      staffId: 'st1',
+    });
+    const second = 't-1-1-1';
+    await operationsApi.save('assignments', 'u4', {
+      tripId: second,
+      vehicleId: 'v1',
+      staffId: 'st1',
+    });
+    const original = await bookingApi.trip(second);
+    await expect(
+      operationsApi.save('trips', 'u4', {
+        ...original,
+        departure: '2026-10-07T09:00:00+07:00',
+      })
+    ).rejects.toThrow('trùng giờ');
+    expect((await bookingApi.trip(second)).departure).toBe(original.departure);
+  });
+  it('keeps the assigned vehicle synchronized when editing a trip', async () => {
+    await operationsApi.save('assignments', 'u4', {
+      tripId,
+      vehicleId: 'v1',
+      staffId: 'st1',
+    });
+    await operationsApi.save('trips', 'u4', {
+      ...(await bookingApi.trip(tripId)),
+      vehicleId: 'v2',
+    });
+    expect(
+      (await operationsApi.list('assignments', 'u4')).find(
+        a => 'tripId' in a && a.tripId === tripId
+      )
+    ).toMatchObject({ vehicleId: 'v2' });
+  });
+  it('preserves held and purchased journeys when editing route stops', async () => {
+    const route = (await operationsApi.catalog()).routes.find(r => r.id === 'r2')!;
+    const hold = await bookingApi.createHold(tripId, 'u0', ['01'], 1, {
+      from: 'Đại học ICTU',
+      to: 'Hồ Núi Cốc',
+    });
+    await expect(
+      operationsApi.save('routes', 'u4', {
+        ...route,
+        stopIds: ['s1', 's3'],
+      })
+    ).rejects.toThrow('hành trình');
+    const booking = await bookingApi.createBooking(hold.id, 'u0', 'Minh Anh', '0901234560', '');
+    const payment = await paymentApi.start(booking.id, 'u0', 'MoMo');
+    await paymentApi.confirmDemo(payment.id, 'u0', 'paid');
+    await expect(
+      operationsApi.save('routes', 'u4', {
+        ...route,
+        stopIds: ['s1', 's3'],
+      })
+    ).rejects.toThrow('hành trình');
+    expect((await operationsApi.catalog()).routes.find(r => r.id === 'r2')!.stopIds).toEqual([
+      's1',
+      's2',
+      's3',
+    ]);
+  });
   it('preserves hold expiry on refresh and releases inventory after 10 minutes', async () => {
     const h = await bookingApi.createHold(tripId, 'u0', ['01'], 1);
     vi.advanceTimersByTime(120000);
@@ -177,8 +241,12 @@ describe('demo business transactions', () => {
     expect((await validateTicket('u4', tripId, 'invalid')).valid).toBe(false);
     expect((await validateTicket('u4', 't1', t.token)).message).toContain('chuyến khác');
     await expect(validateTicket('u1', tripId, t.token)).rejects.toThrow('phân công');
+    expect((await validateTicket('u4', tripId, t.token)).message).toContain('Chuyến chưa mở');
+    const originalTime = Date.now();
+    vi.setSystemTime(new Date(Date.parse((await bookingApi.trip(tripId)).departure) - 10 * 60000));
     expect((await validateTicket('u4', tripId, t.token)).valid).toBe(true);
     expect((await validateTicket('u4', tripId, t.token)).message).toContain('đã được sử dụng');
+    vi.setSystemTime(new Date(originalTime));
     await paid('02');
     const t2 = (await ticketsApi.list('u0'))[0];
     vi.setSystemTime(new Date(Date.parse(t2.expiresAt) + 1000));

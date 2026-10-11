@@ -154,7 +154,8 @@ async function getRouteStopsForTrip(
   const rows = await query<
     Array<{ id: string; name: string; latitude: number; longitude: number; sequence: number }>
   >(
-    `SELECT bs.id, bs.name, bs.latitude, bs.longitude, rs.stop_order AS sequence
+    `SELECT bs.id, bs.name, bs.latitude::double precision AS latitude,
+            bs.longitude::double precision AS longitude, rs.stop_order AS sequence
      FROM trips t
      JOIN route_stops rs ON rs.route_id = t.route_id
      JOIN bus_stops bs ON bs.id = rs.stop_id
@@ -178,24 +179,29 @@ export async function notifyApproachingPassengers(
   const nearest = checkGeofencing(near.latitude, near.longitude, stops, APPROACH_RADIUS_METERS);
   if (!nearest) return;
 
-  // Idempotency: mỗi chuyến + trạm chỉ báo 1 lần trong 10 phút.
-  const dedupKey = `notified:${tripId}:${nearest.stopId}`;
-  const isFirst = await setIfAbsent(dedupKey, '1', DEDUP_TTL_SECONDS);
-  if (!isFirst) return;
-
   const passengers = await query<
     Array<{ user_id: string; ticket_code: string; seat_number: string }>
   >(
     `SELECT user_id, ticket_code, seat_number
      FROM tickets
-     WHERE trip_id = $1 AND user_id IS NOT NULL AND status IN ('BOOKED', 'CHECKED_IN')`,
+     WHERE trip_id = $1 AND user_id IS NOT NULL AND status IN ('BOOKED', 'CHECKED_IN')
+     UNION SELECT user_id,'' AS ticket_code,'' AS seat_number FROM trip_subscriptions WHERE trip_id=$1`,
     [tripId]
   );
   if (!passengers.length) return;
 
   const body = `Xe buýt đã cách trạm ${nearest.stopName} khoảng ${nearest.distanceMeters} m. Vui lòng tới trạm sớm.`;
-  for (const passenger of passengers) {
+  for (const passenger of [...new Map(passengers.map(p => [p.user_id, p])).values()]) {
     try {
+      // Late subscribers still receive their first alert; multi-seat tickets do not duplicate it.
+      if (
+        !(await setIfAbsent(
+          `notified:${tripId}:${nearest.stopId}:${passenger.user_id}`,
+          '1',
+          DEDUP_TTL_SECONDS
+        ))
+      )
+        continue;
       await createNotification(passenger.user_id, {
         type: 'BUS_APPROACHING',
         title: 'Xe đang đến gần trạm',

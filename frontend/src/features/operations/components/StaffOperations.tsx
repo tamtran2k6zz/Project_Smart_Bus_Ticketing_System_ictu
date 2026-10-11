@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/Ui';
 import { dateTime } from '@/utils/format';
 import { can } from '@/configs/permissions';
+import { GpsPublisher } from '@/features/tracking/components/GpsPublisher';
 export function StaffTrips() {
   const user = useSession(s => s.user)!;
   const query = useQuery({
@@ -55,6 +56,7 @@ export function StaffTrips() {
                 <div className="row">
                   <LinkButton to={'/staff/scan?tripId=' + t.id}>Soát vé</LinkButton>
                   <Link to={'/tracking/' + t.id}>Theo dõi</Link>
+                  <GpsPublisher tripId={t.id} />
                 </div>
               </div>
             </Card>

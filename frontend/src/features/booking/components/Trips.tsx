@@ -8,6 +8,7 @@ import { Card, Badge, PageTitle, AsyncState, LinkButton } from '@/components/ui/
 import { money, dateTime, localDay } from '@/utils/format';
 import type { Trip } from '../types';
 import type { Route } from '@/features/operations/types';
+import { boardingDeparture, journeyStops } from '../utils/journey';
 import s from './Booking.module.css';
 export function TripCard({
   trip,
@@ -106,6 +107,14 @@ export function TripDetail() {
   const trip = query.data;
   const route = catalog.data?.routes.find(r => r.id === trip?.routeId);
   const vehicle = catalog.data?.vehicles.find(v => v.id === trip?.vehicleId);
+  const selectedJourney = route
+    ? journeyStops(
+        route,
+        catalog.data?.stops ?? [],
+        params.get('from') ?? '',
+        params.get('to') ?? ''
+      )
+    : null;
   return (
     <div className="container" style={{ paddingBlock: 40 }}>
       <PageTitle
@@ -121,10 +130,10 @@ export function TripDetail() {
                 <Badge>Tuyến {route?.code}</Badge>
                 <Badge tone="neutral">{trip.seatMode ? 'Có sơ đồ ghế' : 'Không gắn ghế'}</Badge>
               </div>
-              <h2>{dateTime(trip.departure)}</h2>
+              <h2>{dateTime(boardingDeparture(trip, route, selectedJourney?.boardingStopId))}</h2>
               <p className="row">
                 <Clock size={18} />
-                {trip.duration} phút · {trip.available} chỗ còn lại
+                {trip.duration} phút toàn tuyến · {trip.available} chỗ còn lại
               </p>
               <p className="row">
                 <RouteIcon size={18} />
@@ -137,8 +146,7 @@ export function TripDetail() {
                 <br />
                 Xuống xe: {params.get('to') || route?.destination}
                 <br />
-                Giờ hiển thị là giờ khởi hành tại đầu tuyến. Giờ đón ở trạm trung gian cần nhà xe
-                xác nhận. Giá demo áp dụng cho cả tuyến.
+                Giờ hiển thị là giờ đón dự kiến tại trạm đã chọn. Giá áp dụng cho cả tuyến.
               </p>
               <div className="stack">
                 {route?.stopIds.map(id => {
@@ -165,8 +173,8 @@ export function TripDetail() {
                 xác nhận thanh toán.
               </p>
               <p className="muted">
-                Chính sách demo: yêu cầu hủy/đổi trước khởi hành 30 phút. Đổi sang chuyến cùng
-                tuyến, cùng loại vé và còn chỗ.
+                Yêu cầu hủy/đổi trước giờ khởi hành đầu tuyến ít nhất 30 phút. Đổi sang chuyến cùng
+                tuyến, cùng giá và còn đủ ghế.
               </p>
               <div className="stack">
                 {Date.parse(trip.departure) > Date.now() && trip.available > 0 ? (

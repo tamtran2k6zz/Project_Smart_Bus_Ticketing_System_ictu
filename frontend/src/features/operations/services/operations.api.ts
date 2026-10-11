@@ -1,5 +1,6 @@
 import { service } from '@/services/adapter';
 import { audit, requireUser, uid, tripAvailability, notify } from '@/services/mocks/database';
+import type { Database } from '@/services/mocks/database';
 import { can } from '@/configs/permissions';
 import { getTrip } from '@/features/booking/services/booking.api';
 import { resourceSchemas } from '../schemas/resources';
@@ -11,6 +12,23 @@ export interface Catalog {
   stops: Stop[];
   vehicles: Vehicle[];
   trips: Trip[];
+}
+function assertAssignmentAvailable(db: Database, assignment: Assignment, trip: Trip) {
+  if (
+    db.assignments.some(other => {
+      if (other.id === assignment.id) return false;
+      if (other.tripId === trip.id) return true;
+      const otherTrip = getTrip(db, other.tripId);
+      const overlaps =
+        Date.parse(otherTrip.departure) < Date.parse(trip.departure) + trip.duration * 60000 &&
+        Date.parse(trip.departure) < Date.parse(otherTrip.departure) + otherTrip.duration * 60000;
+      return (
+        overlaps &&
+        (other.vehicleId === assignment.vehicleId || other.staffId === assignment.staffId)
+      );
+    })
+  )
+    throw new Error('Chuyến đã phân công hoặc xe/nhân sự trùng giờ.');
 }
 export const operationsApi = {
   catalog: () =>
@@ -37,6 +55,20 @@ export const operationsApi = {
         );
         if (key === 'routes') {
           const r = parsed as unknown as Route;
+          const existingRoute = db.routes.find(route => route.id === data.id);
+          const stopsChanged =
+            existingRoute && JSON.stringify(existingRoute.stopIds) !== JSON.stringify(r.stopIds);
+          const routeTrips = new Set(db.trips.filter(t => t.routeId === data.id).map(t => t.id));
+          const hasHeldJourney = db.holds.some(
+            h => routeTrips.has(h.tripId) && h.status === 'active'
+          );
+          const hasPaidJourney = db.bookings.some(
+            b => routeTrips.has(b.tripId) && b.status === 'paid'
+          );
+          if (stopsChanged && (hasHeldJourney || hasPaidJourney))
+            throw new Error(
+              'Tuyến có hành trình đang giữ chỗ hoặc đã mua, chưa thể đổi danh sách trạm.'
+            );
           if (r.origin === r.destination) throw new Error('Điểm đi và đến phải khác nhau.');
           if (r.stopIds.some(id => !db.stops.some(s => s.id === id)))
             throw new Error('Trạm không tồn tại.');
@@ -68,6 +100,17 @@ export const operationsApi = {
             throw new Error('Chuyến có giữ chỗ, chưa thể đổi lịch.');
           if (data.id && db.bookings.some(b => b.tripId === data.id && b.status === 'paid'))
             throw new Error('Chuyến có vé, chưa thể sửa cấu hình.');
+          const assigned = db.assignments.filter(a => a.tripId === data.id);
+          assigned.forEach(a =>
+            assertAssignmentAvailable(
+              db,
+              { ...a, vehicleId: t.vehicleId },
+              { ...t, id: String(data.id) }
+            )
+          );
+          assigned.forEach(a => {
+            a.vehicleId = t.vehicleId;
+          });
         }
         if (key === 'vehicles') {
           const vehicle = parsed as unknown as Vehicle;
@@ -98,20 +141,7 @@ export const operationsApi = {
             !db.staff.some(s => s.id === a.staffId)
           )
             throw new Error('Xe/nhân sự không tồn tại.');
-          if (
-            db.assignments.some(
-              x =>
-                x.id !== data.id &&
-                (x.tripId === a.tripId ||
-                  (Date.parse(getTrip(db, x.tripId).departure) <
-                    Date.parse(trip.departure) + trip.duration * 60000 &&
-                    Date.parse(trip.departure) <
-                      Date.parse(getTrip(db, x.tripId).departure) +
-                        getTrip(db, x.tripId).duration * 60000 &&
-                    (x.vehicleId === a.vehicleId || x.staffId === a.staffId)))
-            )
-          )
-            throw new Error('Chuyến đã phân công hoặc xe/nhân sự trùng giờ.');
+          assertAssignmentAvailable(db, { ...a, id: String(data.id || '') }, trip);
           const vehicle = db.vehicles.find(v => v.id === a.vehicleId)!;
           if (
             vehicle.capacity !== trip.capacity &&

@@ -157,12 +157,13 @@ describe('notifyApproachingPassengers', () => {
 
     await notifyApproachingPassengers('trip-approach', { latitude: 10.77, longitude: 106.7 });
 
-    expect(mockedSetIfAbsent).toHaveBeenCalledWith('notified:trip-approach:stop-1', '1', 600);
+    expect(mockedSetIfAbsent).toHaveBeenCalledWith('notified:trip-approach:stop-1:p1', '1', 600);
+    expect(mockedSetIfAbsent).toHaveBeenCalledWith('notified:trip-approach:stop-1:p2', '1', 600);
     expect(mockedSendToUser).toHaveBeenCalledTimes(2);
   });
 
   it('skips duplicate alerts while the idempotency key is held', async () => {
-    mockedQuery.mockResolvedValueOnce(stopRows);
+    mockedQuery.mockResolvedValueOnce(stopRows).mockResolvedValueOnce(passengerRows);
     mockedGeofence.mockReturnValue({
       stopId: 'stop-1',
       stopName: 'Bến Thành',
@@ -172,8 +173,8 @@ describe('notifyApproachingPassengers', () => {
 
     await notifyApproachingPassengers('trip-dup', { latitude: 10.77, longitude: 106.7 });
 
-    // Stops were loaded, but no passenger query / notification insert happened.
-    expect(mockedQuery).toHaveBeenCalledTimes(1);
+    // Stops and recipients were loaded; no notification insert happened.
+    expect(mockedQuery).toHaveBeenCalledTimes(2);
     expect(mockedSendToUser).not.toHaveBeenCalled();
   });
 });

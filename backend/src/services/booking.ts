@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { PoolClient } from 'pg';
 import { transaction } from '../config/database';
 import { acquireSeatLock, releaseSeatLock } from '../config/redis';
+import { assertEmailVerified } from './email-verification.service';
 
 export class BookingError extends Error {
   constructor(
@@ -130,9 +131,11 @@ export async function reserveSeatForPayment(
   seatNumber: string,
   userId: string,
   paymentMethod: 'VNPAY' | 'MOMO' | 'QR',
-  redisLockId: string
+  redisLockId: string,
+  sharedClient?: PoolClient
 ) {
-  return transaction(async client => {
+  const work = async (client: PoolClient) => {
+    await assertEmailVerified(userId, client);
     const trip = await prepareSeats(client, tripId);
     assertBookableTrip(trip);
     const {
@@ -144,6 +147,7 @@ export async function reserveSeatForPayment(
     if (!seat) throw new BookingError(404, 'Ghế không tồn tại.');
     if (
       ['BOOKED', 'CHECKED_IN'].includes(seat.status) ||
+      (seat.status === 'LOCKED' && seat.ticket_id) ||
       (seat.status === 'LOCKED' && seat.locked_by_user_id !== userId)
     ) {
       throw new BookingError(409, 'Ghế đã được đặt hoặc đang có người giữ chỗ.');
@@ -173,10 +177,12 @@ export async function reserveSeatForPayment(
       [ticketId, paymentMethod, trip.base_price, redisLockId]
     );
     return ticket;
-  });
+  };
+  return sharedClient ? work(sharedClient) : transaction(work);
 }
 
 export async function holdSeat(tripId: string, seatNumber: string, userId: string) {
+  await assertEmailVerified(userId);
   const redisLockId = await acquireSeatLock(tripId, seatNumber, userId);
   if (!redisLockId) throw new BookingError(409, 'Ghế đang được người khác giữ.');
   try {

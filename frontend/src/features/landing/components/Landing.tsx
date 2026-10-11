@@ -1,4 +1,7 @@
 import { useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { operationsApi } from '@/features/operations/services/operations.api';
+import { appConfig } from '@/configs/app.config';
 import { animate, onScroll, stagger } from 'animejs';
 import {
   ArrowUpRight,
@@ -47,7 +50,9 @@ const benefits = [
 const faqs = [
   [
     'Tôi có thể thanh toán bằng cách nào?',
-    'SmartBus có adapter cho MoMo, VNPay, ZaloPay và thẻ. Bản demo mô phỏng các trạng thái, không thu tiền thật. Cổng thật cần backend và webhook xác nhận.',
+    appConfig.demo
+      ? 'Bản demo mô phỏng thanh toán, không thu tiền thật.'
+      : 'Bạn có thể thanh toán bằng MoMo, VNPay hoặc thẻ qua VNPay khi nhà xe mở cổng thanh toán. Vé chỉ phát hành sau khi giao dịch được xác nhận.',
   ],
   [
     'Tôi cần làm gì khi lên xe?',
@@ -55,15 +60,19 @@ const faqs = [
   ],
   [
     'Tôi có thể hủy hoặc đổi vé không?',
-    'Gửi yêu cầu trong chi tiết vé trước giờ khởi hành ít nhất 30 phút theo chính sách demo. Điều hành duyệt yêu cầu; khoản hoàn có trạng thái riêng.',
+    'Gửi yêu cầu trong chi tiết vé trước giờ khởi hành ít nhất 30 phút. Điều hành duyệt yêu cầu; khoản hoàn có trạng thái riêng.',
   ],
   [
     'Vị trí xe được cập nhật như thế nào?',
-    'Màn hình theo dõi hiển thị thời điểm cập nhật, ETA và mất tín hiệu. Dữ liệu hiện tại là mô phỏng; GPS thật cần kết nối nhà xe.',
+    appConfig.demo
+      ? 'Bản demo mô phỏng vị trí xe và ETA.'
+      : 'Vị trí do tài xế được phân công chia sẻ từ thiết bị. Màn hình hiển thị thời điểm cập nhật và cảnh báo khi mất tín hiệu; thời gian đến trạm có thể chưa có.',
   ],
   [
     'Vé tháng và ưu đãi hoạt động thế nào?',
-    'Đăng ký tuyến ở mục Vé tháng. Bản demo minh họa giá 250.000đ/30 ngày; hồ sơ ưu đãi được duyệt có giá 150.000đ.',
+    appConfig.demo
+      ? 'Bản demo minh họa vé tháng 250.000đ/30 ngày; hồ sơ ưu đãi được duyệt có giá 150.000đ.'
+      : 'Vé tháng trực tuyến chưa mở bán. Bạn có thể gửi hồ sơ ưu đãi để nhà xe xét duyệt và liên hệ nhà xe về chính sách áp dụng.',
   ],
 ];
 function SectionHeading({ label, title, text }: { label: string; title: string; text?: string }) {
@@ -76,6 +85,11 @@ function SectionHeading({ label, title, text }: { label: string; title: string; 
   );
 }
 export function Landing() {
+  const catalog = useQuery({ queryKey: ['catalog'], queryFn: operationsApi.catalog });
+  const trackingTrip = catalog.data?.trips.find(
+    t => t.status === 'running' || t.status === 'scheduled'
+  );
+  const trackingUrl = trackingTrip ? '/tracking/' + trackingTrip.id : '/trips';
   const root = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState<number | null>(0);
   const scope = useAnimeScope(root, self => {
@@ -118,7 +132,7 @@ export function Landing() {
   });
   return (
     <div ref={root}>
-      <HeroSection />
+      <HeroSection trackingUrl={trackingUrl} />
       <div className={'container ' + s.searchPanel}>
         <div className={s.searchTitle}>
           <span>
@@ -146,7 +160,7 @@ export function Landing() {
               </div>
               <h3>{title}</h3>
               <p>{text}</p>
-              <Link to={i === 3 ? '/tracking/t1' : '/trips'} aria-label={title}>
+              <Link to={i === 3 ? trackingUrl : '/trips'} aria-label={title}>
                 <ArrowUpRight size={20} />
               </Link>
             </article>
@@ -233,7 +247,7 @@ export function Landing() {
               Thông báo trạm và sự cố trên tuyến
             </li>
           </ul>
-          <LinkButton to="/tracking/t1" secondary>
+          <LinkButton to={trackingUrl} secondary>
             Khám phá theo dõi xe
           </LinkButton>
         </div>
@@ -318,7 +332,11 @@ export function Landing() {
           <article className={s.featuredPass}>
             <Badge>ĐI LẠI THƯỜNG XUYÊN</Badge>
             <h3>Vé tháng</h3>
-            <p>Đăng ký tuyến quen thuộc và quản lý thời hạn ngay trong tài khoản.</p>
+            <p>
+              {appConfig.demo
+                ? 'Đăng ký tuyến quen thuộc và quản lý thời hạn ngay trong tài khoản.'
+                : 'Vé tháng trực tuyến chưa mở bán. Liên hệ nhà xe để biết chính sách.'}
+            </p>
             <Link to="/account/passes">
               Khám phá vé tháng <ArrowRight size={17} />
             </Link>
@@ -328,7 +346,7 @@ export function Landing() {
             <h3>Ưu đãi dành riêng</h3>
             <p>Gửi hồ sơ ưu đãi và theo dõi kết quả duyệt từ nhà xe.</p>
             <Link to="/account/passes">
-              Xem chính sách demo <ArrowRight size={17} />
+              Xem chính sách {appConfig.demo ? 'demo' : ''} <ArrowRight size={17} />
             </Link>
           </article>
         </div>
@@ -378,10 +396,12 @@ export function Landing() {
         </div>
         <LinkButton to="/trips">Tra cứu chuyến ngay</LinkButton>
       </section>
-      <div className={'container ' + s.demoNote}>
-        <Bell size={15} />
-        Đây là ứng dụng demo. Thanh toán, GPS và xác thực vé đang được mô phỏng.
-      </div>
+      {appConfig.demo && (
+        <div className={'container ' + s.demoNote}>
+          <Bell size={15} />
+          Đây là ứng dụng demo. Thanh toán, GPS và xác thực vé đang được mô phỏng.
+        </div>
+      )}
     </div>
   );
 }

@@ -13,6 +13,7 @@ import ticketsRoutes from './routes/tickets.routes';
 import devicesRoutes from './routes/devices.routes';
 import notificationsRoutes from './routes/notifications.routes';
 import ticketDetailsRoutes from './routes/ticket-details.routes';
+import uiRoutes from './routes/ui.routes';
 import { query } from './config/database';
 import { getJwtSecret } from './config/auth';
 import { redisStatus, redisSeatLockEnabled } from './config/redis';
@@ -33,6 +34,7 @@ app.use(
 );
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: false, limit: '100kb' }));
+app.use('/api/smartbus/v1', uiRoutes);
 app.get('/api/health', async (_req, res) => {
   const database = describeDatabaseTarget();
   const callbacks = getGatewayCallbacks();

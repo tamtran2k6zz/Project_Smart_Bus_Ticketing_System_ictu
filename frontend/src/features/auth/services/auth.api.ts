@@ -65,4 +65,21 @@ export const authApi = {
       { name, phone }
     ),
   logout: () => service('/auth/logout', () => true, 'POST'),
+  verifyEmail: (token: string) =>
+    service<{ email: string; message: string }>(
+      '/auth/verify-email',
+      () => {
+        throw new Error('Xác minh email chỉ có ở chế độ API.');
+      },
+      'POST',
+      { token }
+    ),
+  resendVerification: () =>
+    service<{ emailSent: boolean; emailVerified: boolean; message: string }>(
+      '/auth/resend-verification',
+      () => {
+        throw new Error('Demo không gửi email.');
+      },
+      'POST'
+    ),
 };

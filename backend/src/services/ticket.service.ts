@@ -57,6 +57,8 @@ export interface ValidatedTicketInfo {
 }
 
 export interface ValidateTicketQrInput {
+  validatedRole?: string;
+  manual?: boolean;
   code: string;
   tripId?: string;
   stopId?: string;
@@ -155,15 +157,15 @@ export function buildQrPayload(
   };
   if (!options.withSecurity) return payload;
 
-  // Hết hạn: QR_EXP_MINUTES=0 để tắt (mặc định 24h).
+  // Signed QR always has an expiry and nonce; invalid TTL falls back to 24 hours.
   const expMinutes = Number(readEnv('QR_EXP_MINUTES') ?? '1440');
-  if (Number.isFinite(expMinutes) && expMinutes > 0) {
-    payload.exp = Math.floor(Date.now() / 1000) + Math.round(expMinutes * 60);
-  }
-  // Anti-replay: QR_ANTI_REPLAY=false để tắt (mặc định bật).
-  if (readEnv('QR_ANTI_REPLAY') !== 'false') {
-    payload.nonce = randomUUID();
-  }
+  payload.exp =
+    Math.floor(Date.now() / 1000) +
+    Math.max(
+      1,
+      Math.round((Number.isFinite(expMinutes) && expMinutes > 0 ? expMinutes : 1440) * 60)
+    );
+  payload.nonce = randomUUID();
   payload.sig = computeQrSignature(payload);
   if (!payload.sig) delete payload.sig;
   return payload;
@@ -308,14 +310,25 @@ export async function validateTicketQr(
       const {
         rows: [ticket],
       } = await client.query<any>(
-        `SELECT t.*,u.full_name,u.email,r.name AS route_name,r.code AS route_code
+        `SELECT t.*,u.full_name,u.email,r.name AS route_name,r.code AS route_code,
+                tr.driver_id,tr.departure_time,tr.arrival_time,tr.status AS trip_status,
+                p.status AS payment_status,q.kind AS pending_request
          FROM tickets t LEFT JOIN users u ON u.id=t.user_id
          JOIN trips tr ON tr.id=t.trip_id JOIN routes r ON r.id=tr.route_id
+         LEFT JOIN payment_transactions p ON p.ticket_id=t.id
+         LEFT JOIN ticket_requests q ON q.ticket_id=t.id
          WHERE t.ticket_code=$1 OR t.id=$1
          FOR UPDATE OF t`,
         [code]
       );
       if (!ticket) throw new TicketValidationError(404, 'Không tìm thấy vé.');
+      const reject = (status: number, message: string, reason: string): never => {
+        throw new RejectedTicketError(status, message, reason, ticket.id, ticket.trip_id);
+      };
+      if (!['ADMIN', 'MANAGER', 'DRIVER'].includes(input.validatedRole ?? ''))
+        reject(403, 'Không có quyền soát vé.', 'FORBIDDEN');
+      if (input.validatedRole === 'DRIVER' && ticket.driver_id !== input.validatedBy)
+        reject(403, 'Chuyến chưa được phân công cho bạn.', 'DRIVER_NOT_ASSIGNED');
 
       // --- Bảo mật QR (Sprint 3) — chạy trước mọi ràng buộc nghiệp vụ ---
       // a) Chữ ký HMAC-SHA256: payload ký phải khớp ticket thực trong DB.
@@ -349,20 +362,14 @@ export async function validateTicketQr(
           );
         }
       }
+      if (!input.manual && (!sig || exp === undefined || !nonce))
+        reject(
+          403,
+          'QR phải có chữ ký, thời hạn và nonce. Mã nhập tay cần chế độ xác minh thủ công.',
+          'QR_SECURITY_REQUIRED'
+        );
       // c) Redis anti-replay nonce (SET NX EX; fallback process-local khi
       //    không có Redis) — cùng nonce quét lần 2 trong TTL là replay.
-      if (nonce) {
-        const firstScan = await setIfAbsent(`qr:nonce:${nonce}`, '1', QR_NONCE_TTL_SECONDS);
-        if (!firstScan) {
-          throw new RejectedTicketError(
-            409,
-            'Mã QR này vừa được quét — nghi ngờ replay.',
-            'QR_REPLAY',
-            ticket.id,
-            ticket.trip_id
-          );
-        }
-      }
 
       if (expectedTripId && ticket.trip_id !== expectedTripId) {
         throw new RejectedTicketError(
@@ -374,6 +381,29 @@ export async function validateTicketQr(
         );
       }
 
+      if (ticket.payment_status !== 'SUCCESS')
+        reject(409, 'Vé chưa được thanh toán.', 'PAYMENT_NOT_CONFIRMED');
+      if (ticket.pending_request)
+        reject(409, 'Vé đang chờ xử lý yêu cầu hủy/đổi.', 'REQUEST_PENDING');
+      const now = Date.now();
+      if (
+        !['SCHEDULED', 'IN_TRANSIT'].includes(ticket.trip_status) ||
+        !Number.isFinite(new Date(ticket.departure_time).getTime()) ||
+        !Number.isFinite(new Date(ticket.arrival_time).getTime()) ||
+        now < new Date(ticket.departure_time).getTime() - 30 * 60_000 ||
+        now > new Date(ticket.arrival_time).getTime() + 90 * 60_000
+      )
+        reject(
+          409,
+          'Chuyến chưa mở hoặc đã đóng soát vé (mở trước giờ chạy 30 phút).',
+          'CHECKIN_WINDOW_CLOSED'
+        );
+
+      // Rejected scans must not consume a passenger's nonce before boarding opens.
+      if (nonce) {
+        const firstScan = await setIfAbsent(`qr:nonce:${nonce}`, '1', QR_NONCE_TTL_SECONDS);
+        if (!firstScan) reject(409, 'Mã QR này vừa được quét — nghi ngờ replay.', 'QR_REPLAY');
+      }
       let outcome: 'VALID' | 'ALREADY_USED';
       if (ticket.status === 'BOOKED') {
         await client.query("UPDATE tickets SET status='CHECKED_IN' WHERE id=$1", [ticket.id]);

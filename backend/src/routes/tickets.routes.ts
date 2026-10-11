@@ -32,6 +32,8 @@ router.post(
         latitude: req.body.latitude === undefined ? undefined : Number(req.body.latitude),
         longitude: req.body.longitude === undefined ? undefined : Number(req.body.longitude),
         validatedBy: req.user?.id,
+        validatedRole: req.user?.role,
+        manual: req.body.manual === true,
       });
       res.json({ success: true, ...result });
     } catch (error) {

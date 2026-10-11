@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { query } from '../config/database';
 
 export interface AuthUserPayload {
   id: string;
@@ -15,11 +16,11 @@ export interface AuthenticatedRequest extends Request {
 import { getJwtSecret } from '../config/auth';
 
 // Middleware xác thực JWT Token từ Header Authorization: Bearer <token>
-export const authenticateJWT = (
+export const authenticateJWT = async (
   req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
-): void => {
+): Promise<void> => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -35,13 +36,29 @@ export const authenticateJWT = (
 
   try {
     const decoded = jwt.verify(token, getJwtSecret()) as AuthUserPayload;
-    req.user = decoded;
+    const [user] = await query<any[]>(
+      `SELECT u.*,COALESCE(r.name,u.role) AS current_role FROM users u LEFT JOIN roles r ON r.id=u.role_id WHERE u.id=$1`,
+      [decoded.id]
+    );
+    if (!user || user.status !== 'ACTIVE') {
+      res
+        .status(401)
+        .json({ success: false, message: 'Tài khoản đã khóa hoặc không còn hoạt động.' });
+      return;
+    }
+    req.user = { ...decoded, role: user.current_role, email: user.email, fullName: user.full_name };
     next();
   } catch (err: any) {
-    res.status(401).json({
-      statusCode: 401,
+    const invalidToken =
+      err instanceof jwt.JsonWebTokenError ||
+      err instanceof jwt.TokenExpiredError ||
+      err instanceof jwt.NotBeforeError;
+    res.status(invalidToken ? 401 : 503).json({
+      statusCode: invalidToken ? 401 : 503,
       success: false,
-      message: 'Token xác thực không hợp lệ hoặc đã hết hạn phiên làm việc!',
+      message: invalidToken
+        ? 'Token xác thực không hợp lệ hoặc đã hết hạn phiên làm việc!'
+        : 'Không thể xác thực tài khoản lúc này. Vui lòng thử lại.',
     });
   }
 };

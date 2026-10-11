@@ -9,6 +9,7 @@ export interface BookingResult {
   expiresAt?: string;
   paymentMethod?: string;
   paymentStatus?: string;
+  refundPending?: boolean;
   payment?: {
     orderId?: string;
     amount?: number;

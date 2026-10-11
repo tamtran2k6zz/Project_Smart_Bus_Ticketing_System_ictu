@@ -11,7 +11,11 @@ const occupiedTicketCondition = `tk.status IN ('BOOKED', 'CHECKED_IN')
 // Sử dụng thuật toán so khớp stop_order qua SQL JOIN trực tiếp
 export const searchTrips = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { origin_stop_id, destination_stop_id, departure_date } = req.query;
+    const { origin_stop_id, destination_stop_id, departure_date, time } = req.query;
+    if (time && (typeof time !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time))) {
+      res.status(400).json({ success: false, message: 'Giờ phải có dạng HH:mm.' });
+      return;
+    }
 
     if (!origin_stop_id || !destination_stop_id) {
       res.status(400).json({
@@ -33,9 +37,11 @@ export const searchTrips = async (req: Request, res: Response): Promise<void> =>
 
     let sql = `
       SELECT t.id AS trip_id, t.route_id, COALESCE(b.plate_number, 'N/A') AS bus_plate,
-        t.departure_time, t.arrival_time, COALESCE(b.total_seats, 40) AS total_seats,
-        (SELECT COUNT(*) FROM tickets tk WHERE tk.trip_id = t.id AND (${occupiedTicketCondition})) AS booked_seats,
-        (COALESCE(b.total_seats, 40) - (SELECT COUNT(*) FROM tickets tk WHERE tk.trip_id = t.id AND (${occupiedTicketCondition}))) AS available_seats,
+        t.departure_time + origin_rs.estimated_time_minutes * INTERVAL '1 minute' AS departure_time,
+        t.departure_time + dest_rs.estimated_time_minutes * INTERVAL '1 minute' AS arrival_time,
+        COALESCE(b.total_seats, 40) AS total_seats,
+        (SELECT COALESCE(SUM(tk.quantity),0) FROM tickets tk WHERE tk.trip_id = t.id AND (${occupiedTicketCondition})) AS booked_seats,
+        (COALESCE(b.total_seats, 40) - (SELECT COALESCE(SUM(tk.quantity),0) FROM tickets tk WHERE tk.trip_id = t.id AND (${occupiedTicketCondition}))) AS available_seats,
         t.status AS trip_status, r.code AS route_code, r.name AS route_name,
         COALESCE(t.base_price, 10000) AS base_price, origin_s.id AS origin_stop_id,
         origin_s.name AS origin_stop_name, origin_s.address AS origin_stop_address,
@@ -50,16 +56,20 @@ export const searchTrips = async (req: Request, res: Response): Promise<void> =>
       JOIN bus_stops origin_s ON origin_rs.stop_id = origin_s.id JOIN bus_stops dest_s ON dest_rs.stop_id = dest_s.id
       WHERE r.status = 'ACTIVE'
         AND t.status = 'SCHEDULED'
-        AND t.departure_time >= NOW()
+        AND t.departure_time + origin_rs.estimated_time_minutes * INTERVAL '1 minute' >= NOW()
         AND origin_rs.stop_order < dest_rs.stop_order
     `;
     const params: any[] = [origin_stop_id, destination_stop_id];
 
     if (departure_date) {
-      sql += ` AND (t.departure_time AT TIME ZONE 'Asia/Ho_Chi_Minh')::date = $${params.length + 1}::date`;
+      sql += ` AND ((t.departure_time + origin_rs.estimated_time_minutes * INTERVAL '1 minute') AT TIME ZONE 'Asia/Ho_Chi_Minh')::date = $${params.length + 1}::date`;
       params.push(departure_date);
     }
-    sql += ' ORDER BY t.departure_time ASC';
+    if (time) {
+      params.push(time);
+      sql += ` AND ((t.departure_time + origin_rs.estimated_time_minutes * INTERVAL '1 minute') AT TIME ZONE 'Asia/Ho_Chi_Minh')::time >= $${params.length}::time`;
+    }
+    sql += ' ORDER BY departure_time ASC';
 
     const results = await query<any[]>(sql, params);
     const trips = results.map(row => ({
@@ -108,8 +118,8 @@ export const getTrips = async (req: Request, res: Response): Promise<void> => {
   try {
     const { route_id, date, bookable } = req.query;
     let sql = `SELECT t.id, t.route_id, COALESCE(b.plate_number, 'N/A') AS bus_plate, t.driver_id, t.departure_time, t.arrival_time,
-      COALESCE(b.total_seats, 40) AS total_seats, (SELECT COUNT(*) FROM tickets tk WHERE tk.trip_id = t.id AND (${occupiedTicketCondition})) AS booked_seats,
-      (COALESCE(b.total_seats, 40) - (SELECT COUNT(*) FROM tickets tk WHERE tk.trip_id = t.id AND (${occupiedTicketCondition}))) AS available_seats,
+      COALESCE(b.total_seats, 40) AS total_seats, (SELECT COALESCE(SUM(tk.quantity),0) FROM tickets tk WHERE tk.trip_id = t.id AND (${occupiedTicketCondition})) AS booked_seats,
+      (COALESCE(b.total_seats, 40) - (SELECT COALESCE(SUM(tk.quantity),0) FROM tickets tk WHERE tk.trip_id = t.id AND (${occupiedTicketCondition}))) AS available_seats,
       t.status, t.created_at, r.code AS route_code, r.name AS route_name, COALESCE(t.base_price, 10000) AS base_price, u.full_name AS driver_name
       FROM trips t JOIN routes r ON t.route_id = r.id LEFT JOIN buses b ON t.bus_id = b.id LEFT JOIN users u ON t.driver_id = u.id WHERE 1=1`;
     const params: any[] = [];
@@ -122,8 +132,7 @@ export const getTrips = async (req: Request, res: Response): Promise<void> => {
       params.push(date);
     }
     if (bookable === 'true')
-      sql +=
-        " AND t.status = 'SCHEDULED' AND r.status = 'ACTIVE' AND t.departure_time >= NOW() - INTERVAL '24 hours'";
+      sql += " AND t.status = 'SCHEDULED' AND r.status = 'ACTIVE' AND t.departure_time >= NOW()";
     sql += ` ORDER BY t.departure_time ${bookable === 'true' ? 'ASC' : 'DESC'} LIMIT 100`;
 
     const trips = await query<any[]>(sql, params);

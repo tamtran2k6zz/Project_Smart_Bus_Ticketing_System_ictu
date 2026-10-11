@@ -1,6 +1,2 @@
-const app = require('../backend/dist/app');
-
-module.exports = app;
-module.exports.config = {
-  maxDuration: 30,
-};
+// Vercel's root entrypoint loads the Express application compiled by the build.
+module.exports = require('../backend/dist/app').default;

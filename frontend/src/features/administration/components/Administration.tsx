@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { appConfig } from '@/configs/app.config';
 import { useQuery } from '@tanstack/react-query';
 import { useSession } from '@/store/session.store';
 import { useAction } from '@/hooks/useAction';
@@ -118,11 +119,12 @@ export function UserManagement() {
                 <option value="false">Tạm khóa</option>
               </select>
             </Field>
-            <strong style={{ fontSize: 13 }}>Quyền cụ thể</strong>
+            <strong style={{ fontSize: 13 }}>Quyền theo vai trò</strong>
             {rolePermissions[editing.role].map(p => (
               <label key={p} className="row muted">
                 <input
                   type="checkbox"
+                  disabled={!appConfig.demo}
                   checked={editing.permissions.includes(p)}
                   onChange={e =>
                     setEditing({

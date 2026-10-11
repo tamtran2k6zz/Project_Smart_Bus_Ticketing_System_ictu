@@ -35,6 +35,11 @@ const baseTicket = {
   email: 'a@example.com',
   route_name: 'Ha Noi - Hai Phong',
   route_code: 'HN-HP',
+  driver_id: 'driver-1',
+  departure_time: new Date(Date.now() + 10 * 60_000).toISOString(),
+  arrival_time: new Date(Date.now() + 70 * 60_000).toISOString(),
+  trip_status: 'SCHEDULED',
+  payment_status: 'SUCCESS',
 };
 
 function makeClient(ticketRow: typeof baseTicket | null) {
@@ -53,7 +58,11 @@ async function runWithClient(ticketRow: typeof baseTicket | null, input: Record<
     work(client)
   );
   try {
-    const result = await validateTicketQr(input as never);
+    const result = await validateTicketQr({
+      validatedRole: 'ADMIN',
+      manual: !String(input.code).trim().startsWith('{'),
+      ...input,
+    } as never);
     return { result, client };
   } catch (error) {
     return { error, client };
@@ -93,6 +102,42 @@ describe('parseQrScan', () => {
 });
 
 describe('validateTicketQr', () => {
+  it('requires signed security fields unless staff explicitly requests manual verification', async () => {
+    const { error } = await runWithClient(baseTicket, { code: 'TB-001', manual: false });
+    expect(error).toMatchObject({ status: 403, message: expect.stringContaining('QR phải có') });
+  });
+  it('rejects an unassigned driver', async () => {
+    const { error } = await runWithClient(baseTicket, {
+      code: 'TB-001',
+      validatedRole: 'DRIVER',
+      validatedBy: 'other-driver',
+    });
+    expect(error).toMatchObject({ status: 403 });
+  });
+  it('rejects a BOOKED ticket without confirmed payment', async () => {
+    const { error } = await runWithClient(
+      { ...baseTicket, payment_status: 'PENDING' },
+      { code: 'TB-001' }
+    );
+    expect(error).toMatchObject({ status: 409, message: 'Vé chưa được thanh toán.' });
+  });
+  it('rejects a future trip before the check-in window', async () => {
+    const { error } = await runWithClient(
+      { ...baseTicket, departure_time: '2099-01-01T00:00:00Z' },
+      { code: 'TB-001' }
+    );
+    expect(error).toMatchObject({
+      status: 409,
+      message: expect.stringContaining('Chuyến chưa mở'),
+    });
+  });
+  it('rejects completed trips', async () => {
+    const { error } = await runWithClient(
+      { ...baseTicket, trip_status: 'COMPLETED' },
+      { code: 'TB-001' }
+    );
+    expect(error).toMatchObject({ status: 409 });
+  });
   it('checks in a BOOKED ticket and writes a VALID audit log', async () => {
     const { result, client } = await runWithClient(baseTicket, { code: 'TB-001' });
 

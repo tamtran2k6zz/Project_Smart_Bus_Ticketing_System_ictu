@@ -3,6 +3,6 @@ export interface LocationUpdate {
   lng: number;
   updatedAt: string;
   connected: boolean;
-  eta: number;
+  eta: number | null;
   nextStop: string;
 }

@@ -6,6 +6,7 @@ export interface Route {
   destination: string;
   price: number;
   stopIds: string[];
+  stopMinutes?: number[];
   active: boolean;
 }
 export interface Stop {

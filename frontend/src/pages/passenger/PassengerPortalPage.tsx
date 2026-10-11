@@ -10,6 +10,7 @@ import type { ApiRoute, FeedbackRecord, TripOccupancy } from '../../types/api';
 import { getErrorMessage } from '../../utils/errorMessage';
 import { isPaymentPageState, loadPaymentDraft, savePaymentDraft } from '../../utils/paymentDraft';
 import type { PaymentPageState } from '../../types/payment';
+import { applyCancellationResult, canDisplayBookingQr } from '../../utils/bookingCancellation';
 
 interface SeatInfo {
   id: string;
@@ -432,27 +433,21 @@ export const PassengerPortalPage: React.FC = () => {
         method: 'POST',
       });
       const result = await response.json();
+      if (response.ok || result.ticketStatus === 'CANCELLED') {
+        setBookingResult(current => current ? applyCancellationResult(current, result) : current);
+        await fetchMyTickets();
+      }
       if (!response.ok) throw new Error(result.message || 'Không thể hủy vé.');
       setBookingMsg(result.message);
-      setBookingResult(current =>
-        current
-          ? {
-              ...current,
-              ticket: { ...current.ticket, status: 'CANCELLED' },
-              paymentStatus:
-                current.paymentStatus === 'SUCCESS' ? 'REFUNDED' : current.paymentStatus,
-            }
-          : current,
-      );
     } catch (error) {
       setBookingMsg(error instanceof Error ? error.message : 'Không thể hủy vé.');
     }
   };
 
-  const handleDemoTripComplete = async () => {
+  const handleDemoPaymentConfirm = async () => {
     const ticketId = bookingResult?.ticket?.id || bookingResult?.ticketId;
     if (!ticketId) {
-      setBookingMsg('Không tìm thấy mã vé để hoàn tất chuyến demo.');
+      setBookingMsg('Không tìm thấy mã vé để xác nhận thanh toán demo.');
       return;
     }
 
@@ -465,7 +460,7 @@ export const PassengerPortalPage: React.FC = () => {
       );
       const result = await response.json();
       if (!response.ok) {
-        throw new Error(result?.message || 'Không thể hoàn tất chuyến demo.');
+        throw new Error(result?.message || 'Không thể xác nhận thanh toán demo.');
       }
 
       setBookingResult(current =>
@@ -482,12 +477,10 @@ export const PassengerPortalPage: React.FC = () => {
           : current,
       );
       setBookingMsg(result.message);
-      setFeedbackMsg(result.message);
       await fetchTrips();
       await fetchOtherData();
-      setActiveTab('feedback');
     } catch (error) {
-      setBookingMsg(getErrorMessage(error, 'Không thể hoàn tất chuyến demo.'));
+      setBookingMsg(getErrorMessage(error, 'Không thể xác nhận thanh toán demo.'));
     } finally {
       setIsBooking(false);
     }
@@ -877,7 +870,8 @@ export const PassengerPortalPage: React.FC = () => {
                 const ticketStatus = bookingResult.ticket?.status || bookingResult.status;
                 const paymentStatus = bookingResult.paymentStatus || bookingResult.payment?.status;
                 const paymentMethod = bookingResult.paymentMethod || bookingResult.payment?.method;
-                const isPaid = ticketStatus === 'BOOKED' || paymentStatus === 'SUCCESS';
+                const isPaid = canDisplayBookingQr(bookingResult);
+                const isPending = ticketStatus === 'RESERVED' && paymentStatus === 'PENDING';
                 const selectedTrip = trips.find(trip => trip.id === String(bookingResult.ticket?.tripId || selectedTripId));
                 const paymentQrValue = paymentMethod === 'QR' && tCode && selectedTrip
                   ? buildPaymentQrPayload({
@@ -916,7 +910,8 @@ export const PassengerPortalPage: React.FC = () => {
                         <p style={{ margin: 0 }}><strong>Số ghế:</strong> <span style={{ color: '#34d399', fontWeight: 600 }}>{sNumber}</span></p>
                         <p style={{ margin: 0 }}><strong>Số tiền:</strong> {Number(payAmount).toLocaleString('vi-VN')} VNĐ</p>
                         <p style={{ margin: 0 }}><strong>Trạng thái thanh toán:</strong> {paymentStatus || (isPaid ? 'SUCCESS' : 'PENDING')}</p>
-                        {expRaw && !isPaid && (
+                        <p style={{ margin: 0 }}><strong>Trạng thái vé:</strong> {ticketStatus}</p>
+                        {expRaw && isPending && (
                           <div style={{ margin: '4px 0' }}>
                             <strong>Giữ chỗ đến:</strong> {expTime} ({<ReservationCountdown expiresAt={expRaw} onExpired={() => {
                               alert('⚠️ Thời gian giữ chỗ 10 phút đã hết hạn. Ghế đã được tự động giải phóng về trạng thái trống.');
@@ -925,11 +920,11 @@ export const PassengerPortalPage: React.FC = () => {
                           </div>
                         )}
                         <div style={{ marginTop: '10px', fontSize: '12.5px', color: isPaid ? '#34d399' : '#fbbf24', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span>{isPaid ? '✓' : '…'}</span> {isPaid ? 'Vé đã được xác nhận' : 'Mã QR chỉ lưu thông tin giao dịch; chưa ghi nhận đã thanh toán'}
+                          <span>{isPaid ? '✓' : '…'}</span> {isPaid ? 'Vé đã được xác nhận' : ticketStatus === 'CANCELLED' ? 'Vé đã hủy, không thể sử dụng mã QR' : 'Vé chưa đủ điều kiện hiển thị mã QR soát vé'}
                         </div>
                       </div>
 
-                      {!isPaid && paymentQrValue && <div
+                      {isPending && paymentQrValue && <div
                         style={{
                           padding: '16px 20px',
                           background: '#ffffff',
@@ -946,18 +941,18 @@ export const PassengerPortalPage: React.FC = () => {
                           Quét mã để xem mã vé, chuyến xe, ghế và số tiền. Mã này không chuyển tiền và không tự xác nhận thanh toán.
                         </div>
                       </div>}
-                      {!isPaid && paymentMethod === 'QR' && (
+                      {isPending && paymentMethod === 'QR' && (
                         <div style={{ flexBasis: '100%' }}>
                           <button
                             type="button"
                             className="primary-button"
-                            onClick={handleDemoTripComplete}
+                            onClick={handleDemoPaymentConfirm}
                             disabled={isBooking}
                           >
-                            {isBooking ? 'Đang cập nhật dữ liệu...' : 'Hoàn thành chuyến đi (demo) → Đánh giá chuyến đi'}
+                            {isBooking ? 'Đang cập nhật dữ liệu...' : 'Xác nhận thanh toán (demo)'}
                           </button>
                           <p style={{ color: '#fbbf24', fontSize: '12px', margin: '8px 0 0' }}>
-                            Thao tác demo cập nhật thanh toán/vé/chuyến lên dữ liệu chung nhưng không chuyển tiền thật.
+                            Thao tác demo xác nhận vé, không chuyển tiền thật và không kết thúc chuyến. Chỉ dùng khi máy chủ đã bật chế độ thử nghiệm.
                           </p>
                         </div>
                       )}
@@ -996,9 +991,9 @@ export const PassengerPortalPage: React.FC = () => {
                         <div style={{ fontSize: '13px', color: '#34d399', background: 'rgba(52, 211, 153, 0.1)', padding: '10px 14px', borderRadius: '10px', border: '1px solid rgba(52, 211, 153, 0.3)' }}>
                           ✓ Đã tự động gửi hóa đơn điện tử và ảnh QR vé qua email tới: <strong>{user?.email || 'khachhang@gmail.com'}</strong>
                         </div>
-                        {ticketStatus && ['BOOKED', 'RESERVED'].includes(ticketStatus) && (
+                        {ticketStatus && (['BOOKED', 'RESERVED'].includes(ticketStatus) || bookingResult.refundPending) && (
                           <button type="button" onClick={handleCancelTicket} className="primary-button" style={{ background: '#b91c1c' }}>
-                            Hủy vé / yêu cầu hoàn tiền
+                            {bookingResult.refundPending ? 'Thử lại yêu cầu hoàn tiền' : 'Hủy vé / yêu cầu hoàn tiền'}
                           </button>
                         )}
                       </div>
@@ -1074,7 +1069,7 @@ export const PassengerPortalPage: React.FC = () => {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 {myTickets.map((t) => {
-                  const isPaid = t.ticket_status === 'BOOKED' || t.payment_status === 'SUCCESS';
+                  const isPaid = canDisplayBookingQr({ status: t.ticket_status, paymentStatus: t.payment_status }) && Date.parse(t.arrival_time) > Date.now();
                   const qrVal = `SMARTBUS-QR-${t.ticket_code}`;
                   return (
                     <div
@@ -1114,10 +1109,10 @@ export const PassengerPortalPage: React.FC = () => {
                           <p style={{ margin: 0 }}><strong>Số tiền:</strong> {Number(t.fare_amount || t.payment_amount || 0).toLocaleString('vi-VN')} VNĐ</p>
                         </div>
 
-                        <div style={{ background: '#ffffff', padding: '12px', borderRadius: '14px', display: 'inline-block', textAlign: 'center', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+                        {isPaid ? <div style={{ background: '#ffffff', padding: '12px', borderRadius: '14px', display: 'inline-block', textAlign: 'center', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
                           <PaymentQrCode value={qrVal} size={140} alt="Mã QR vé xe buýt" showDownload={true} downloadFileName={`smartbus-ticket-${t.ticket_code}.png`} />
                           <div style={{ fontSize: '11px', color: '#0f172a', fontWeight: 600, marginTop: '6px', fontFamily: 'monospace' }}>{t.ticket_code}</div>
-                        </div>
+                        </div> : <p>Vé không còn mã QR có thể sử dụng.</p>}
                       </div>
                     </div>
                   );

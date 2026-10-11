@@ -6,12 +6,15 @@ const { createServer } = require('node:http');
 const { PGlite } = require('@electric-sql/pglite');
 const request = require('supertest');
 process.env.JWT_SECRET = 'test-only-secret-at-least-32-characters-long';
+process.env.DATABASE_URL = 'postgresql://test:test@127.0.0.1:1/test';
 process.env.MOMO_PARTNER_CODE = 'test-partner';
 process.env.MOMO_ACCESS_KEY = 'test-access-key';
 process.env.MOMO_SECRET_KEY = 'test-secret-key';
 process.env.PAYMENT_CRON_SECRET = 'test-cron-secret';
 process.env.VNPAY_TMN_CODE = 'test-tmn';
 process.env.VNPAY_HASH_SECRET = 'test-vnpay-secret';
+process.env.NODE_ENV = 'test';
+process.env.PAYMENT_DEMO_ENABLED = 'true';
 // The suite must not depend on a running Redis. Seat locking falls back to the
 // PostgreSQL row lock, which is the concurrency guard under test.
 delete process.env.REDIS_URL;
@@ -38,6 +41,9 @@ async function main() {
   delete process.env.REDIS_HOST;
   delete process.env.REDIS_PORT;
   delete process.env.REDIS_PASSWORD;
+  const refundRequests = [];
+  let refundHandler;
+  delete process.env.SMTP_HOST;
   const gatewayServer = createServer((req, res) => {
     let body = '';
     req.setEncoding('utf8');
@@ -46,6 +52,15 @@ async function main() {
     });
     req.on('end', () => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
+      if (req.url === '/refund') {
+        refundRequests.push(JSON.parse(body));
+        if (refundHandler) {
+          const handler = refundHandler;
+          refundHandler = undefined;
+          handler(res);
+          return;
+        }
+      }
       res.end(
         req.url === '/refund'
           ? JSON.stringify({ resultCode: 0, message: 'Refund accepted' })
@@ -83,12 +98,31 @@ async function main() {
   const app = require('../dist/app').default;
   let checks = 0;
   const call = async (method, url, body, token, status = 200) => {
+    // Existing paid-seat fixtures now explicitly reserve QR and confirm using the
+    // opt-in LOCAL demo endpoint. Production rejection is tested separately.
+    const paidFixture =
+      method === 'post' &&
+      /^\/api\/(v1\/)?ticketing\/bookings$/.test(url) &&
+      body?.paymentMethod === undefined;
+    if (paidFixture) body = { ...body, paymentMethod: 'QR' };
+    if (url.endsWith('/verify')) body = { ...body, manual: true };
     let r = request(app)[method](url);
     if (token) r = r.set('Authorization', 'Bearer ' + token);
     if (body) r = r.send(body);
     const response = await r;
     assert.equal(response.status, status, JSON.stringify(response.body));
     checks++;
+    if (paidFixture && response.status === 201) {
+      const id = response.body.ticketId;
+      const paid = await request(app)
+        .post('/api/ticketing/bookings/' + id + '/demo-complete')
+        .set('Authorization', 'Bearer ' + token)
+        .send({});
+      assert.equal(paid.status, 200, JSON.stringify(paid.body));
+      response.body.qrCode =
+        'SMARTBUS-QR-' +
+        (await db.query('SELECT ticket_code FROM tickets WHERE id=$1', [id])).rows[0].ticket_code;
+    }
     return response.body;
   };
   const momoCallback = (orderId, amount, transId) => {
@@ -141,6 +175,8 @@ async function main() {
     const passenger = first.data.tokens.accessToken;
     const second = await register('other@example.test');
     const other = second.data.tokens.accessToken;
+    // Paid-seat fixtures are already verified; verification itself is exercised separately.
+    await db.query('UPDATE users SET email_verified_at=NOW() WHERE id=ANY($1::text[])', [[first.data.user.id, second.data.user.id]]);
     await db.query("UPDATE users SET role='ADMIN',role_id=1 WHERE id=$1", [first.data.user.id]);
     const login = await call('post', '/api/auth/login', {
       email: 'passenger@example.test',
@@ -173,7 +209,13 @@ async function main() {
         await call(
           'post',
           '/api/stops',
-          { code: 'STOP' + n, name: 'Trạm ' + n, address: 'ICTU' },
+          {
+            code: 'STOP' + n,
+            name: 'Trạm ' + n,
+            address: 'ICTU',
+            latitude: 21.58,
+            longitude: 105.79 + n / 100,
+          },
           admin,
           201
         )
@@ -224,7 +266,12 @@ async function main() {
       `/api/routes/${routeWithStops}`,
       {
         stations: [
-          { id: firstSavedStop.stopId, name: firstSavedStop.name, address: firstSavedStop.address, order: 2 },
+          {
+            id: firstSavedStop.stopId,
+            name: firstSavedStop.name,
+            address: firstSavedStop.address,
+            order: 2,
+          },
           { name: 'Trạm tự tạo 2', address: 'Địa chỉ 2', order: 1 },
         ],
       },
@@ -261,6 +308,12 @@ async function main() {
     const search = `/api/trips/search?origin_stop_id=${stops[0]}&destination_stop_id=${stops[1]}`;
     assert.equal((await call('get', search)).data.length, 1);
     assert.equal((await call('get', search + '&departure_date=2099-01-01')).data.length, 1);
+    const reverseSearch = `/api/trips/search?origin_stop_id=${stops[1]}&destination_stop_id=${stops[0]}`;
+    assert.equal(
+      (await call('get', reverseSearch)).data.length,
+      0,
+      'Reverse journeys must not be sold'
+    );
     assert.equal((await call('get', '/api/trips?bookable=true')).data.length, 1);
     const pastTrip = (
       await call(
@@ -306,20 +359,20 @@ async function main() {
     const booked = await call(
       'post',
       '/api/ticketing/bookings',
-      { tripId: trip, seatNumber: 'A01', userId: second.data.user.id },
+      { tripId: trip, seatNumber: 'A01', userId: second.data.user.id, paymentMethod: 'MOMO' },
       passenger,
       201
+    );
+    await call(
+      'post',
+      '/api/v1/ticketing/payments/momo/ipn',
+      momoCallback(booked.ticketId, 15000, 11001)
     );
     const [{ ticket_code: bookedTicketCode }] = (
       await db.query('SELECT ticket_code FROM tickets WHERE id=$1', [booked.ticketId])
     ).rows;
-    await call(
-      'get',
-      `/api/v1/tickets/${encodeURIComponent(bookedTicketCode)}`,
-      null,
-      null,
-      401
-    );
+    booked.qrCode = bookedTicketCode;
+    await call('get', `/api/v1/tickets/${encodeURIComponent(bookedTicketCode)}`, null, null, 401);
     const ticketDetails = await call(
       'get',
       `/api/v1/tickets/${encodeURIComponent(bookedTicketCode)}`,
@@ -330,13 +383,7 @@ async function main() {
     assert.equal(ticketDetails.seat_code, 'A01');
     assert.equal(ticketDetails.route_name, 'Tuyến cập nhật');
     assert.match(ticketDetails.qr_code_base64, /^data:image\/png;base64,/);
-    await call(
-      'get',
-      `/api/v1/tickets/${encodeURIComponent(bookedTicketCode)}`,
-      null,
-      other,
-      403
-    );
+    await call('get', `/api/v1/tickets/${encodeURIComponent(bookedTicketCode)}`, null, other, 403);
     assert.equal(
       (await db.query('SELECT user_id FROM tickets WHERE id=$1', [booked.ticketId])).rows[0]
         .user_id,
@@ -349,6 +396,10 @@ async function main() {
       passenger,
       409
     );
+    await db.query(
+      "UPDATE trips SET departure_time=NOW()+INTERVAL '10 minutes',arrival_time=NOW()+INTERVAL '70 minutes' WHERE id=$1",
+      [trip]
+    );
     assert.equal(
       (await call('post', '/api/ticketing/verify', { code: booked.qrCode }, admin))
         .isAlreadyCheckedIn,
@@ -360,6 +411,64 @@ async function main() {
       true
     );
     await call('post', '/api/ticketing/verify', { code: booked.qrCode }, other, 403);
+    // Provider retries after check-in must acknowledge success, never refund a used ticket.
+    const refundsBeforeRescan = refundRequests.length;
+    await call(
+      'post',
+      '/api/v1/ticketing/payments/momo/ipn',
+      momoCallback(booked.ticketId, 15000, 11001)
+    );
+    const usedPayment = await call(
+      'get',
+      `/api/v1/ticketing/payments/${booked.ticketId}`,
+      null,
+      passenger
+    );
+    assert.equal(usedPayment.data.paymentStatus, 'SUCCESS');
+    assert.equal(usedPayment.data.ticket.status, 'CHECKED_IN');
+    assert.equal(refundRequests.length, refundsBeforeRescan);
+    await call('post', `/api/v1/ticketing/tickets/${booked.ticketId}/cancel`, {}, passenger, 400);
+    // Require an explicit payment method; a QR reservation remains unpaid.
+    const missingMethod = await request(app)
+      .post('/api/ticketing/bookings')
+      .set('Authorization', 'Bearer ' + passenger)
+      .send({ tripId: trip, seatNumber: 'A09' });
+    assert.equal(missingMethod.status, 400);
+    const pending = await call(
+      'post',
+      '/api/ticketing/bookings',
+      { tripId: trip, seatNumber: 'A09', paymentMethod: 'QR' },
+      passenger,
+      201
+    );
+    assert.equal(pending.status, 'RESERVED');
+    assert.equal(pending.data.payment.status, 'PENDING');
+    const pendingDetails = await call(
+      'get',
+      `/api/v1/tickets/${pending.ticketCode}`,
+      null,
+      passenger
+    );
+    assert.equal(pendingDetails.qr_code_base64, null);
+    await call('post', '/api/tickets/validate-qr', { code: pending.ticketCode, manual: true }, admin, 409);
+    await call('post', `/api/v1/ticketing/tickets/${pending.ticketId}/cancel`, {}, passenger);
+    const pendingCancelled = await call(
+      'get',
+      `/api/v1/ticketing/payments/${pending.ticketId}`,
+      null,
+      passenger
+    );
+    assert.equal(pendingCancelled.data.ticket.status, 'CANCELLED');
+    assert.equal(pendingCancelled.data.paymentStatus, 'FAILED');
+    assert.equal(
+      (await call('get', `/api/trips/${trip}/seats`)).data.seats.find(s => s.seatNumber === 'A09')
+        .isAvailable,
+      true
+    );
+    await db.query(
+      "UPDATE trips SET departure_time='2099-01-01T01:00:00Z',arrival_time='2099-01-01T02:00:00Z' WHERE id=$1",
+      [trip]
+    );
     const qrReservation = await call(
       'post',
       '/api/ticketing/bookings',
@@ -372,9 +481,10 @@ async function main() {
     assert.equal(qrReservation.data.payment.paymentUrl, undefined);
     assert.equal(
       (
-        await db.query('SELECT payment_method,amount,status FROM payment_transactions WHERE order_id=$1', [
-          qrReservation.ticketId,
-        ])
+        await db.query(
+          'SELECT payment_method,amount,status FROM payment_transactions WHERE order_id=$1',
+          [qrReservation.ticketId]
+        )
       ).rows[0].payment_method,
       'QR'
     );
@@ -428,12 +538,44 @@ async function main() {
     );
     assert.equal(paidStatus.data.paymentStatus, 'SUCCESS');
     assert.equal(paidStatus.data.ticket.status, 'BOOKED');
-    const cancelled = await call(
-      'post',
-      `/api/v1/ticketing/tickets/${paidReservation.ticketId}/cancel`,
-      {},
-      passenger
-    );
+    // Scan while the external refund is deliberately paused. Cancellation must
+    // already be durable, without keeping a database transaction open.
+    let releaseRefund;
+    let startedRefund;
+    const refundStarted = new Promise(resolve => {
+      startedRefund = resolve;
+    });
+    refundHandler = res => {
+      releaseRefund = () => res.end(JSON.stringify({ resultCode: 0 }));
+      startedRefund();
+    };
+    const cancelResponse = request(app)
+      .post(`/api/v1/ticketing/tickets/${paidReservation.ticketId}/cancel`)
+      .set('Authorization', 'Bearer ' + passenger)
+      .send({})
+      .then(response => response);
+    try {
+      await Promise.race([
+        refundStarted,
+        new Promise((_, reject) => {
+          const timeout = setTimeout(() => reject(new Error('Refund did not start')), 5000);
+          timeout.unref();
+        }),
+      ]);
+      await call(
+        'post',
+        '/api/tickets/validate-qr',
+        { code: paidReservation.ticketCode, manual: true },
+        admin,
+        409
+      );
+    } finally {
+      if (releaseRefund) releaseRefund();
+    }
+    const cancelledResponse = await cancelResponse;
+    assert.equal(cancelledResponse.status, 200);
+    checks++;
+    const cancelled = cancelledResponse.body;
     assert.equal(cancelled.success, true);
     assert.equal(
       (
@@ -443,6 +585,58 @@ async function main() {
       ).rows[0].status,
       'REFUNDED'
     );
+    // A failed provider call keeps the cancellation durable and retries with
+    // the same refund id. A completed retry must not issue another refund.
+    const retryReservation = await call(
+      'post',
+      '/api/ticketing/bookings',
+      { tripId: trip, seatNumber: 'A08', paymentMethod: 'MOMO' },
+      passenger,
+      201
+    );
+    await call(
+      'post',
+      '/api/v1/ticketing/payments/momo/ipn',
+      momoCallback(retryReservation.ticketId, 15000, 12001)
+    );
+    refundHandler = res => res.end(JSON.stringify({ resultCode: 99 }));
+    const failedRefund = await call(
+      'post',
+      `/api/v1/ticketing/tickets/${retryReservation.ticketId}/cancel`,
+      {},
+      passenger,
+      503
+    );
+    assert.equal(failedRefund.refundPending, true);
+    assert.equal(failedRefund.ticketStatus, 'CANCELLED');
+    const refundKey = refundRequests.at(-1).requestId;
+    await call(
+      'post',
+      '/api/tickets/validate-qr',
+      { code: retryReservation.ticketCode, manual: true },
+      admin,
+      409
+    );
+    await call(
+      'post',
+      `/api/v1/ticketing/tickets/${retryReservation.ticketId}/cancel`,
+      {},
+      passenger
+    );
+    assert.equal(refundRequests.at(-1).requestId, refundKey);
+    const refundsAfterRetry = refundRequests.length;
+    await call(
+      'post',
+      `/api/v1/ticketing/tickets/${retryReservation.ticketId}/cancel`,
+      {},
+      passenger
+    );
+    assert.equal(refundRequests.length, refundsAfterRetry);
+    // Run the notification service against real migration columns, not a SQL mock.
+    const { notifyApproachingPassengers } = require('../dist/services/notification.service');
+    await notifyApproachingPassengers(trip, { latitude: 21.58, longitude: 105.8 });
+    const approaching = await call('get', '/api/notifications', null, passenger);
+    assert.ok(approaching.items.some(n => n.type === 'BUS_APPROACHING'));
 
     const vnpayReservation = await call(
       'post',
@@ -524,21 +718,108 @@ async function main() {
       ).rows[0].status,
       'REFUNDED'
     );
+    const cancelledPending = await call(
+      'post',
+      '/api/v1/ticketing/bookings',
+      { tripId: trip, seatNumber: 'A09', paymentMethod: 'MOMO' },
+      passenger,
+      201
+    );
+    await call(
+      'post',
+      `/api/v1/ticketing/tickets/${cancelledPending.ticketId}/cancel`,
+      {},
+      passenger
+    );
+    const refundsBeforeLateCallback = refundRequests.length;
+    await call(
+      'post',
+      '/api/v1/ticketing/payments/momo/ipn',
+      momoCallback(cancelledPending.ticketId, 15000, 14001)
+    );
+    const lateCancelledStatus = await call(
+      'get',
+      `/api/v1/ticketing/payments/${cancelledPending.ticketId}`,
+      null,
+      passenger
+    );
+    assert.equal(lateCancelledStatus.data.ticket.status, 'CANCELLED');
+    assert.equal(lateCancelledStatus.data.paymentStatus, 'REFUNDED');
+    assert.equal(refundRequests.length, refundsBeforeLateCallback + 1);
+    await call(
+      'post',
+      '/api/v1/ticketing/payments/momo/ipn',
+      momoCallback(cancelledPending.ticketId, 15000, 14001)
+    );
+    assert.equal(refundRequests.length, refundsBeforeLateCallback + 1);
+    await call(
+      'post',
+      '/api/tickets/validate-qr',
+      { code: cancelledPending.ticketCode, manual: true },
+      admin,
+      409
+    );
+    const originalSchedule = (
+      await db.query('SELECT departure_time FROM trips WHERE id=$1', [trip])
+    ).rows[0];
+    try {
+      await db.query("UPDATE trips SET departure_time=NOW()+INTERVAL '20 minutes' WHERE id=$1", [
+        trip,
+      ]);
+      const refundsBeforeCutoff = refundRequests.length;
+      await call(
+        'post',
+        `/api/v1/ticketing/tickets/${vnpayReservation.ticketId}/cancel`,
+        {},
+        passenger,
+        400
+      );
+      assert.equal(refundRequests.length, refundsBeforeCutoff);
+      const unchanged = await call(
+        'get',
+        `/api/v1/ticketing/payments/${vnpayReservation.ticketId}`,
+        null,
+        passenger
+      );
+      assert.equal(unchanged.data.ticket.status, 'BOOKED');
+      assert.equal(unchanged.data.paymentStatus, 'SUCCESS');
+    } finally {
+      await db.query('UPDATE trips SET departure_time=$1 WHERE id=$2', [
+        originalSchedule.departure_time,
+        trip,
+      ]);
+    }
     await call('post', `/api/trips/${trip}/seats/lock`, { seatNumber: 'A02' }, passenger);
     await db.query(
       "UPDATE trip_seats SET lock_expires_at=NOW()-INTERVAL '1 minute' WHERE trip_id=$1 AND seat_number='A02'",
       [trip]
     );
-    await call('post', '/api/ticketing/bookings', { tripId: trip, seatNumber: 'A02' }, other, 201);
+    const secondBooked = await call(
+      'post',
+      '/api/ticketing/bookings',
+      { tripId: trip, seatNumber: 'A02', paymentMethod: 'MOMO' },
+      other,
+      201
+    );
+    await call(
+      'post',
+      '/api/v1/ticketing/payments/momo/ipn',
+      momoCallback(secondBooked.ticketId, 15000, 13001)
+    );
     const competing = await Promise.all(
       [passenger, other].map(token =>
         request(app)
           .post('/api/ticketing/bookings')
           .set('Authorization', 'Bearer ' + token)
-          .send({ tripId: trip, seatNumber: 'A03' })
+          .send({ tripId: trip, seatNumber: 'A03', paymentMethod: 'MOMO' })
       )
     );
     assert.deepEqual(competing.map(r => r.status).sort(), [201, 409]);
+    await call(
+      'post',
+      '/api/v1/ticketing/payments/momo/ipn',
+      momoCallback(competing.find(r => r.status === 201).body.ticketId, 15000, 13002)
+    );
     checks++;
     await assert.rejects(
       db.query(
@@ -601,6 +882,24 @@ async function main() {
       other,
       201
     );
+    process.env.PAYMENT_DEMO_ENABLED = 'false';
+    await call(
+      'post',
+      `/api/ticketing/bookings/${demoReservation.ticketId}/demo-complete`,
+      {},
+      other,
+      404
+    );
+    process.env.PAYMENT_DEMO_ENABLED = 'true';
+    process.env.NODE_ENV = 'production';
+    await call(
+      'post',
+      `/api/ticketing/bookings/${demoReservation.ticketId}/demo-complete`,
+      {},
+      other,
+      404
+    );
+    process.env.NODE_ENV = 'test';
     await call(
       'post',
       `/api/ticketing/bookings/${demoReservation.ticketId}/demo-complete`,
@@ -616,9 +915,7 @@ async function main() {
     );
     assert.equal(demoCompletion.data.tripStatus, 'SCHEDULED');
     assert.equal(
-      (
-        await db.query('SELECT status FROM trips WHERE id=$1', [demoTrip])
-      ).rows[0].status,
+      (await db.query('SELECT status FROM trips WHERE id=$1', [demoTrip])).rows[0].status,
       'SCHEDULED'
     );
     assert.equal(
@@ -632,23 +929,21 @@ async function main() {
     );
     assert.equal(
       (
-        await db.query(
-          'SELECT status FROM payment_transactions WHERE ticket_id=$1',
-          [demoReservation.ticketId]
-        )
+        await db.query('SELECT status FROM payment_transactions WHERE ticket_id=$1', [
+          demoReservation.ticketId,
+        ])
       ).rows[0].status,
       'SUCCESS'
     );
-    await db.query("UPDATE trips SET status='COMPLETED' WHERE id=$1", [demoTrip]);
     const eligibleDemoTrips = await call('get', '/api/ticketing/completed-trips', null, other);
-    assert.ok(eligibleDemoTrips.data.some(item => item.tripId === demoTrip));
+    assert.ok(!eligibleDemoTrips.data.some(item => item.tripId === demoTrip));
+    await db.query("UPDATE trips SET status='COMPLETED' WHERE id=$1", [demoTrip]);
+    const completedDemoTrips = await call('get', '/api/ticketing/completed-trips', null, other);
+    assert.ok(completedDemoTrips.data.some(item => item.tripId === demoTrip));
     const dashboard = await call('get', '/api/operations/dashboard/summary', null, admin);
     assert.equal(Number(dashboard.summary.totalRoutes), 2);
     assert.equal(dashboard.tripOccupancy[0].routeCode, 'TEST');
-    assert.equal(
-      dashboard.tripOccupancy.find(item => item.id === demoTrip).status,
-      'COMPLETED'
-    );
+    assert.equal(dashboard.tripOccupancy.find(item => item.id === demoTrip).status, 'COMPLETED');
     await call(
       'patch',
       `/api/users/${second.data.user.id}/discount-approval`,
@@ -674,17 +969,21 @@ async function main() {
     );
 
     // Vé BOOKED trên đúng chuyến → check-in thành công + log VALID.
+    await db.query(
+      "UPDATE trips SET status='SCHEDULED',departure_time=NOW()+INTERVAL '10 minutes',arrival_time=NOW()+INTERVAL '70 minutes' WHERE id=$1",
+      [demoTrip]
+    );
     const sprint3Checkin = await call(
       'post',
       '/api/tickets/validate-qr',
-      { code: demoTicketCode, tripId: demoTrip },
+      { code: demoTicketCode, tripId: demoTrip, manual: true },
       admin
     );
     assert.equal(sprint3Checkin.isAlreadyCheckedIn, false);
     assert.ok(sprint3Checkin.validationId);
     assert.equal(
-      (await db.query('SELECT status FROM tickets WHERE id=$1', [demoReservation.ticketId]))
-        .rows[0].status,
+      (await db.query('SELECT status FROM tickets WHERE id=$1', [demoReservation.ticketId])).rows[0]
+        .status,
       'CHECKED_IN'
     );
     assert.equal(
@@ -701,7 +1000,7 @@ async function main() {
     const sprint3Rescan = await call(
       'post',
       '/api/tickets/validate-qr',
-      { code: demoTicketCode, tripId: demoTrip },
+      { code: demoTicketCode, tripId: demoTrip, manual: true },
       admin
     );
     assert.equal(sprint3Rescan.isAlreadyCheckedIn, true);
@@ -781,10 +1080,11 @@ async function main() {
     });
     const notifList = await call('get', '/api/notifications?limit=50', null, passenger);
     assert.equal(notifList.success, true);
-    assert.equal(notifList.items.length, 1); // isolation: chỉ thông báo của mình
-    assert.equal(notifList.unreadCount, 1);
+    assert.equal(notifList.items.length, 2); // approaching + update; excludes other user's update
+    assert.ok(notifList.items.every(item => item.user_id === first.data.user.id));
+    assert.equal(notifList.unreadCount, 2);
     const notifUnread = await call('get', '/api/notifications/unread-count', null, passenger);
-    assert.equal(notifUnread.unreadCount, 1);
+    assert.equal(notifUnread.unreadCount, 2);
     const notifRead = await call(
       'post',
       `/api/notifications/${notifList.items[0].id}/read`,
@@ -829,8 +1129,22 @@ async function main() {
           "SELECT count(*)::int AS n FROM pg_tables WHERE schemaname='public' AND rowsecurity"
         )
       ).rows[0].n,
-      17
+      28
     );
+    await require('./test-ui-contract.cjs')({
+      app,
+      db,
+      call,
+      request,
+      route,
+      stops,
+      admin,
+      passenger,
+      other,
+      second,
+      momoCallback,
+    });
+    await require('./test-email-contract.cjs')({ app,db,call,request,route,admin,momoCallback });
     await call('delete', `/api/routes/${route}`, null, admin);
     await call('delete', `/api/routes/${routeWithStops}`, null, admin);
     assert.equal((await call('get', '/api/routes')).data.length, 0);
