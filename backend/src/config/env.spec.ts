@@ -30,6 +30,12 @@ describe('config/env', () => {
     'MOMO_REDIRECT_URL',
     'MOMO_IPN_URL',
     'PAYMENT_RESULT_URL',
+    'SMTP_HOST',
+    'SMTP_FROM',
+    'SMTP_USER',
+    'SMTP_PASSWORD',
+    'SMTP_PORT',
+    'SMTP_SECURE',
   ];
 
   beforeEach(() => {
@@ -156,5 +162,22 @@ describe('config/env', () => {
       .map(issue => issue.variable);
     expect(variables).not.toContain('VNPAY_RETURN_URL');
     expect(variables).not.toContain('VNPAY_IPN_URL');
+  });
+  it('warns about missing SMTP configuration instead of silently disabling real email', () => {
+    const variables = collectEnvironmentIssues().map(issue => issue.variable);
+    expect(variables).toContain('SMTP_HOST');
+    expect(variables).toContain('SMTP_FROM');
+  });
+  it('requires credentials for Gmail and never includes a secret value in diagnostics', () => {
+    process.env.SMTP_HOST = 'smtp.gmail.com';
+    process.env.SMTP_FROM = 'SmartBus <sender@example.test>';
+    process.env.SMTP_USER = 'sender@example.test';
+    expect(collectEnvironmentIssues()).toContainEqual(
+      expect.objectContaining({ variable: 'SMTP_PASSWORD' })
+    );
+    process.env.SMTP_PASSWORD = 'private-test-value';
+    const issues = collectEnvironmentIssues();
+    expect(issues.some(issue => issue.variable.startsWith('SMTP_'))).toBe(false);
+    expect(JSON.stringify(issues)).not.toContain('private-test-value');
   });
 });

@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import { readEnv } from '../config/env';
+import { collectEmailEnvironmentIssues, readEnv } from '../config/env';
 import { appLogger } from '../config/logger';
 import type { Options } from 'nodemailer/lib/mailer';
 
@@ -11,11 +11,18 @@ export async function sendEmail(
 ): Promise<boolean> {
   const host = readEnv('SMTP_HOST'),
     from = readEnv('SMTP_FROM');
-  if (!host || !from) return false;
+  const issues = collectEmailEnvironmentIssues();
+  if (issues.length) {
+    appLogger.error('email_configuration_incomplete', {
+      variables: issues.map(issue => issue.variable).join(','),
+    });
+    return false;
+  }
   const transport = nodemailer.createTransport({
     host,
     port: Number(readEnv('SMTP_PORT') || 587),
     secure: readEnv('SMTP_SECURE') === 'true',
+    requireTLS: host?.toLowerCase() === 'smtp.gmail.com' && readEnv('SMTP_SECURE') !== 'true',
     connectionTimeout: 10000,
     socketTimeout: 15000,
     auth: readEnv('SMTP_USER')

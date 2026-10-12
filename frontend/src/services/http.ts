@@ -57,6 +57,7 @@ export async function request<T>(
       active: u.status === 'ACTIVE',
       emailVerified: u.emailVerified === true,
       emailVerificationNotice: value.emailConfirmationNotice,
+      emailVerificationSent: typeof value.emailSent === 'boolean' ? value.emailSent : undefined,
       permissions: rolePermissions[u.role as Role] || [],
     } as T;
   }

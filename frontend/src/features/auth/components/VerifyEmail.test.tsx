@@ -22,10 +22,18 @@ const user = {
   permissions: [],
   emailVerified: false,
 };
-const open = (url = '/verify-email') =>
+const open = (url = '/verify-email', state?: { notice: string; emailSent: boolean }) =>
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <MemoryRouter initialEntries={[url]}>
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: url.split('#')[0],
+            hash: url.includes('#') ? '#' + url.split('#')[1] : '',
+            state,
+          },
+        ]}
+      >
         <VerifyEmail />
         <Link to={'/verify-email#token=' + 'c'.repeat(64)}>Mở liên kết email thử</Link>
       </MemoryRouter>
@@ -65,6 +73,34 @@ it('reports SMTP failure honestly and keeps the resend action available', async 
   open();
   fireEvent.click(screen.getByRole('button', { name: 'Gửi lại email xác minh' }));
   await screen.findByText('Chưa gửi được email. Vui lòng liên hệ nhà xe.');
+  expect(screen.getByRole('alert').textContent).toContain('Chưa gửi được email.');
+  expect(useSession.getState().user?.emailVerified).toBe(false);
+});
+it('does not imply an email was sent when opening the page without a delivery result', () => {
+  open();
+  expect(screen.getByRole('status').textContent).toContain('Chưa có xác nhận gửi email');
+  expect(
+    screen.queryByText('Mở email SmartBus và bấm liên kết xác minh. Kiểm tra cả thư rác.')
+  ).toBeNull();
+});
+it('shows the failed registration delivery notice as an error', () => {
+  open('/verify-email', {
+    emailSent: false,
+    notice: 'Tài khoản đã tạo; chưa gửi được email xác minh.',
+  });
+  expect(screen.getByRole('alert').textContent).toContain('chưa gửi được email');
+  expect(screen.queryByRole('status')).toBeNull();
+});
+it('shows a delivery confirmation only after the API accepts the email', async () => {
+  api.resendVerification.mockResolvedValue({
+    emailSent: true,
+    emailVerified: false,
+    message: 'Đã gửi liên kết xác minh. Kiểm tra cả thư rác.',
+  });
+  open();
+  fireEvent.click(screen.getByRole('button', { name: 'Gửi lại email xác minh' }));
+  await screen.findByText('Đã gửi liên kết xác minh. Kiểm tra cả thư rác.');
+  expect(screen.queryByRole('alert')).toBeNull();
   expect(useSession.getState().user?.emailVerified).toBe(false);
 });
 it('accepts an emailed link opened while the verification page is already mounted', async () => {

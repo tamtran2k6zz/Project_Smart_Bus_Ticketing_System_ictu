@@ -31,7 +31,19 @@
 4. Rebuild/deploy frontend và backend cùng migration. **Tài khoản cũ cũng chưa được mặc định xác minh**; hành khách đăng nhập sẽ được hướng dẫn xác minh. Không backfill đã xác minh nếu chưa có bằng chứng sở hữu email.
 5. Nghiệm thu bằng hộp thư thật thuộc người kiểm thử: đăng ký → nhận mail → xác minh → đặt/thanh toán sandbox merchant → nhận QR → xem vé trong tài khoản. Không dùng credential hoặc email thật trong test fixtures/commit.
 
-## API
+## Gmail trên Vercel
+
+Lỗi được xác nhận ngày 11/10/2026: `vercel env ls production --project project-smart-bus-ticketing-system-ictu` không có biến SMTP nào. Backend trả `emailSent=false`; trang xác minh vẫn hiển thị hướng dẫn mở hộp thư khi chưa có kết quả gửi. Các biến chỉ tồn tại trong file `.env.example` không cấu hình cho deployment.
+
+- Đã thêm sáu biến production: `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`, `SMTP_SECURE=false`, `SMTP_USER`, `SMTP_FROM`, `FRONTEND_PUBLIC_URL`. Địa chỉ gửi do chủ dự án cung cấp, không lưu mật khẩu trong Git.
+- Chủ tài khoản bật Xác minh 2 bước, tạo Mật khẩu ứng dụng tên SmartBus tại https://myaccount.google.com/apppasswords. Hướng dẫn chính thức: https://support.google.com/accounts/answer/185833?hl=vi.
+- Thêm **SMTP_PASSWORD** dưới dạng Secret cho **Production** tại https://vercel.com/dtc245220005-9804s-projects/project-smart-bus-ticketing-system-ictu/settings/environment-variables. Dùng mật khẩu ứng dụng, không dùng mật khẩu đăng nhập Gmail; không gửi mật khẩu vào chat hoặc commit. Nếu Google hiển thị mã theo nhóm, nhập liền 16 ký tự.
+- Redeploy production sau khi thêm biến, rồi đăng nhập tài khoản hiện có và bấm **Gửi lại email xác minh**. Không cần đăng ký lại. Kiểm tra trạng thái trả về, thư rác và thư thật; SMTP chấp nhận không bảo đảm thư vào Inbox.
+- Backend ghi `email_configuration_incomplete` kèm **tên** biến thiếu, không ghi giá trị mật khẩu. Gmail trên port 587 bắt buộc STARTTLS. Giao diện chỉ báo đã gửi khi API xác nhận; gửi thất bại hiển thị lỗi, còn khi mở trang chưa có kết quả sẽ nói rõ chưa có xác nhận gửi email.
+
+Kiểm thử tự động dùng transport giả; nghiệm thu Gmail thật chỉ có thể hoàn tất sau khi chủ tài khoản thêm `SMTP_PASSWORD` và redeploy.
+
+## API chi tiết
 
 | Endpoint dưới `/api/smartbus/v1/auth` | Quyền | Kết quả |
 |---|---|---|

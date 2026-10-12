@@ -72,3 +72,25 @@ it('normalizes auth/me session data and clears credentials on logout', async () 
   await request('/auth/logout', 'POST');
   expect(sessionStorage.getItem('smartbus.accessToken.v1')).toBeNull();
 });
+it('preserves a failed verification delivery result from registration', async () => {
+  mocked.request.mockResolvedValue({
+    data: {
+      success: true,
+      data: {
+        user: {
+          id: 'u1',
+          fullName: 'Khách hàng',
+          role: 'PASSENGER',
+          status: 'ACTIVE',
+          emailVerified: false,
+        },
+        emailSent: false,
+        emailConfirmationNotice: 'Chưa gửi được email xác minh.',
+      },
+    },
+  });
+  expect(await request('/auth/register', 'POST', {})).toMatchObject({
+    emailVerificationSent: false,
+    emailVerificationNotice: 'Chưa gửi được email xác minh.',
+  });
+});

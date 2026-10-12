@@ -16,9 +16,18 @@ export default function VerifyEmail() {
     () => new URLSearchParams(location.hash.slice(1)).get('token') || ''
   );
   const [message, setMessage] = useState<string>(
-    location.state?.notice || 'Mở email SmartBus và bấm liên kết xác minh. Kiểm tra cả thư rác.'
+    location.state?.emailSent === false
+      ? ''
+      : location.state?.notice ||
+          (token
+            ? 'Bấm Xác minh email để xác nhận hộp thư của bạn.'
+            : 'Chưa có xác nhận gửi email. Bấm Gửi lại email xác minh để yêu cầu liên kết mới.')
   );
-  const [error, setError] = useState(''),
+  const [error, setError] = useState(
+      location.state?.emailSent === false
+        ? location.state.notice || 'Chưa gửi được email xác minh.'
+        : ''
+    ),
     [busy, setBusy] = useState(false),
     [verified, setVerified] = useState(false);
   useEffect(() => {
@@ -89,7 +98,12 @@ export default function VerifyEmail() {
               onClick={() =>
                 run(async () => {
                   const result = await authApi.resendVerification();
-                  setMessage(result.message);
+                  if (!result.emailSent && !result.emailVerified) {
+                    setMessage('');
+                    setError(result.message);
+                  } else {
+                    setMessage(result.message);
+                  }
                 })
               }
             >
