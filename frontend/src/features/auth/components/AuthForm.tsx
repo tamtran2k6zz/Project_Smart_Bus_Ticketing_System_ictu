@@ -49,7 +49,10 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' | 'forgot' }) {
     setUser(user);
     client.clear();
     if (!appConfig.demo && user.role === 'PASSENGER' && !user.emailVerified) {
-      navigate('/verify-email', { replace: true, state: { notice: user.emailVerificationNotice } });
+      navigate('/verify-email', {
+        replace: true,
+        state: { notice: user.emailVerificationNotice, emailSent: user.emailVerificationSent },
+      });
       return;
     }
     const redirect = params.get('redirect');

@@ -171,6 +171,42 @@ export interface EnvIssue {
   message: string;
 }
 
+/** Configuration names only: safe to expose in operator logs, never secret values. */
+export function collectEmailEnvironmentIssues(): EnvIssue[] {
+  const issues: EnvIssue[] = [];
+  const missing = (variable: string) => {
+    issues.push({
+      level: 'warning',
+      variable,
+      message: `Thiếu ${variable}: chưa thể gửi email thật.`,
+    });
+  };
+  const host = readEnv('SMTP_HOST');
+  if (!host) missing('SMTP_HOST');
+  if (!readEnv('SMTP_FROM')) missing('SMTP_FROM');
+  const user = readEnv('SMTP_USER'),
+    password = readEnv('SMTP_PASSWORD');
+  if (host?.toLowerCase() === 'smtp.gmail.com' || user || password) {
+    if (!user) missing('SMTP_USER');
+    if (!password) missing('SMTP_PASSWORD');
+  }
+  const port = Number(readEnv('SMTP_PORT') || 587);
+  if (!Number.isInteger(port) || port < 1 || port > 65535)
+    issues.push({
+      level: 'warning',
+      variable: 'SMTP_PORT',
+      message: 'SMTP_PORT phải là số nguyên từ 1 đến 65535.',
+    });
+  const secure = readEnv('SMTP_SECURE');
+  if (secure && !['true', 'false'].includes(secure))
+    issues.push({
+      level: 'warning',
+      variable: 'SMTP_SECURE',
+      message: 'SMTP_SECURE phải là true hoặc false.',
+    });
+  return issues;
+}
+
 export function collectEnvironmentIssues(): EnvIssue[] {
   const issues: EnvIssue[] = [];
   const database = describeDatabaseTarget();
@@ -226,7 +262,7 @@ export function collectEnvironmentIssues(): EnvIssue[] {
       message: 'Bắt buộc ở môi trường production cho endpoint release-expired.',
     });
   }
-  return issues;
+  return [...issues, ...collectEmailEnvironmentIssues()];
 }
 
 /** Print a boot summary so a missing integration is visible immediately. */

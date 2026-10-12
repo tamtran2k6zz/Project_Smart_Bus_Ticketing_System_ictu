@@ -17,5 +17,6 @@ export interface User {
   active: boolean;
   emailVerified?: boolean;
   emailVerificationNotice?: string;
+  emailVerificationSent?: boolean;
   permissions: Permission[];
 }
