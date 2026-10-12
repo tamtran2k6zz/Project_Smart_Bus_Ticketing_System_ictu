@@ -2,9 +2,23 @@ import { service } from '@/services/adapter';
 import { getTrip } from '@/features/booking/services/booking.api';
 import type { LocationUpdate } from '../types';
 import { notify } from '@/services/mocks/database';
+
+interface LocationPayload {
+  lat?: number | string;
+  lng?: number | string;
+  latitude?: number | string;
+  longitude?: number | string;
+  updatedAt?: number | string;
+  connected?: boolean;
+  eta?: number | string | null;
+  nextStop?: string;
+}
+
+type LocationResponse = LocationPayload & { data?: LocationPayload };
+
 export const trackingApi = {
   location: async (tripId: string): Promise<LocationUpdate> => {
-    const res = await service<any>('/trips/' + tripId + '/location', db => {
+    const res = await service<LocationResponse>('/trips/' + tripId + '/location', db => {
       try {
         const t = getTrip(db, tripId);
         const r = db.routes.find(r => r.id === t.routeId);
@@ -41,7 +55,7 @@ export const trackingApi = {
               notify(
                 db,
                 subscription.userId,
-                'Xe sắp đến trạm',
+                'Xe sắp đến trạm (demo)',
                 end.name + ' · ETA ' + eta + ' phút.',
                 '/tracking/' + tripId
               );

@@ -37,8 +37,9 @@ const VIETNAM_STOPS_COORDS: Record<string, [number, number]> = {
 };
 
 function getValidCoordinates(stop: Stop, fallbackIndex = 0): [number, number] {
-  const lat = Number(stop.lat ?? (stop as any).latitude);
-  const lng = Number(stop.lng ?? (stop as any).longitude);
+  const coordinates = stop as Stop & { latitude?: number | string; longitude?: number | string };
+  const lat = Number(stop.lat ?? coordinates.latitude);
+  const lng = Number(stop.lng ?? coordinates.longitude);
   if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
     const nameLower = (stop.name || '').toLowerCase();
     for (const [key, coords] of Object.entries(VIETNAM_STOPS_COORDS)) {
