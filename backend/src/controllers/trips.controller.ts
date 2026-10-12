@@ -252,7 +252,9 @@ export const getTripLocationController = async (req: Request, res: Response): Pr
     );
 
     if (tripRows.length === 0) {
-      res.status(404).json({ statusCode: 404, success: false, message: 'Không tìm thấy chuyến xe' });
+      res
+        .status(404)
+        .json({ statusCode: 404, success: false, message: 'Không tìm thấy chuyến xe' });
       return;
     }
 
@@ -273,10 +275,10 @@ export const getTripLocationController = async (req: Request, res: Response): Pr
       'thái nguyên': [21.58245, 105.83615],
       'bắc kạn': [22.14682, 105.83471],
       'lạng sơn': [21.84903, 106.75704],
-      'công nghệ thông tin': [21.58520, 105.80750],
-      'ictu': [21.58520, 105.80750],
-      'gang thép': [21.53670, 105.85940],
-      'bắc giang': [21.27310, 106.19460],
+      'công nghệ thông tin': [21.5852, 105.8075],
+      ictu: [21.5852, 105.8075],
+      'gang thép': [21.5367, 105.8594],
+      'bắc giang': [21.2731, 106.1946],
       'mỹ đình': [21.02851, 105.77832],
       'cầu giấy': [21.02981, 105.80164],
       'kim mã': [21.03152, 105.81981],
@@ -381,4 +383,3 @@ export const getTripLocationController = async (req: Request, res: Response): Pr
     res.status(500).json({ statusCode: 500, success: false, message: err.message });
   }
 };
-
