@@ -22,6 +22,7 @@ export function StaffTrips() {
   const query = useQuery({
     queryKey: ['assigned', user.id],
     queryFn: () => operationsApi.assigned(user.id),
+    refetchInterval: 30000,
   });
   const catalog = useQuery({ queryKey: ['catalog'], queryFn: operationsApi.catalog });
   return (
@@ -52,6 +53,7 @@ export function StaffTrips() {
                     {dateTime(t.departure)} ·{' '}
                     {catalog.data?.vehicles.find(v => v.id === t.vehicleId)?.plate}
                   </p>
+                  {t.checkIn && <p className="muted">{t.checkIn.message}</p>}
                 </div>
                 <div className="row">
                   <LinkButton to={'/staff/scan?tripId=' + t.id}>Soát vé</LinkButton>

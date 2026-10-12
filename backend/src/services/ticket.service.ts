@@ -3,6 +3,7 @@ import * as QRCode from 'qrcode';
 import { query, transaction } from '../config/database';
 import { readEnv } from '../config/env';
 import { createLogger } from '../config/logger';
+import { getCheckInWindow } from './check-in-window';
 import {
   acquireTicketValidationLock,
   releaseTicketValidationLock,
@@ -385,19 +386,8 @@ export async function validateTicketQr(
         reject(409, 'Vé chưa được thanh toán.', 'PAYMENT_NOT_CONFIRMED');
       if (ticket.pending_request)
         reject(409, 'Vé đang chờ xử lý yêu cầu hủy/đổi.', 'REQUEST_PENDING');
-      const now = Date.now();
-      if (
-        !['SCHEDULED', 'IN_TRANSIT'].includes(ticket.trip_status) ||
-        !Number.isFinite(new Date(ticket.departure_time).getTime()) ||
-        !Number.isFinite(new Date(ticket.arrival_time).getTime()) ||
-        now < new Date(ticket.departure_time).getTime() - 30 * 60_000 ||
-        now > new Date(ticket.arrival_time).getTime() + 90 * 60_000
-      )
-        reject(
-          409,
-          'Chuyến chưa mở hoặc đã đóng soát vé (mở trước giờ chạy 30 phút).',
-          'CHECKIN_WINDOW_CLOSED'
-        );
+      const window = getCheckInWindow({ ...ticket, status: ticket.trip_status });
+      if (window.state !== 'open') reject(409, window.message, window.reason);
 
       // Rejected scans must not consume a passenger's nonce before boarding opens.
       if (nonce) {

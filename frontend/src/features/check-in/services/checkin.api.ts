@@ -2,6 +2,7 @@ import { service } from '@/services/adapter';
 import { audit, requireUser } from '@/services/mocks/database';
 import { can } from '@/configs/permissions';
 import type { CheckedInPassenger, ValidationResult } from '../types';
+import { demoCheckInWindow } from './demo-window';
 
 /** Danh sách vé đã soát của một chuyến, cập nhật từ nguồn dữ liệu demo qua polling. */
 export const listCheckedInPassengers = (tripId: string, userId: string) =>
@@ -66,13 +67,9 @@ export const validateTicket = (userId: string, tripId: string, token: string) =>
           message: 'Vé đang có yêu cầu hủy/đổi. Vui lòng xử lý yêu cầu trước.',
         };
       const trip = db.trips.find(trip => trip.id === tripId);
-      if (
-        !trip ||
-        trip.status === 'completed' ||
-        Date.now() < Date.parse(trip.departure) - 30 * 60000 ||
-        Date.now() > Date.parse(trip.departure) + (trip.duration + 90) * 60000
-      )
-        return { valid: false, message: 'Chuyến chưa mở hoặc đã đóng soát vé.' };
+      if (!trip) return { valid: false, message: 'Không tìm thấy chuyến.' };
+      const window = demoCheckInWindow(trip);
+      if (window.state !== 'open') return { valid: false, message: window.message };
 
       const checkedInAt = new Date().toISOString();
       t.status = 'used';

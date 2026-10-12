@@ -18,6 +18,8 @@ export function ScanTicket() {
   const query = useQuery({
     queryKey: ['assigned', user.id],
     queryFn: () => operationsApi.assigned(user.id),
+    refetchInterval: 5000,
+    refetchOnWindowFocus: true,
   });
   const catalog = useQuery({ queryKey: ['catalog'], queryFn: operationsApi.catalog });
   const [tripId, setTripId] = useState(params.get('tripId') || ''),
@@ -44,6 +46,25 @@ export function ScanTicket() {
     mounted = useRef(true),
     starting = useRef(false),
     checking = useRef(false);
+  const selectedTrip = query.data?.find(trip => trip.id === tripId);
+  const canScan = selectedTrip?.checkIn?.state === 'open' && !query.isError;
+  const windowMessage =
+    selectedTrip?.checkIn?.message ||
+    (tripId
+      ? 'Chưa xác nhận được quyền và thời gian soát vé của chuyến này.'
+      : 'Chọn chuyến trước khi soát vé.');
+
+  useEffect(() => {
+    if (camera && !canScan) {
+      setCamera(false);
+      const current = scanner.current;
+      if (current?.isScanning)
+        void current
+          .stop()
+          .then(() => current.clear())
+          .catch(() => undefined);
+    }
+  }, [camera, canScan]);
 
   useEffect(() => {
     mounted.current = true;
@@ -74,6 +95,7 @@ export function ScanTicket() {
     try {
       if (!navigator.onLine) throw new Error('Đang ngoại tuyến. Chưa thể xác minh vé.');
       if (!tripId) throw new Error('Chọn chuyến trước khi soát vé.');
+      if (!canScan) throw new Error(windowMessage);
       if (value.trim().length < 4) throw new Error('Nhập token QR hợp lệ.');
       const r = await validateTicket(user.id, tripId, value);
       if (mounted.current) {
@@ -90,6 +112,10 @@ export function ScanTicket() {
   }
 
   async function startCamera() {
+    if (!canScan) {
+      setError(windowMessage);
+      return;
+    }
     if (!tripId) {
       setError('Chọn chuyến trước khi bật camera.');
       return;
@@ -144,6 +170,7 @@ export function ScanTicket() {
                 disabled={camera}
                 onChange={e => {
                   setTripId(e.target.value);
+                  setToken('');
                   setResult(undefined);
                   setError('');
                 }}
@@ -157,6 +184,7 @@ export function ScanTicket() {
                 ))}
               </select>
             </Field>
+            {tripId && <Message>{windowMessage}</Message>}
             <div
               id={elementId}
               style={{
@@ -174,7 +202,7 @@ export function ScanTicket() {
                 Tắt camera
               </Button>
             ) : (
-              <Button disabled={!tripId} onClick={() => void startCamera()}>
+              <Button disabled={!canScan} onClick={() => void startCamera()}>
                 <Camera size={18} />
                 Bật camera đọc QR
               </Button>
@@ -198,12 +226,13 @@ export function ScanTicket() {
               <Field label="Token từ vé QR">
                 <input
                   value={token}
+                  disabled={!canScan || busy}
                   onChange={e => setToken(e.target.value)}
-                  placeholder="SB-DEMO-…"
+                  placeholder="Dán nội dung QR từ vé điện tử"
                   autoComplete="off"
                 />
               </Field>
-              <Button disabled={busy || !tripId}>
+              <Button disabled={busy || !canScan}>
                 {busy ? 'Đang xác minh…' : 'Xác thực & ghi nhận lên xe'}
               </Button>
             </form>

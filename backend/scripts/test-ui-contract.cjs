@@ -571,6 +571,25 @@ module.exports = async ({
     403
   );
   await db.query('UPDATE trips SET driver_id=$1 WHERE id=$2', [second.data.user.id, trip]);
+  const assignedTrip = (await call('get', prefix + '/staff/trips', null, driver)).find(
+    t => t.id === trip
+  );
+  assert.ok(assignedTrip);
+  assert.equal(assignedTrip.checkIn.state, 'not_open');
+  assert.equal(
+    Date.parse(assignedTrip.checkIn.opensAt),
+    Date.parse(assignedTrip.departure) - 30 * 60000
+  );
+  assert.ok(Number.isFinite(Date.parse(assignedTrip.checkIn.serverTime)));
+  const tooEarly = await call(
+    'post',
+    prefix + '/ticket-validations',
+    { tripId: trip, token: ticket.token },
+    driver,
+    409
+  );
+  assert.match(tooEarly.message, /Chuyến chưa mở soát vé/);
+  assert.match(tooEarly.message, /Giờ mở:/);
   await call(
     'post',
     prefix + '/trips/' + trip + '/location',

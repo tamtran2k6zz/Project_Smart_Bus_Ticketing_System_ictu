@@ -123,7 +123,11 @@ describe('validateTicketQr', () => {
   });
   it('rejects a future trip before the check-in window', async () => {
     const { error } = await runWithClient(
-      { ...baseTicket, departure_time: '2099-01-01T00:00:00Z' },
+      {
+        ...baseTicket,
+        departure_time: '2099-01-01T00:00:00Z',
+        arrival_time: '2099-01-01T01:00:00Z',
+      },
       { code: 'TB-001' }
     );
     expect(error).toMatchObject({
@@ -137,6 +141,31 @@ describe('validateTicketQr', () => {
       { code: 'TB-001' }
     );
     expect(error).toMatchObject({ status: 409 });
+  });
+  it("tells the assigned driver exactly when tomorrow's 06:30 trip opens without consuming the ticket", async () => {
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-12T09:41:00+07:00'));
+    try {
+      const { error, client } = await runWithClient(
+        {
+          ...baseTicket,
+          departure_time: '2026-10-13T06:30:00+07:00',
+          arrival_time: '2026-10-13T08:30:00+07:00',
+        },
+        { code: 'TB-001', validatedRole: 'DRIVER', validatedBy: 'driver-1' }
+      );
+      expect(error).toMatchObject({
+        status: 409,
+        message: expect.stringContaining('06:00 13/10/2026'),
+      });
+      expect(mockedSetIfAbsent).not.toHaveBeenCalled();
+      expect(
+        client.query.mock.calls.some((c: unknown[]) =>
+          (c[0] as string).includes("UPDATE tickets SET status='CHECKED_IN'")
+        )
+      ).toBe(false);
+    } finally {
+      clock.mockRestore();
+    }
   });
   it('checks in a BOOKED ticket and writes a VALID audit log', async () => {
     const { result, client } = await runWithClient(baseTicket, { code: 'TB-001' });

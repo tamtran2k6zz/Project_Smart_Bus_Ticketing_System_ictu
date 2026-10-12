@@ -6,6 +6,7 @@ import { getTrip } from '@/features/booking/services/booking.api';
 import { resourceSchemas } from '../schemas/resources';
 import type { Assignment, Incident, Route, Staff, Stop, Vehicle } from '../types';
 import type { Trip } from '@/features/booking/types';
+import { demoCheckInWindow } from '@/features/check-in/services/demo-window';
 export type Resource = 'routes' | 'stops' | 'vehicles' | 'staff' | 'trips' | 'assignments';
 export interface Catalog {
   routes: Route[];
@@ -221,11 +222,13 @@ export const operationsApi = {
       const user = requireUser(db, userId);
       if (!can(user, 'check-in')) throw new Error('Không có quyền.');
       const staffIds = db.staff.filter(s => s.userId === userId).map(s => s.id);
-      return user.role === 'DRIVER'
-        ? db.trips.filter(t =>
-            db.assignments.some(a => a.tripId === t.id && staffIds.includes(a.staffId))
-          )
-        : db.trips;
+      const trips =
+        user.role === 'DRIVER'
+          ? db.trips.filter(t =>
+              db.assignments.some(a => a.tripId === t.id && staffIds.includes(a.staffId))
+            )
+          : db.trips;
+      return trips.map(trip => ({ ...trip, checkIn: demoCheckInWindow(trip) }));
     }),
   incidents: (tripId?: string) =>
     service<Incident[]>('/incidents' + (tripId ? '?tripId=' + tripId : ''), db =>

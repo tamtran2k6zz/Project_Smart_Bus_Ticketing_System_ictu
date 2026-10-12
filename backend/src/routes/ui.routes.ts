@@ -9,6 +9,7 @@ import { prepareSeats, reserveSeatForPayment } from '../services/booking';
 import { PaymentGatewayService } from '../services/payment-gateway.service';
 import { buildQrPayload, validateTicketQr } from '../services/ticket.service';
 import { assertTripAccess } from '../services/trip-access.service';
+import { getCheckInWindow } from '../services/check-in-window';
 import { updateTripLocation } from '../services/location-update.service';
 import { appLogger } from '../config/logger';
 import bcrypt from 'bcrypt';
@@ -155,6 +156,7 @@ async function catalog() {
       routeId: t.route_id,
       vehicleId: t.bus_id,
       departure: iso(t.departure_time),
+      checkIn: getCheckInWindow(t),
       duration: Math.round(
         (new Date(t.arrival_time).getTime() - new Date(t.departure_time).getTime()) / 60000
       ),

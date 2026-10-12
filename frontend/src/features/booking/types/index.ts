@@ -1,3 +1,10 @@
+export interface CheckInWindow {
+  state: 'not_open' | 'open' | 'closed' | 'unavailable';
+  opensAt: string | null;
+  closesAt: string | null;
+  serverTime: string;
+  message: string;
+}
 export interface Trip {
   id: string;
   routeId: string;
@@ -9,6 +16,7 @@ export interface Trip {
   price: number;
   capacity: number;
   available: number;
+  checkIn?: CheckInWindow;
 }
 export interface Seat {
   id: string;
