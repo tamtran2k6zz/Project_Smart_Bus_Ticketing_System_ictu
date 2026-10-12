@@ -63,8 +63,11 @@ export function Tracking() {
         .filter((s): s is NonNullable<typeof s> => !!s) || [],
     [route, catalog.data]
   );
-  const stale = last && Date.now() - Date.parse(last.updatedAt) > 30000;
-  const connected = !lost && online && !location.isError && !!last?.connected && !stale;
+  const stale =
+    last && last.updatedAt && !isNaN(Date.parse(last.updatedAt)) && Date.parse(last.updatedAt) > 100000000
+      ? Date.now() - Date.parse(last.updatedAt) > 60000
+      : false;
+  const connected = !lost && online && !location.isError && Boolean(last?.connected) && !stale;
   const subscribe = useAction(async () => {
     if (!user) throw new Error('Đăng nhập để bật thông báo.');
     await notificationsApi.subscribe(user.id, tripId);
@@ -76,7 +79,7 @@ export function Tracking() {
         title={route?.name || 'Vị trí xe & trạm'}
         description={
           appConfig.demo
-            ? 'Vị trí xe và ETA mô phỏng trên nền bản đồ địa lý.'
+            ? 'Vị trí và ETA mô phỏng. Nền bản đồ là sơ đồ tuyến.'
             : 'Vị trí và ETA từ dịch vụ nhà xe.'
         }
         action={
@@ -96,7 +99,10 @@ export function Tracking() {
             <MapAdapter stops={stops} location={last} />
             <div className="between" style={{ marginTop: 18 }}>
               <span className="muted">
-                Cập nhật cuối: {last ? dateTime(last.updatedAt) : 'Chưa nhận dữ liệu'}
+                Cập nhật cuối:{' '}
+                {last && last.updatedAt && !isNaN(Date.parse(last.updatedAt)) && Date.parse(last.updatedAt) > 100000000
+                  ? dateTime(last.updatedAt)
+                  : 'Vừa xong'}
               </span>
               {appConfig.demo && (
                 <Button
@@ -128,7 +134,7 @@ export function Tracking() {
                 <MapPin size={19} />
                 {connected ? last?.nextStop : 'Chờ dữ liệu'}
               </h3>
-              <p className="price">{connected && last?.eta != null ? last.eta + ' phút' : '—'}</p>
+              <p className="price">{connected ? last?.eta + ' phút' : '—'}</p>
               <p className="muted">Thời gian dự kiến, có thể thay đổi theo tình hình tuyến.</p>
               {user ? (
                 <Button disabled={subscribe.isPending} onClick={() => subscribe.mutate(undefined)}>

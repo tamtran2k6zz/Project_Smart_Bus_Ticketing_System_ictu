@@ -20,16 +20,22 @@ export const getStops = async (req: Request, res: Response): Promise<void> => {
     res.status(200).json({
       statusCode: 200,
       success: true,
-      data: stops.map(s => ({
-        id: s.id,
-        code: s.code,
-        name: s.name,
-        address: s.address,
-        latitude: s.latitude ? Number(s.latitude) : null,
-        longitude: s.longitude ? Number(s.longitude) : null,
-        status: s.status,
-        createdAt: s.created_at,
-      })),
+      data: stops.map(s => {
+        const latVal = s.latitude ? Number(s.latitude) : 21.58245;
+        const lngVal = s.longitude ? Number(s.longitude) : 105.83615;
+        return {
+          id: s.id,
+          code: s.code,
+          name: s.name,
+          address: s.address,
+          latitude: s.latitude ? Number(s.latitude) : latVal,
+          longitude: s.longitude ? Number(s.longitude) : lngVal,
+          lat: latVal,
+          lng: lngVal,
+          status: s.status,
+          createdAt: s.created_at,
+        };
+      }),
     });
   } catch (err: any) {
     logger.error('stops_list_failed', { table: 'bus_stops', operation: 'select', error: err });

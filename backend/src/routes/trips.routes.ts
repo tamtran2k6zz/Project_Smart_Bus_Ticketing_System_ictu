@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { searchTrips, getTrips, createTrip } from '../controllers/trips.controller';
+import { searchTrips, getTrips, createTrip, getTripLocationController } from '../controllers/trips.controller';
 import { getSeatsByTrip, lockSeat, unlockSeat } from '../controllers/seats.controller';
 import { authenticateJwt } from '../middlewares/auth';
 import { requireRoles } from '../middlewares/rbac';
@@ -8,6 +8,9 @@ const router = Router();
 
 // US 01: Tra cứu chuyến xe theo điểm đi, điểm đến, ngày (Công khai)
 router.get('/search', searchTrips);
+
+// Lấy vị trí GPS và thông tin thời gian thực của chuyến xe (Tracking / Realtime GPS)
+router.get('/:tripId/location', getTripLocationController);
 
 // Lấy sơ đồ ghế và trạng thái ghế theo chuyến xe (US 02)
 router.get('/:tripId/seats', getSeatsByTrip);

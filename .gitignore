@@ -33,6 +33,7 @@ supabase/.temp/
 .idea/
 .postman/
 skills-lock.json
+.worktrees/
 
 # OS files, temporary files, and backups
 .DS_Store
