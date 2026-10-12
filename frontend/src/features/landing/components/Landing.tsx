@@ -208,8 +208,20 @@ export function Landing() {
           </svg>
           <span className={s.mapStopOne}>Bến xe trung tâm</span>
           <span className={s.mapStopTwo}>Đại học ICTU</span>
-          <div className={s.mapBus} data-marker>
-            <Route size={21} />
+          <div className={s.mapBusWrapper} data-marker>
+            <div className={s.mapBusRadar} />
+            <div className={s.mapBus} title="Xe buýt SmartBus đang di chuyển">
+              <svg viewBox="0 0 28 28" width="22" height="22" fill="none" aria-label="Xe buýt SmartBus">
+                <rect x="3.5" y="4" width="21" height="17" rx="3.5" fill="#16a34a" stroke="#ffffff" strokeWidth="2" />
+                <path d="M5.5 7h17v5.5h-17z" fill="#dcfce7" stroke="#ffffff" strokeWidth="1.2" />
+                <line x1="14" y1="7" x2="14" y2="12.5" stroke="#16a34a" strokeWidth="1.2" />
+                <circle cx="7.5" cy="16.5" r="1.5" fill="#fef08a" stroke="#ffffff" strokeWidth="0.8" />
+                <circle cx="20.5" cy="16.5" r="1.5" fill="#fef08a" stroke="#ffffff" strokeWidth="0.8" />
+                <line x1="11" y1="16.5" x2="17" y2="16.5" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" />
+                <rect x="5.5" y="21" width="3" height="3" rx="1" fill="#1f2937" />
+                <rect x="19.5" y="21" width="3" height="3" rx="1" fill="#1f2937" />
+              </svg>
+            </div>
           </div>
           <div className={s.mapInfo}>
             <span className={s.icon}>
