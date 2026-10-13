@@ -130,7 +130,7 @@ export async function reserveSeatForPayment(
   tripId: string,
   seatNumber: string,
   userId: string,
-  paymentMethod: 'VNPAY' | 'MOMO' | 'QR',
+  paymentMethod: 'VNPAY' | 'MOMO' | 'QR' | 'ZALOPAY',
   redisLockId: string,
   sharedClient?: PoolClient
 ) {

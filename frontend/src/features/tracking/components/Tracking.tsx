@@ -9,6 +9,7 @@ import { notificationsApi } from '@/features/notifications/services/notification
 import { MapAdapter } from './MapAdapter';
 import {
   PageTitle,
+  Field,
   Card,
   Badge,
   Button,
@@ -26,6 +27,8 @@ import s from './Tracking.module.css';
 export function Tracking() {
   const { tripId = '' } = useParams(),
     user = useSession(s => s.user);
+  const [boarding, setBoarding] = useState(''),
+    [alighting, setAlighting] = useState('');
   const [lost, setLost] = useState(false),
     [online, setOnline] = useState(navigator.onLine),
     [last, setLast] = useState<LocationUpdate>();
@@ -64,13 +67,21 @@ export function Tracking() {
     [route, catalog.data]
   );
   const stale =
-    last && last.updatedAt && !isNaN(Date.parse(last.updatedAt)) && Date.parse(last.updatedAt) > 100000000
-      ? Date.now() - Date.parse(last.updatedAt) > 60000
+    last &&
+    last.updatedAt &&
+    !isNaN(Date.parse(last.updatedAt)) &&
+    Date.parse(last.updatedAt) > 100000000
+      ? Date.now() - Date.parse(last.updatedAt) > 120000
       : false;
   const connected = !lost && online && !location.isError && Boolean(last?.connected) && !stale;
   const subscribe = useAction(async () => {
     if (!user) throw new Error('Đăng nhập để bật thông báo.');
-    await notificationsApi.subscribe(user.id, tripId);
+    await notificationsApi.subscribe(
+      user.id,
+      tripId,
+      boarding || stops[0]?.id,
+      alighting || stops[stops.length - 1]?.id
+    );
   }, 'Đã bật thông báo trạm trong ứng dụng.');
   return (
     <div className="container" style={{ paddingBlock: 40 }}>
@@ -100,9 +111,12 @@ export function Tracking() {
             <div className="between" style={{ marginTop: 18 }}>
               <span className="muted">
                 Cập nhật cuối:{' '}
-                {last && last.updatedAt && !isNaN(Date.parse(last.updatedAt)) && Date.parse(last.updatedAt) > 100000000
+                {last &&
+                last.updatedAt &&
+                !isNaN(Date.parse(last.updatedAt)) &&
+                Date.parse(last.updatedAt) > 100000000
                   ? dateTime(last.updatedAt)
-                  : 'Vừa xong'}
+                  : 'Chưa nhận dữ liệu'}
               </span>
               {appConfig.demo && (
                 <Button
@@ -118,7 +132,9 @@ export function Tracking() {
             </div>
             {!connected && (
               <Message error>
-                Vị trí được giữ tại lần nhận cuối. ETA tạm ngừng khi mất tín hiệu.
+                {last?.updatedAt
+                  ? 'Vị trí được giữ tại lần nhận cuối. ETA tạm ngừng khi mất tín hiệu.'
+                  : 'Xe chưa gửi vị trí GPS. Bản đồ chỉ hiển thị tuyến và các trạm.'}
               </Message>
             )}
             {location.isError && (
@@ -134,8 +150,32 @@ export function Tracking() {
                 <MapPin size={19} />
                 {connected ? last?.nextStop : 'Chờ dữ liệu'}
               </h3>
-              <p className="price">{connected ? last?.eta + ' phút' : '—'}</p>
+              <p className="price">{connected && last?.eta != null ? last.eta + ' phút' : '—'}</p>
               <p className="muted">Thời gian dự kiến, có thể thay đổi theo tình hình tuyến.</p>
+              <Field label="Trạm đón">
+                <select
+                  value={boarding || stops[0]?.id || ''}
+                  onChange={e => setBoarding(e.target.value)}
+                >
+                  {stops.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Trạm xuống">
+                <select
+                  value={alighting || stops[stops.length - 1]?.id || ''}
+                  onChange={e => setAlighting(e.target.value)}
+                >
+                  {stops.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
               {user ? (
                 <Button disabled={subscribe.isPending} onClick={() => subscribe.mutate(undefined)}>
                   Nhận thông báo trạm

@@ -3,4 +3,7 @@ export interface Audit {
   actor: string;
   action: string;
   createdAt: string;
+  statusCode?: number;
+  method?: string;
+  path?: string;
 }

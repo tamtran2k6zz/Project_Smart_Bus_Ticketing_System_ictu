@@ -51,6 +51,10 @@ module.exports = async ({
       201
     )
   ).data.id;
+  const missingGps = await call('get', prefix + '/trips/' + trip + '/location');
+  assert.equal(missingGps.connected, false, 'API must not report simulated GPS as connected');
+  assert.equal(missingGps.lat, null);
+  assert.equal(missingGps.updatedAt, null);
   const noPayment = await request(app)
     .post('/api/ticketing/bookings')
     .set('Authorization', 'Bearer ' + passenger)
@@ -671,7 +675,7 @@ module.exports = async ({
   await call(
     'post',
     '/api/v1/ticketing/payments/momo/ipn',
-    momoCallback(nextPayment.id, 30000, 90002),
+    momoCallback(nextPayment.id, 21000, 90002),
     null
   );
   await call(
@@ -702,7 +706,8 @@ module.exports = async ({
     null,
     admin
   );
-  assert.ok(refunds.refunds.some(r => r.id === nextBooking.id && r.total === 30000));
+  assert.equal(nextBooking.total, 21000, 'approved student fare applies to two seats');
+  assert.ok(refunds.refunds.some(r => r.id === nextBooking.id && r.total === 21000));
   assert.equal(refunds.revenue, 0);
   await db.query('DELETE FROM ui_bookings WHERE id=$1', [nextBooking.id]);
   await db.query('DELETE FROM ui_holds WHERE id=$1', [nextHold.id]);

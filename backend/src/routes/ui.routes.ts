@@ -1,4 +1,11 @@
 import { randomUUID } from 'crypto';
+import { userFarePolicy } from '../services/fare-policy.service';
+import productRoutes from './product.routes';
+import { localDemoEnabled } from '../config/demo';
+import { issueBookingInvoice } from '../services/invoice.service';
+import { listPasses, buyPass, validatePass } from '../services/monthly-pass.service';
+import { readTripLocation } from '../services/tracking-read.service';
+import { notifyTripChange } from '../services/trip-notification.service';
 import { Router, Response, RequestHandler } from 'express';
 import { query, transaction } from '../config/database';
 import { AuthenticatedRequest, authenticateJWT } from '../middlewares/auth';
@@ -12,7 +19,6 @@ import { assertTripAccess } from '../services/trip-access.service';
 import { updateTripLocation } from '../services/location-update.service';
 import { appLogger } from '../config/logger';
 import bcrypt from 'bcrypt';
-import { sendEmail } from '../services/email.service';
 import { assertEmailVerified } from '../services/email-verification.service';
 import {
   createNotification,
@@ -22,6 +28,7 @@ import {
 } from '../services/notification.service';
 
 const router = Router();
+router.get('/capabilities', (_req, res) => res.json({ localDemo: localDemoEnabled() }));
 const logger = appLogger.child('ui-api');
 const gateway = new PaymentGatewayService();
 const fail = (message: string, status = 400): never => {
@@ -67,6 +74,7 @@ const permissions: Record<string, string[]> = {
     'audit',
   ],
   FINANCE: ['reports', 'promotions'],
+  MARKETING: ['promotions'],
 };
 const userDto = (u: any) => ({
   id: u.id,
@@ -196,8 +204,8 @@ async function getHold(id: string, userId: string, client?: any) {
   };
 }
 const bookingSql = `SELECT b.*,h.user_id,h.trip_id,h.seat_ids,h.quantity,h.expires_at,h.status AS hold_status,
- h.boarding_stop_id,h.alighting_stop_id,t.status AS ticket_status,p.status AS payment_status,p.payment_method,p.payment_url,p.amount,e.status AS ticket_email_status
- FROM ui_bookings b JOIN ui_holds h ON h.id=b.hold_id LEFT JOIN tickets t ON t.id=b.ticket_id LEFT JOIN payment_transactions p ON p.ticket_id=t.id LEFT JOIN ticket_email_deliveries e ON e.ticket_id=t.id`;
+ h.boarding_stop_id,h.alighting_stop_id,t.status AS ticket_status,p.status AS payment_status,p.payment_method,p.payment_url,p.amount,e.status AS ticket_email_status,rj.status AS refund_job_status
+ FROM ui_bookings b JOIN ui_holds h ON h.id=b.hold_id LEFT JOIN tickets t ON t.id=b.ticket_id LEFT JOIN payment_transactions p ON p.ticket_id=t.id LEFT JOIN ticket_email_deliveries e ON e.ticket_id=t.id LEFT JOIN refund_jobs rj ON rj.ticket_id=t.id`;
 const bookingDto = (b: any) => ({
   id: b.id,
   holdId: b.hold_id,
@@ -225,7 +233,12 @@ const bookingDto = (b: any) => ({
           : new Date(b.expires_at).getTime() <= Date.now()
             ? 'expired'
             : 'pending',
-  refund: b.payment_status === 'REFUNDED' ? 'refunded' : 'none',
+  refund:
+    b.payment_status === 'REFUNDED'
+      ? 'refunded'
+      : b.refund_job_status && b.refund_job_status !== 'done'
+        ? 'pending'
+        : 'none',
 });
 async function ownBooking(id: string, userId: string) {
   const [b] = await query<any[]>(bookingSql + ' WHERE b.id=$1 AND h.user_id=$2', [id, userId]);
@@ -237,7 +250,12 @@ const paymentDto = (b: any) =>
     ? {
         id: b.ticket_id,
         bookingId: b.id,
-        gateway: b.payment_method === 'MOMO' ? 'MoMo' : 'VNPay',
+        gateway:
+          b.payment_method === 'MOMO'
+            ? 'MoMo'
+            : b.payment_method === 'ZALOPAY'
+              ? 'ZaloPay'
+              : 'VNPay',
         amount: Number(b.amount),
         status:
           b.payment_status === 'SUCCESS'
@@ -253,10 +271,6 @@ const paymentDto = (b: any) =>
     : null;
 
 router.get('/auth/session', authenticateJWT, getMe);
-router.post(
-  '/auth/forgot-password',
-  api(async () => fail('Khôi phục mật khẩu trực tuyến chưa mở. Vui lòng liên hệ nhà xe.', 503))
-);
 router.use(
   '/auth',
   (req, _res, next) => {
@@ -321,60 +335,10 @@ router.get(
 );
 router.get(
   '/trips/:id/location',
-  api(async req => {
-    const [l] = await query<any[]>('SELECT * FROM trip_locations WHERE trip_id=$1', [
-      req.params.id,
-    ]);
-    if (l && (l.latitude || l.longitude)) {
-      return {
-        lat: Number(l.latitude),
-        lng: Number(l.longitude),
-        updatedAt: iso(l.updated_at),
-        connected: Boolean(Date.now() - new Date(l.updated_at).getTime() < 120000),
-        eta: l.eta != null ? Number(l.eta) : 5,
-        nextStop: l.next_stop || 'Đang di chuyển trên tuyến',
-      };
-    }
-
-    const cat = await catalog();
-    const trip = cat.trips.find(t => t.id === req.params.id);
-    const route = cat.routes.find(r => r.id === trip?.routeId);
-    const stopIds = route?.stopIds || [];
-    const routeStops = stopIds
-      .map(id => cat.stops.find(s => s.id === id))
-      .filter((s): s is NonNullable<typeof s> => !!s);
-
-    if (routeStops.length < 2) {
-      return {
-        lat: routeStops[0]?.lat ?? 21.58245,
-        lng: routeStops[0]?.lng ?? 105.83615,
-        updatedAt: new Date().toISOString(),
-        connected: true,
-        eta: 5,
-        nextStop: routeStops[0]?.name ?? 'Bến xe Thái Nguyên',
-      };
-    }
-
-    const segmentDuration = 120000;
-    const totalCycle = (routeStops.length - 1) * segmentDuration;
-    const segmentTime = Date.now() % Math.max(1, totalCycle);
-    const segment = Math.min(routeStops.length - 2, Math.floor(segmentTime / segmentDuration));
-    const start = routeStops[segment];
-    const end = routeStops[segment + 1];
-    const progress = (segmentTime % segmentDuration) / segmentDuration;
-    const eta = Math.max(1, Math.round((1 - progress) * 12));
-
-    return {
-      lat: start.lat + (end.lat - start.lat) * progress,
-      lng: start.lng + (end.lng - start.lng) * progress,
-      updatedAt: new Date().toISOString(),
-      connected: true,
-      eta,
-      nextStop: end.name,
-    };
-  })
+  api(async req => readTripLocation(req.params.id))
 );
 router.use(authenticateJWT);
+router.use(productRoutes);
 router.get(
   '/trips/:id/seats',
   api(async req =>
@@ -521,6 +485,8 @@ async function voucherPrice(h: any, code: any) {
     if (!v) fail('Voucher không tồn tại hoặc hết hạn.');
     percent = v.percent;
   }
+  const eligibilityPercent = (await userFarePolicy(h.userId)).ticketDiscount;
+  percent = Math.max(percent, eligibilityPercent);
   const subtotal = h.price * h.quantity,
     discount = Math.round((subtotal * percent) / 100);
   return { code: normalized, percent, subtotal, discount, total: subtotal - discount };
@@ -585,9 +551,11 @@ router.post(
     const method =
       req.body.gateway === 'MoMo'
         ? 'MOMO'
-        : ['VNPay', 'Card'].includes(req.body.gateway)
-          ? 'VNPAY'
-          : fail('Cổng thanh toán chưa được hỗ trợ.');
+        : req.body.gateway === 'ZaloPay'
+          ? 'ZALOPAY'
+          : ['VNPay', 'Card'].includes(req.body.gateway)
+            ? 'VNPAY'
+            : fail('Cổng thanh toán chưa được hỗ trợ.');
     const b = await ownBooking(req.body.bookingId, req.user!.id);
     if (bookingDto(b).status === 'paid') return paymentDto(b);
     const ticketId = await transaction(async client => {
@@ -869,6 +837,21 @@ router.put(
 router.post(
   '/ticket-validations',
   api(async req => {
+    if (typeof req.body.token === 'string' && req.body.token.includes('monthly-pass')) {
+      const result = await validatePass(
+        req.body.token,
+        req.body.tripId,
+        req.user!.id,
+        req.user!.role
+      );
+      return {
+        ...result,
+        valid: !result.isAlreadyCheckedIn,
+        message: result.isAlreadyCheckedIn
+          ? 'Vé tháng đã soát cho chuyến này.'
+          : 'Vé tháng hợp lệ · đã ghi nhận lên xe',
+      };
+    }
     const result = await validateTicketQr({
       code: req.body.token,
       tripId: req.body.tripId,
@@ -893,19 +876,25 @@ router.get(
   api(async req => {
     const id = String(req.query.tripId ?? '');
     await assertTripAccess(id, req.user!.id, req.user!.role);
+    const passes = await query<any[]>(
+      `SELECT p.id AS "ticketId",p.id AS "ticketCode",u.full_name AS "passengerName",ARRAY[c.seat_number] AS "seatNumbers",1 AS quantity,c.created_at AS "checkedInAt" FROM pass_checkins c JOIN monthly_passes p ON p.id=c.pass_id JOIN users u ON u.id=p.user_id WHERE c.trip_id=$1 ORDER BY c.created_at DESC`,
+      [id]
+    );
     return (
       await query<any[]>(
         ticketsSql + " AND t.trip_id=$1 AND t.status='CHECKED_IN' ORDER BY checked_in_at DESC",
         [id]
       )
-    ).map(t => ({
-      ticketId: t.id,
-      ticketCode: t.ticket_code,
-      passengerName: t.name ?? 'Hành khách',
-      seatNumbers: t.seat_ids ?? [t.seat_number],
-      quantity: t.quantity,
-      checkedInAt: iso(t.checked_in_at),
-    }));
+    )
+      .map(t => ({
+        ticketId: t.id,
+        ticketCode: t.ticket_code,
+        passengerName: t.name ?? 'Hành khách',
+        seatNumbers: t.seat_ids ?? [t.seat_number],
+        quantity: t.quantity,
+        checkedInAt: iso(t.checked_in_at),
+      }))
+      .concat(passes);
   })
 );
 router.get(
@@ -914,7 +903,10 @@ router.get(
     roles(req, ['ADMIN', 'MANAGER', 'DRIVER']);
     const c = await catalog();
     if (req.user!.role !== 'DRIVER') return c.trips;
-    const assigned = await query<any[]>('SELECT id FROM trips WHERE driver_id=$1', [req.user!.id]);
+    const assigned = await query<any[]>(
+      'SELECT id FROM trips WHERE driver_id=$1 OR conductor_id=$1',
+      [req.user!.id]
+    );
     return c.trips.filter(t => assigned.some(a => a.id === t.id));
   })
 );
@@ -922,7 +914,8 @@ router.get(
   '/reports',
   api(async req => {
     roles(req, ['ADMIN', 'MANAGER', 'FINANCE']);
-    const { from, to, routeId = '', vehicleId = '' } = req.query;
+    const { from, to, routeId = '', vehicleId = '', groupBy = 'day' } = req.query;
+    if (!['day', 'month'].includes(String(groupBy))) fail('Chỉ nhóm theo ngày hoặc tháng.');
     if (
       !/^\d{4}-\d{2}-\d{2}$/.test(String(from)) ||
       !/^\d{4}-\d{2}-\d{2}$/.test(String(to)) ||
@@ -931,7 +924,7 @@ router.get(
       fail('Khoảng ngày không hợp lệ.');
     const rows = await query<any[]>(
       `SELECT r.id AS "routeId",r.code||' · '||r.name AS route,
-    (tr.departure_time AT TIME ZONE 'Asia/Ho_Chi_Minh')::date::text AS date,
+    CASE WHEN $5='month' THEN to_char(tr.departure_time AT TIME ZONE 'Asia/Ho_Chi_Minh','YYYY-MM') ELSE (tr.departure_time AT TIME ZONE 'Asia/Ho_Chi_Minh')::date::text END AS date,
     COALESCE(SUM(p.net),0)::numeric AS revenue,COALESCE(SUM(p.tickets),0)::int AS tickets,SUM(b.total_seats)::int AS capacity
     FROM trips tr JOIN routes r ON r.id=tr.route_id JOIN buses b ON b.id=tr.bus_id
     LEFT JOIN LATERAL (SELECT SUM(CASE WHEN pt.status='SUCCESS' THEN pt.amount ELSE 0 END) AS net,
@@ -940,7 +933,7 @@ router.get(
     WHERE (tr.departure_time AT TIME ZONE 'Asia/Ho_Chi_Minh')::date BETWEEN $1::date AND $2::date
       AND ($3='' OR tr.route_id=$3) AND ($4='' OR tr.bus_id=$4) AND tr.status<>'CANCELLED'
     GROUP BY r.id,r.code,r.name,date ORDER BY date,r.code`,
-      [from, to, routeId, vehicleId]
+      [from, to, routeId, vehicleId, groupBy]
     );
     rows.forEach(r => {
       r.revenue = Number(r.revenue);
@@ -948,14 +941,23 @@ router.get(
     });
     const tickets = rows.reduce((n, r) => n + r.tickets, 0),
       capacity = rows.reduce((n, r) => n + r.capacity, 0);
+    const passSales = await query<any[]>(
+      `SELECT r.name AS route,CASE WHEN $5='month' THEN to_char(o.paid_at AT TIME ZONE 'Asia/Ho_Chi_Minh','YYYY-MM') ELSE (o.paid_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date::text END AS date,SUM(o.amount)::numeric AS revenue,COUNT(*)::int AS orders FROM pass_orders o JOIN routes r ON r.id=o.route_id WHERE o.status='SUCCESS' AND (o.paid_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date BETWEEN $1::date AND $2::date AND ($3='' OR o.route_id=$3) AND $4='' GROUP BY r.name,date ORDER BY date,r.name`,
+      [from, to, routeId, vehicleId, groupBy]
+    );
+    passSales.forEach(s => {
+      s.revenue = Number(s.revenue);
+    });
     return {
       rows,
+      passSales,
+      passRevenue: passSales.reduce((n, s) => n + s.revenue, 0),
       revenue: rows.reduce((n, r) => n + r.revenue, 0),
       tickets,
       occupancy: capacity ? Math.round((tickets / capacity) * 100) : 0,
       refunds: (
         await query<any[]>(
-          `SELECT COALESCE(b.id,t.id) AS id,p.amount AS total,'refunded' AS refund FROM payment_transactions p JOIN tickets t ON t.id=p.ticket_id JOIN trips tr ON tr.id=t.trip_id LEFT JOIN ui_bookings b ON b.ticket_id=t.id WHERE p.status='REFUNDED' AND (tr.departure_time AT TIME ZONE 'Asia/Ho_Chi_Minh')::date BETWEEN $1::date AND $2::date AND ($3='' OR tr.route_id=$3) AND ($4='' OR tr.bus_id=$4)`,
+          `SELECT COALESCE(b.id,t.id) AS id,p.amount AS total,CASE WHEN p.status='REFUNDED' THEN 'refunded' ELSE 'pending' END AS refund FROM payment_transactions p JOIN tickets t ON t.id=p.ticket_id JOIN trips tr ON tr.id=t.trip_id LEFT JOIN ui_bookings b ON b.ticket_id=t.id WHERE (p.status='REFUNDED' OR (p.status='SUCCESS' AND EXISTS(SELECT 1 FROM refund_jobs j WHERE j.ticket_id=t.id AND j.status<>'done'))) AND (tr.departure_time AT TIME ZONE 'Asia/Ho_Chi_Minh')::date BETWEEN $1::date AND $2::date AND ($3='' OR tr.route_id=$3) AND ($4='' OR tr.bus_id=$4)`,
           [from, to, routeId, vehicleId]
         )
       ).map(r => ({ ...r, total: Number(r.total) })),
@@ -972,7 +974,10 @@ router.get(
       )
     ).map(a => ({
       id: a.id,
-      actor: a.full_name ?? a.user_id,
+      actor: a.full_name ?? a.user_id ?? 'Chưa xác thực',
+      method: a.method,
+      path: a.path,
+      statusCode: a.status_code,
       action: a.action,
       createdAt: iso(a.created_at),
     }));
@@ -981,7 +986,7 @@ router.get(
 router.get(
   '/vouchers',
   api(async req => {
-    roles(req, ['ADMIN', 'FINANCE']);
+    roles(req, ['ADMIN', 'FINANCE', 'MARKETING']);
     return (await query<any[]>('SELECT * FROM vouchers ORDER BY code')).map(v => ({
       ...v,
       expiresAt: iso(v.expires_at),
@@ -991,7 +996,7 @@ router.get(
 router.post(
   '/vouchers',
   api(async req => {
-    roles(req, ['ADMIN', 'FINANCE']);
+    roles(req, ['ADMIN', 'FINANCE', 'MARKETING']);
     const v = req.body;
     if (
       !/^[A-Z0-9_-]{3,30}$/.test(v.code) ||
@@ -1037,9 +1042,22 @@ router.post(
 router.post(
   '/notifications/subscriptions',
   api(async req => {
+    const stops = await query<any[]>(
+      'SELECT rs.stop_id FROM trips t JOIN route_stops rs ON rs.route_id=t.route_id WHERE t.id=$1 ORDER BY rs.stop_order',
+      [req.body.tripId]
+    );
+    const boarding = req.body.boardingStopId || stops[0]?.stop_id,
+      alighting = req.body.alightingStopId || stops.at(-1)?.stop_id;
+    if (
+      !boarding ||
+      !alighting ||
+      stops.findIndex(s => s.stop_id === boarding) < 0 ||
+      stops.findIndex(s => s.stop_id === alighting) <= stops.findIndex(s => s.stop_id === boarding)
+    )
+      fail('Chọn trạm đón/xuống hợp lệ.');
     await query(
-      'INSERT INTO trip_subscriptions(user_id,trip_id) VALUES($1,$2) ON CONFLICT DO NOTHING',
-      [req.user!.id, req.body.tripId]
+      'INSERT INTO trip_subscriptions(user_id,trip_id,boarding_stop_id,alighting_stop_id) VALUES($1,$2,$3,$4) ON CONFLICT(user_id,trip_id) DO UPDATE SET boarding_stop_id=$3,alighting_stop_id=$4',
+      [req.user!.id, req.body.tripId, boarding, alighting]
     );
     return true;
   })
@@ -1119,6 +1137,7 @@ router.post(
   })
 );
 const supportDto = (s: any) => ({
+  tripId: s.trip_id || undefined,
   id: s.id,
   userId: s.user_id,
   subject: s.subject,
@@ -1145,7 +1164,7 @@ router.get(
 router.post(
   '/support',
   api(async req => {
-    const { subject, message, rating } = req.body;
+    const { subject, message, rating, tripId } = req.body;
     if (
       typeof subject !== 'string' ||
       subject.trim().length < 3 ||
@@ -1156,9 +1175,16 @@ router.post(
       rating > 5
     )
       fail('Nội dung phản ánh không hợp lệ.');
+    if (tripId) {
+      const [owned] = await query<any[]>(
+        "SELECT id FROM tickets WHERE trip_id=$1 AND user_id=$2 AND status IN ('BOOKED','CHECKED_IN') UNION SELECT pass_id AS id FROM pass_checkins c JOIN monthly_passes p ON p.id=c.pass_id WHERE c.trip_id=$1 AND p.user_id=$2",
+        [tripId, req.user!.id]
+      );
+      if (!owned) fail('Bạn chưa có vé hợp lệ cho chuyến được đánh giá.', 403);
+    }
     const [s] = await query<any[]>(
-      'INSERT INTO support_requests(user_id,subject,message,rating) VALUES($1,$2,$3,$4) RETURNING *',
-      [req.user!.id, subject.trim(), message.trim(), rating]
+      'INSERT INTO support_requests(user_id,subject,message,rating,trip_id) VALUES($1,$2,$3,$4,$5) RETURNING *',
+      [req.user!.id, subject.trim(), message.trim(), rating, tripId || null]
     );
     await audit(req, 'Gửi phản ánh ' + s.id);
     return supportDto(s);
@@ -1193,25 +1219,42 @@ const eligibilityDto = (e: any) => ({
 });
 router.get(
   '/passes',
-  api(async req => ({
-    passes: [],
-    eligibility: (
-      await query<any[]>('SELECT * FROM eligibility_applications WHERE user_id=$1', [req.user!.id])
-    ).map(eligibilityDto),
-  }))
+  api(async req => listPasses(req.user!.id))
 );
 router.post(
   '/passes',
-  api(async () => fail('Vé tháng chưa mở bán qua cổng thanh toán. Vui lòng liên hệ nhà xe.', 503))
+  api(async req => {
+    const method =
+      req.body.gateway === 'ZaloPay'
+        ? 'ZALOPAY'
+        : req.body.gateway === 'VNPay' || req.body.gateway === 'Card'
+          ? 'VNPAY'
+          : req.body.gateway === 'MoMo'
+            ? 'MOMO'
+            : fail('Chọn phương thức thanh toán.');
+    return buyPass(req.user!.id, req.body.routeId, method, req.ip || '127.0.0.1');
+  })
+);
+router.post(
+  '/passes/validate',
+  api(async req => validatePass(req.body.code, req.body.tripId, req.user!.id, req.user!.role))
 );
 router.post(
   '/eligibility',
   api(async req => {
     const { category, document } = req.body;
     if (
-      !['student', 'elderly', 'STUDENT', 'ELDERLY', 'Sinh viên', 'Người cao tuổi'].includes(
-        category
-      ) ||
+      ![
+        'student',
+        'elderly',
+        'STUDENT',
+        'ELDERLY',
+        'Sinh viên',
+        'Học sinh',
+        'Người đi làm',
+        'Người khuyết tật',
+        'Người cao tuổi',
+      ].includes(category) ||
       typeof document !== 'string' ||
       document.trim().length < 5
     )
@@ -1244,7 +1287,13 @@ router.put(
     if (!e) fail('Hồ sơ đã xử lý hoặc không tồn tại.', 409);
     await query('UPDATE users SET discount_status=$1,discount_type=$2 WHERE id=$3', [
       req.body.approve ? 'APPROVED' : 'REJECTED',
-      ['elderly', 'người cao tuổi'].includes(e.category.toLowerCase()) ? 'ELDERLY' : 'STUDENT',
+      ['elderly', 'người cao tuổi'].includes(e.category.toLowerCase())
+        ? 'ELDERLY'
+        : e.category.toLowerCase().includes('khuyết')
+          ? 'DISABLED'
+          : e.category.toLowerCase().includes('đi làm')
+            ? 'WORKER'
+            : 'STUDENT',
       e.user_id,
     ]);
     await audit(req, 'Duyệt hồ sơ ' + e.id);
@@ -1273,6 +1322,13 @@ router.post(
     await assertTripAccess(req.body.tripId, req.user!.id, req.user!.role);
     if (typeof req.body.message !== 'string' || req.body.message.trim().length < 10)
       fail('Mô tả ít nhất 10 ký tự.');
+    if (
+      req.body.delayMinutes !== undefined &&
+      (!Number.isInteger(req.body.delayMinutes) ||
+        req.body.delayMinutes < 0 ||
+        req.body.delayMinutes > 1440)
+    )
+      fail('Số phút trễ không hợp lệ.');
     const [i] = await query<any[]>(
       "INSERT INTO incidents(trip_id,driver_id,incident_type,description) VALUES($1,$2,'OTHER',$3) RETURNING *",
       [req.body.tripId, req.user!.id, req.body.message.trim()]
@@ -1289,6 +1345,17 @@ router.post(
           body: i.description,
           data: { tripId: i.trip_id },
         });
+    if (req.body.delayMinutes !== undefined) {
+      await query('UPDATE trips SET delay_minutes=$2 WHERE id=$1', [
+        i.trip_id,
+        req.body.delayMinutes,
+      ]);
+      await notifyTripChange(
+        i.trip_id,
+        'Cập nhật trễ chuyến',
+        'Chuyến dự kiến trễ ' + req.body.delayMinutes + ' phút.'
+      );
+    }
     await audit(req, 'Báo sự cố ' + i.id);
     return {
       id: i.id,
@@ -1329,24 +1396,12 @@ router.get(
 );
 router.post(
   '/bookings/:id/invoice',
-  api(async req => {
-    const b = await ownBooking(req.params.id, req.user!.id);
-    if (bookingDto(b).status !== 'paid') fail('Chỉ gửi chứng từ cho giao dịch đã thanh toán.', 409);
-    const [u] = await query<any[]>('SELECT email FROM users WHERE id=$1', [req.user!.id]);
-    const delivered = await sendEmail(
-      u.email,
-      'SmartBus · Biên nhận thanh toán ' + b.id,
-      `Mã đặt vé: ${b.id}\nKhách hàng: ${b.name}\nSố vé: ${b.quantity}\nSố tiền đã thu: ${b.total} VND\nMã giao dịch: ${b.ticket_id}\nĐây là biên nhận thanh toán; hóa đơn thuế được cấp theo quy trình của nhà xe.`
-    );
-    if (!delivered) fail('Chưa gửi được email. Nhà xe cần cấu hình SMTP hoặc thử lại.', 503);
-    await query('UPDATE ui_bookings SET invoice_requested=true WHERE id=$1', [b.id]);
-    return { message: 'Đã gửi biên nhận thanh toán qua email.' };
-  })
+  api(async req => issueBookingInvoice(req.params.id, req.user!.id))
 );
 router.put(
   '/vouchers/:id',
   api(async req => {
-    roles(req, ['ADMIN', 'FINANCE']);
+    roles(req, ['ADMIN', 'FINANCE', 'MARKETING']);
     const v = req.body;
     if (
       typeof v.active !== 'boolean' ||
@@ -1367,7 +1422,7 @@ router.put(
 router.delete(
   '/vouchers/:id',
   api(async req => {
-    roles(req, ['ADMIN', 'FINANCE']);
+    roles(req, ['ADMIN', 'FINANCE', 'MARKETING']);
     await query('DELETE FROM vouchers WHERE id=$1', [req.params.id]);
     return true;
   })
@@ -1627,6 +1682,13 @@ router.all(
       } else fail('Danh mục không tồn tại.', 404);
     });
     await audit(req, 'Lưu ' + key + ' ' + id);
+    if (key === 'trips' && req.method === 'PUT')
+      await notifyTripChange(
+        id,
+        'Thay đổi lịch chuyến',
+        'Giờ khởi hành mới: ' +
+          new Date(d.departure).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })
+      );
     return (await resources(key)).find(
       (row: any) => row.id === (key === 'assignments' ? d.tripId : id)
     );

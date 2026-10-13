@@ -41,8 +41,8 @@ export const trackingApi = {
           id: 'start',
         };
         const end = db.stops.find(s => s.id === r.stopIds[segment + 1]) || {
-          lat: 21.58800,
-          lng: 105.83400,
+          lat: 21.588,
+          lng: 105.834,
           name: 'Trạm tiếp theo',
           id: 'end',
         };
@@ -63,8 +63,9 @@ export const trackingApi = {
             }
           });
         return {
-          lat: (start.lat ?? 21.58245) + ((end.lat ?? 21.58800) - (start.lat ?? 21.58245)) * progress,
-          lng: (start.lng ?? 105.83615) + ((end.lng ?? 105.83400) - (start.lng ?? 105.83615)) * progress,
+          lat: (start.lat ?? 21.58245) + ((end.lat ?? 21.588) - (start.lat ?? 21.58245)) * progress,
+          lng:
+            (start.lng ?? 105.83615) + ((end.lng ?? 105.834) - (start.lng ?? 105.83615)) * progress,
           updatedAt: new Date().toISOString(),
           connected: true,
           eta,
@@ -83,22 +84,29 @@ export const trackingApi = {
     });
 
     const raw = res && typeof res === 'object' && 'data' in res && res.data ? res.data : res;
-    let updateTime = new Date().toISOString();
-    if (raw?.updatedAt) {
-      if (typeof raw.updatedAt === 'number') {
-        updateTime = new Date(raw.updatedAt).toISOString();
-      } else if (!isNaN(Date.parse(raw.updatedAt))) {
-        updateTime = new Date(raw.updatedAt).toISOString();
-      }
+    let updateTime: string | null = null;
+    if (raw?.updatedAt != null) {
+      const date =
+        typeof raw.updatedAt === 'number' ? new Date(raw.updatedAt) : new Date(raw.updatedAt);
+      if (Number.isFinite(date.getTime())) updateTime = date.toISOString();
     }
-
+    const rawLat = raw?.lat ?? raw?.latitude,
+      rawLng = raw?.lng ?? raw?.longitude;
+    const lat =
+      rawLat != null && Number.isFinite(Number(rawLat)) && Math.abs(Number(rawLat)) <= 90
+        ? Number(rawLat)
+        : null;
+    const lng =
+      rawLng != null && Number.isFinite(Number(rawLng)) && Math.abs(Number(rawLng)) <= 180
+        ? Number(rawLng)
+        : null;
     return {
-      lat: Number(raw?.lat ?? raw?.latitude ?? 21.58245),
-      lng: Number(raw?.lng ?? raw?.longitude ?? 105.83615),
+      lat,
+      lng,
       updatedAt: updateTime,
-      connected: Boolean(raw?.connected ?? true),
-      eta: Number(raw?.eta ?? 5),
-      nextStop: String(raw?.nextStop ?? 'Đang di chuyển trên tuyến'),
+      connected: raw?.connected === true && lat !== null && lng !== null && updateTime !== null,
+      eta: raw?.eta != null && Number.isFinite(Number(raw.eta)) ? Number(raw.eta) : null,
+      nextStop: String(raw?.nextStop ?? 'Chưa xác định trạm'),
     };
   },
 };

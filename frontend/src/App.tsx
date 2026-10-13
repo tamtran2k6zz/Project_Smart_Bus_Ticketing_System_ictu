@@ -3,6 +3,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { Component, lazy, Suspense, type ReactNode } from 'react';
 import { queryClient } from '@/services/queryClient';
 import AppRouter from '@/routes/AppRouter';
+import { LocalDemoBanner } from '@/components/LocalDemoBanner';
 const LegacyApp = lazy(() => import('./legacy-entry'));
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state: { error: Error | null } = { error: null };
@@ -33,6 +34,7 @@ export default function App() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
+          <LocalDemoBanner />
           <a className="skipLink" href="#main">
             Bỏ qua tới nội dung
           </a>

@@ -109,6 +109,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       email: email.trim().toLowerCase(),
       fullName: full_name.trim(),
       role: roleName,
+      authVersion: 0,
     };
 
     const accessToken = jwt.sign(tokenPayload, getJwtSecret(), {
@@ -195,7 +196,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     let users: any[] = [];
     try {
       users = await query<any[]>(
-        `SELECT u.id, u.full_name, u.email, u.phone_number, u.password_hash, u.status, u.email_verified_at,
+        `SELECT u.id, u.full_name, u.email, u.phone_number, u.password_hash, u.status, u.email_verified_at, u.auth_version,
                 COALESCE(r.name, u.role, 'PASSENGER') AS role_name
          FROM users u
          LEFT JOIN roles r ON u.role_id = r.id
@@ -205,7 +206,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       );
     } catch {
       users = await query<any[]>(
-        `SELECT u.id, u.full_name, u.email, u.phone_number, u.password_hash, u.status, u.email_verified_at,
+        `SELECT u.id, u.full_name, u.email, u.phone_number, u.password_hash, u.status, u.email_verified_at, u.auth_version,
                 COALESCE(u.role, 'PASSENGER') AS role_name
          FROM users u
          WHERE LOWER(u.email) = $1 OR u.phone_number IN ($2, $3)
@@ -252,12 +253,14 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       email: user.email,
       fullName: user.full_name,
       role: user.role_name || user.role || 'PASSENGER',
+      authVersion: user.auth_version,
     };
 
     const accessToken = jwt.sign(tokenPayload, getJwtSecret(), {
       expiresIn: getExpiry() as any,
     });
 
+    (req as any).user = tokenPayload;
     res.status(200).json({
       statusCode: 200,
       success: true,

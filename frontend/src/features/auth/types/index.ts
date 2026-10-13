@@ -1,4 +1,4 @@
-export type Role = 'PASSENGER' | 'DRIVER' | 'MANAGER' | 'FINANCE' | 'ADMIN';
+export type Role = 'PASSENGER' | 'DRIVER' | 'MANAGER' | 'FINANCE' | 'ADMIN' | 'MARKETING';
 export type Permission =
   | 'operations'
   | 'check-in'

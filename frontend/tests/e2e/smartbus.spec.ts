@@ -8,13 +8,13 @@ const tomorrow = () =>
   );
 async function login(page: Page, role = 'Hành khách') {
   await page.goto('/login');
-  await page.getByRole('button', { name: role, exact: true }).click();
+  await page.getByRole('button', { name: new RegExp('^' + role + ' ') }).click();
   await expect(page.getByRole('button', { name: 'Đăng xuất' })).toBeVisible();
 }
 async function chooseSeat(page: Page) {
   await page.goto('/booking/t-1-1-0');
   await page.getByRole('button', { name: 'Ghế 01', exact: true }).click();
-  await page.getByRole('button', { name: 'Giữ chỗ 10 phút' }).click();
+  await page.getByRole('button', { name: 'ĐẶT CHỖ' }).click();
   await expect(page.getByText('Chỗ đang được giữ cho bạn')).toBeVisible();
   await page.getByRole('button', { name: 'Tiếp tục thanh toán' }).click();
   await expect(page).toHaveURL(/checkout/);
@@ -89,7 +89,7 @@ test('landing form forwards query and login preserves booking redirect', async (
   await page.getByRole('link', { name: 'Xem chuyến' }).first().click();
   await page.getByRole('link', { name: 'Đặt vé chuyến này' }).click();
   await expect(page).toHaveURL(/login\?redirect=/);
-  await page.getByRole('button', { name: 'Hành khách', exact: true }).click();
+  await page.getByRole('button', { name: /^Hành khách / }).click();
   await expect(page).toHaveURL(/booking/);
 });
 test('hold refresh, pending callback forgery, failed retry, paid QR and reused check-in', async ({
@@ -122,6 +122,7 @@ test('hold refresh, pending callback forgery, failed retry, paid QR and reused c
   await page.getByLabel('Token từ vé QR').fill('QR-sai');
   await page.getByRole('button', { name: 'Xác thực & ghi nhận lên xe' }).click();
   await expect(page.getByRole('alert')).toContainText('không hợp lệ');
+  await page.clock.setFixedTime(new Date(tomorrow() + 'T08:15:00+07:00'));
   await page.getByLabel('Token từ vé QR').fill(token);
   await page.getByRole('button', { name: 'Xác thực & ghi nhận lên xe' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Vé hợp lệ' })).toBeVisible();
@@ -132,7 +133,7 @@ test('expiry survives refresh, unassigned seats and tracking reconnect', async (
   await login(page);
   await page.goto('/booking/t-1-0-0');
   await page.getByLabel('Số vé (tối đa 6)').selectOption('2');
-  await page.getByRole('button', { name: 'Giữ chỗ 10 phút' }).click();
+  await page.getByRole('button', { name: 'ĐẶT CHỖ' }).click();
   await expect(page.getByText('Chỗ đang được giữ cho bạn')).toBeVisible();
   await page.evaluate(() => {
     const db = JSON.parse(localStorage.getItem('smartbus.demo.v1')!);
@@ -176,7 +177,10 @@ test('direct route permissions, admin CRUD and modal keyboard', async ({ page })
   await expect(page.getByRole('cell', { name: 'Trạm thử nghiệm', exact: true })).not.toBeVisible();
   await page.goto('/admin/users');
   await page.getByRole('button', { name: 'Chỉnh quyền' }).first().click();
-  await page.getByLabel('Vai trò').selectOption('FINANCE');
+  await page
+    .getByRole('dialog', { name: 'Chỉnh quyền tài khoản' })
+    .getByLabel('Vai trò')
+    .selectOption('FINANCE');
   await page.getByLabel('Voucher', { exact: true }).uncheck();
   await page.getByRole('button', { name: 'Lưu quyền' }).click();
 });
@@ -326,7 +330,7 @@ test('registration, profile validation and forgot-password demo', async ({ page 
   await page.getByLabel('Số điện thoại').fill('0905551234');
   await page.getByLabel('Email', { exact: true }).fill('test@smartbus.demo');
   await page.getByLabel('Mật khẩu', { exact: true }).fill('SmartBus123!');
-  await page.getByRole('button', { name: 'Đăng ký', exact: true }).click();
+  await page.getByRole('button', { name: 'Đăng ký & xác minh email', exact: true }).click();
   await expect(page).toHaveURL('/account/tickets');
   await page.goto('/account/profile');
   await page.getByLabel('Số điện thoại').fill('123');

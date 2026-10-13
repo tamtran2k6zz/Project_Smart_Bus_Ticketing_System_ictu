@@ -14,6 +14,7 @@ const LandingPage = lazy(() => import('@/pages/LandingPage'));
 const TripsPage = lazy(() => import('@/pages/TripsPage'));
 const AuthPage = lazy(() => import('@/pages/AuthPage'));
 const VerifyEmailPage = lazy(() => import('@/features/auth/components/VerifyEmail'));
+const ResetPasswordPage = lazy(() => import('@/features/auth/components/ResetPassword'));
 const BookingPage = lazy(() => import('@/pages/BookingPage'));
 const PaymentPage = lazy(() => import('@/pages/PaymentPage'));
 const TicketsPage = lazy(() => import('@/pages/TicketsPage'));
@@ -69,6 +70,7 @@ export default function AppRouter() {
           </Route>
           <Route element={<AuthLayout />}>
             <Route path="/verify-email" element={<VerifyEmailPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path={paths.login} element={<AuthPage mode="login" />} />
             <Route path={paths.register} element={<AuthPage mode="register" />} />
             <Route path={paths.forgot} element={<AuthPage mode="forgot" />} />
@@ -88,7 +90,9 @@ export default function AppRouter() {
                 />
               ))}
             </Route>
-            <Route element={<PermissionGuard roles={['ADMIN', 'MANAGER', 'FINANCE']} />}>
+            <Route
+              element={<PermissionGuard roles={['ADMIN', 'MANAGER', 'FINANCE', 'MARKETING']} />}
+            >
               <Route path="/admin" element={<AdminLayout />}>
                 <Route index element={<DashboardPage />} />
                 <Route element={<PermissionGuard permission="operations" />}>

@@ -1,17 +1,19 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
+import { createZalopayPayment } from './zalopay.service';
 import { getGatewayCallbacks, readGatewayEnv } from '../config/env';
 import { appLogger } from '../config/logger';
 
 const logger = appLogger.child('gateway');
 
-export type OnlinePaymentMethod = 'VNPAY' | 'MOMO';
+export type OnlinePaymentMethod = 'VNPAY' | 'MOMO' | 'ZALOPAY';
 
 export class PaymentGatewayService {
   async createPaymentUrl(
     method: OnlinePaymentMethod,
     orderId: string,
     amount: number,
-    clientIp: string
+    clientIp: string,
+    resultPath?: string
   ): Promise<string> {
     if (!Number.isSafeInteger(amount) || amount <= 0) {
       throw new Error('Số tiền thanh toán không hợp lệ.');
@@ -20,7 +22,8 @@ export class PaymentGatewayService {
     if (method === 'VNPAY') {
       return this.createVnpayUrl(orderId, amount, clientIp);
     }
-    return this.createMomoPayment(orderId, amount);
+    if (method === 'ZALOPAY') return createZalopayPayment(orderId, amount, resultPath);
+    return this.createMomoPayment(orderId, amount, resultPath);
   }
 
   verifyVnpayCallback(params: Record<string, string>): boolean {
@@ -107,7 +110,11 @@ export class PaymentGatewayService {
     return `${endpoint}?${queryString}&vnp_SecureHash=${secureHash}`;
   }
 
-  private async createMomoPayment(orderId: string, amount: number): Promise<string> {
+  private async createMomoPayment(
+    orderId: string,
+    amount: number,
+    resultPath?: string
+  ): Promise<string> {
     const partnerCode = this.requiredEnv('MOMO_PARTNER_CODE');
     const accessKey = this.requiredEnv('MOMO_ACCESS_KEY');
     const secretKey = this.requiredEnv('MOMO_SECRET_KEY');
@@ -117,6 +124,10 @@ export class PaymentGatewayService {
     const extraData = '';
     const requestType = 'captureWallet';
     const redirectUrl = new URL(momoRedirectUrl);
+    if (resultPath) {
+      redirectUrl.pathname = resultPath;
+      redirectUrl.search = '';
+    }
     redirectUrl.searchParams.set('paymentOrder', orderId);
     const rawSignature = [
       `accessKey=${accessKey}`,

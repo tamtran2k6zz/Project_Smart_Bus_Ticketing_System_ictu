@@ -1,4 +1,8 @@
 import nodemailer from 'nodemailer';
+import { localDemoEnabled } from '../config/demo';
+import { mkdir, writeFile } from 'fs/promises';
+import { resolve } from 'path';
+import { randomUUID } from 'crypto';
 import { collectEmailEnvironmentIssues, readEnv } from '../config/env';
 import { appLogger } from '../config/logger';
 import type { Options } from 'nodemailer/lib/mailer';
@@ -9,6 +13,25 @@ export async function sendEmail(
   text: string,
   content: Pick<Options, 'html' | 'attachments'> = {}
 ): Promise<boolean> {
+  if (localDemoEnabled()) {
+    const transport = nodemailer.createTransport({ jsonTransport: true });
+    const mail = await transport.sendMail({
+      from: 'SmartBus Demo <demo@smartbus.test>',
+      to,
+      subject,
+      text,
+      ...content,
+    });
+    const output = resolve(process.env.DEMO_MAIL_DIR || 'demo-output/outbox');
+    await mkdir(output, { recursive: true });
+    await writeFile(
+      resolve(output, Date.now() + '-' + randomUUID() + '.json'),
+      String(mail.message),
+      'utf8'
+    );
+    transport.close();
+    return true;
+  }
   const host = readEnv('SMTP_HOST'),
     from = readEnv('SMTP_FROM');
   const issues = collectEmailEnvironmentIssues();

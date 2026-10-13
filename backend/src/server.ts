@@ -1,4 +1,5 @@
 import app from './app';
+import { processRefundJobs } from './services/refund-queue.service';
 import pool from './config/database';
 import { connectRedis, closeRedis, redisStatus } from './config/redis';
 import { collectEnvironmentIssues, logEnvironmentSummary, readEnv } from './config/env';
@@ -23,6 +24,7 @@ async function cleanupExpiredReservations(): Promise<void> {
   cleanupRunning = true;
   try {
     const count = await releaseExpiredReservations();
+    await processRefundJobs(10);
     if (count) {
       logger.info('expired_reservations_released', {
         released: count,

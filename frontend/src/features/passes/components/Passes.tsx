@@ -1,3 +1,4 @@
+import { TicketQr } from '@/features/tickets/components/Tickets';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -28,11 +29,21 @@ export function Passes() {
   const user = useSession(s => s.user)!;
   const query = useQuery({ queryKey: ['passes', user.id], queryFn: () => passesApi.list(user.id) });
   const catalog = useQuery({ queryKey: ['catalog'], queryFn: operationsApi.catalog });
+  const [gateway, setGateway] = useState('MoMo');
   const [route, setRoute] = useState(''),
     [confirm, setConfirm] = useState<{ routeId: string; id?: string } | null>(null);
   const buy = useAction(async () => {
     if (!confirm) throw new Error('Chọn tuyến.');
-    await passesApi.buy(user.id, confirm.routeId, confirm.id);
+    const result = await passesApi.buy(user.id, confirm.routeId, confirm.id, gateway);
+    if (!appConfig.demo && result.redirectUrl) {
+      const url = new URL(result.redirectUrl);
+      if (
+        url.protocol !== 'https:' &&
+        !(url.protocol === 'http:' && ['127.0.0.1', 'localhost'].includes(url.hostname))
+      )
+        throw new Error('Liên kết thanh toán không hợp lệ.');
+      window.location.assign(url.href);
+    }
     setConfirm(null);
   }, 'Vé tháng đã được cập nhật.');
   const form = useForm<z.infer<typeof schema>>({
@@ -51,7 +62,7 @@ export function Passes() {
         description={
           appConfig.demo
             ? 'Quản lý tuyến quen thuộc và thời hạn sử dụng. Giá dưới đây là chính sách demo.'
-            : 'Gửi hồ sơ ưu đãi để nhà xe xét duyệt. Vé tháng trực tuyến chưa mở bán.'
+            : 'Mua/gia hạn vé tháng theo tuyến; chỉ kích hoạt sau khi cổng thanh toán xác nhận.'
         }
       />
       <div className="grid">
@@ -68,7 +79,7 @@ export function Passes() {
                   thật.
                 </>
               ) : (
-                'Vui lòng liên hệ nhà xe để đăng ký vé tháng và xác nhận giá áp dụng.'
+                `Giá theo hồ sơ hiện tại: ${money(query.data?.policy?.monthlyPrice ?? 0)} / 30 ngày. Giá được xác nhận khi khởi tạo thanh toán.`
               )}
             </p>
             <Field label="Tuyến đăng ký">
@@ -85,13 +96,23 @@ export function Passes() {
             </Field>
             <Button
               style={{ marginTop: 18 }}
-              disabled={!route || !appConfig.demo}
+              disabled={!route}
               onClick={() => setConfirm({ routeId: route })}
             >
               Đăng ký {appConfig.demo ? 'demo' : ''}
             </Button>
             <ActionMessage action={buy} />
           </Card>
+          {query.data?.orders?.map(o => (
+            <Card key={o.id}>
+              <p>Đơn vé tháng đang chờ thanh toán · {money(o.price)}</p>
+              {o.redirectUrl && (
+                <Button onClick={() => window.location.assign(o.redirectUrl!)}>
+                  Tiếp tục thanh toán
+                </Button>
+              )}
+            </Card>
+          ))}
           <AsyncState
             query={query}
             empty={query.data?.passes.length === 0}
@@ -99,6 +120,17 @@ export function Passes() {
           >
             {query.data?.passes.map(p => (
               <Card key={p.id}>
+                {p.token && p.status === 'active' && Date.parse(p.expiresAt) > Date.now() && (
+                  <TicketQr token={p.token} />
+                )}
+                {p.token && (
+                  <details>
+                    <summary>Mã vé tháng để soát thủ công</summary>
+                    <Field label="Token vé tháng">
+                      <textarea readOnly value={p.token} />
+                    </Field>
+                  </details>
+                )}
                 <Badge tone={Date.parse(p.expiresAt) > Date.now() ? 'green' : 'amber'}>
                   {Date.parse(p.expiresAt) > Date.now() ? 'Đang hoạt động' : 'Hết hạn'}
                 </Badge>
@@ -110,7 +142,7 @@ export function Passes() {
                 </p>
                 <Button
                   variant="secondary"
-                  disabled={!appConfig.demo}
+                  disabled={buy.isPending}
                   onClick={() => setConfirm({ routeId: p.routeId, id: p.id })}
                 >
                   Gia hạn thêm 30 ngày
@@ -127,7 +159,9 @@ export function Passes() {
           <form className="stack" onSubmit={form.handleSubmit(v => eligibility.mutate(v))}>
             <Field label="Nhóm đối tượng">
               <select {...form.register('category')}>
+                <option>Học sinh</option>
                 <option>Sinh viên</option>
+                <option>Người đi làm</option>
                 <option>Người cao tuổi</option>
                 <option>Người khuyết tật</option>
               </select>
@@ -157,12 +191,22 @@ export function Passes() {
           thêm 30 ngày.
         </p>
         <p className="muted">
-          Demo không thu tiền thật. Thời hạn gia hạn được cộng từ ngày hết hạn nếu vé còn hiệu lực.
+          {appConfig.demo
+            ? 'Demo không thu tiền thật.'
+            : 'Bạn sẽ chuyển tới cổng thanh toán. Vé chỉ kích hoạt sau xác nhận hợp lệ.'}{' '}
+          Thời hạn gia hạn được cộng từ ngày hết hạn nếu vé còn hiệu lực.
         </p>
+        <Field label="Phương thức thanh toán">
+          <select value={gateway} onChange={e => setGateway(e.target.value)}>
+            {['MoMo', 'VNPay', 'ZaloPay', 'Card'].map(g => (
+              <option key={g}>{g}</option>
+            ))}
+          </select>
+        </Field>
         <ActionMessage action={buy} />
         <div className="row">
           <Button disabled={buy.isPending} onClick={() => buy.mutate(undefined)}>
-            Xác nhận demo
+            {appConfig.demo ? 'Xác nhận demo' : 'Thanh toán vé tháng'}
           </Button>
           <Button variant="secondary" onClick={() => setConfirm(null)}>
             Đóng

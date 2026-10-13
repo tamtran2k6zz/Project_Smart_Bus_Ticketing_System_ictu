@@ -2,7 +2,7 @@ require('dotenv/config');
 const { Client } = require('pg');
 const fs = require('node:fs');
 const path = require('node:path');
-const { createHash } = require('node:crypto');
+const { migrationChecksums } = require('./migration-checksum.cjs');
 
 async function main() {
   const rawUrl = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
@@ -26,9 +26,10 @@ async function main() {
     const dir=path.resolve(__dirname,'../../supabase/migrations');
     for(const name of fs.readdirSync(dir).filter(f=>f.endsWith('.sql')).sort()) {
       const sql=fs.readFileSync(path.join(dir,name),'utf8');
-      const checksum=createHash('sha256').update(sql).digest('hex');
+      const checksums=migrationChecksums(sql);
+      const checksum=checksums.canonical;
       const {rows:[existing]}=await db.query('SELECT checksum FROM smartbus_private.migrations WHERE name=$1',[name]);
-      if(existing && existing.checksum!==checksum)throw new Error('Applied migration changed: '+name);
+      if(existing && !Object.values(checksums).includes(existing.checksum))throw new Error('Applied migration changed: '+name);
       const version=name.split('_')[0];
       const supabaseName=name.replace(/\.sql$/,'');
       let applied=false;

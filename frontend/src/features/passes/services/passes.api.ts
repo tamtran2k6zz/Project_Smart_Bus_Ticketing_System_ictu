@@ -4,14 +4,19 @@ import { can } from '@/configs/permissions';
 import type { Pass, Eligibility } from '../types';
 export const passesApi = {
   list: (userId: string) =>
-    service<{ passes: Pass[]; eligibility: Eligibility[] }>('/passes', db => {
+    service<{
+      passes: Pass[];
+      eligibility: Eligibility[];
+      orders?: Pass[];
+      policy?: { monthlyPrice: number };
+    }>('/passes', db => {
       requireUser(db, userId);
       return {
         passes: db.passes.filter(p => p.userId === userId),
         eligibility: db.eligibility.filter(e => e.userId === userId),
       };
     }),
-  buy: (userId: string, routeId: string, id?: string) =>
+  buy: (userId: string, routeId: string, id?: string, gateway = 'MoMo') =>
     service<Pass>(
       '/passes',
       db => {
@@ -38,6 +43,13 @@ export const passesApi = {
         ).toISOString();
         p.price = eligible ? 150000 : 250000;
         p.status = 'active';
+        p.token = JSON.stringify({
+          kind: 'monthly-pass',
+          id: p.id,
+          routeId: p.routeId,
+          userId,
+          expiresAt: p.expiresAt,
+        });
         notify(
           db,
           userId,
@@ -49,7 +61,7 @@ export const passesApi = {
         return p;
       },
       'POST',
-      { routeId, id }
+      { routeId, id, gateway }
     ),
   eligibility: (userId: string, category: string, document: string) =>
     service<Eligibility>(

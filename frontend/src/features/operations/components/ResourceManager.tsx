@@ -1,3 +1,5 @@
+import { FarePolicies } from '@/features/passes/components/FarePolicies';
+import { SchedulePlanner } from './SchedulePlanner';
 import { useQuery } from '@tanstack/react-query';
 import {
   DataManager,
@@ -91,9 +93,18 @@ export function ResourceManager({ resource }: { resource: Resource }) {
       { name: 'vehicleId', label: 'Xe', type: 'select', options: vehicleOptions },
       {
         name: 'staffId',
-        label: 'Nhân sự',
+        label: 'Tài xế',
         type: 'select',
         options: staff.data?.map(s => ({ value: s.id, label: 'name' in s ? s.name : s.id })),
+      },
+      {
+        name: 'conductorId',
+        label: 'Phụ xe (tùy chọn)',
+        type: 'select',
+        options: [
+          { value: '', label: 'Không phân phụ xe' },
+          ...(staff.data?.map(s => ({ value: s.id, label: 'name' in s ? s.name : s.id })) || []),
+        ],
       },
     ],
   };
@@ -143,7 +154,7 @@ export function ResourceManager({ resource }: { resource: Resource }) {
       { key: 'vehicleId', label: 'Xe', format: v => name('vehicles', v) || String(v) },
       {
         key: 'staffId',
-        label: 'Nhân sự',
+        label: 'Tài xế',
         format: v => {
           const row = staff.data?.find(s => s.id === v);
           return row && 'name' in row ? row.name : String(v);
@@ -160,17 +171,21 @@ export function ResourceManager({ resource }: { resource: Resource }) {
     assignments: 'Phân công chuyến',
   };
   return (
-    <DataManager
-      key={resource}
-      title={titles[resource]}
-      description="Thay đổi danh mục demo được phản ánh vào tra cứu và các màn hình liên quan."
-      fields={fields[resource]}
-      columns={columns[resource]}
-      schema={resourceSchemas[resource]}
-      queryKey={'resource-' + resource}
-      load={async () => (await operationsApi.list(resource, user.id)).map(row => ({ ...row }))}
-      save={data => operationsApi.save(resource, user.id, data)}
-      remove={id => operationsApi.remove(resource, user.id, id)}
-    />
+    <>
+      {resource === 'trips' && <SchedulePlanner />}
+      {resource === 'routes' && <FarePolicies />}
+      <DataManager
+        key={resource}
+        title={titles[resource]}
+        description="Thay đổi danh mục được phản ánh vào tra cứu và các màn hình liên quan."
+        fields={fields[resource]}
+        columns={columns[resource]}
+        schema={resourceSchemas[resource]}
+        queryKey={'resource-' + resource}
+        load={async () => (await operationsApi.list(resource, user.id)).map(row => ({ ...row }))}
+        save={data => operationsApi.save(resource, user.id, data)}
+        remove={id => operationsApi.remove(resource, user.id, id)}
+      />
+    </>
   );
 }

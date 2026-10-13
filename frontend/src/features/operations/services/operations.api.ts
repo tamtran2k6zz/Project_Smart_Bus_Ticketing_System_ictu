@@ -24,7 +24,10 @@ function assertAssignmentAvailable(db: Database, assignment: Assignment, trip: T
         Date.parse(trip.departure) < Date.parse(otherTrip.departure) + otherTrip.duration * 60000;
       return (
         overlaps &&
-        (other.vehicleId === assignment.vehicleId || other.staffId === assignment.staffId)
+        (other.vehicleId === assignment.vehicleId ||
+          [assignment.staffId, assignment.conductorId]
+            .filter(Boolean)
+            .some(id => [other.staffId, other.conductorId].includes(id)))
       );
     })
   )
@@ -223,7 +226,12 @@ export const operationsApi = {
       const staffIds = db.staff.filter(s => s.userId === userId).map(s => s.id);
       return user.role === 'DRIVER'
         ? db.trips.filter(t =>
-            db.assignments.some(a => a.tripId === t.id && staffIds.includes(a.staffId))
+            db.assignments.some(
+              a =>
+                a.tripId === t.id &&
+                (staffIds.includes(a.staffId) ||
+                  (!!a.conductorId && staffIds.includes(a.conductorId)))
+            )
           )
         : db.trips;
     }),
@@ -231,7 +239,7 @@ export const operationsApi = {
     service<Incident[]>('/incidents' + (tripId ? '?tripId=' + tripId : ''), db =>
       db.incidents.filter(i => !tripId || i.tripId === tripId)
     ),
-  reportIncident: (userId: string, tripId: string, message: string) =>
+  reportIncident: (userId: string, tripId: string, message: string, delayMinutes = 0) =>
     service<Incident>(
       '/incidents',
       db => {
@@ -264,7 +272,7 @@ export const operationsApi = {
         return incident;
       },
       'POST',
-      { tripId, message }
+      { tripId, message, delayMinutes }
     ),
   resolveIncident: (userId: string, id: string) =>
     service(

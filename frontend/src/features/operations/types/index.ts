@@ -34,6 +34,7 @@ export interface Assignment {
   tripId: string;
   vehicleId: string;
   staffId: string;
+  conductorId?: string;
 }
 export interface Incident {
   id: string;

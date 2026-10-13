@@ -58,7 +58,11 @@ export function Checkout() {
         throw new Error('Chưa có liên kết thanh toán. Hãy thử lại hoặc chọn phương thức khác.');
       if (p.redirectUrl && !appConfig.demo) {
         const url = new URL(p.redirectUrl);
-        if (url.protocol !== 'https:') throw new Error('URL cổng thanh toán không an toàn.');
+        if (
+          url.protocol !== 'https:' &&
+          !(url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname))
+        )
+          throw new Error('URL cổng thanh toán không an toàn.');
         window.location.assign(url.href);
       }
     },
@@ -101,7 +105,7 @@ export function Checkout() {
                 <div className="grid">
                   {(appConfig.demo
                     ? (['MoMo', 'VNPay', 'ZaloPay', 'Card'] as Gateway[])
-                    : (['MoMo', 'VNPay', 'Card'] as Gateway[])
+                    : (['MoMo', 'VNPay', 'ZaloPay', 'Card'] as Gateway[])
                   ).map(value => (
                     <label
                       key={value}

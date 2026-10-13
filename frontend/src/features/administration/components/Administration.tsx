@@ -40,9 +40,10 @@ export function UserManagement() {
     <>
       <PageTitle
         title="Tài khoản & phân quyền"
-        description="Quyền chi tiết ảnh hưởng menu, route và dịch vụ demo. Backend thật phải kiểm tra quyền API."
+        description="Tạo tài khoản, phân vai trò và khóa tài khoản. Backend kiểm tra quyền trên từng API."
       />
       <ActionMessage action={action} />
+      <UserCreateForm />
       <AsyncState query={query}>
         <Card>
           <div className="tableWrap">
@@ -155,7 +156,7 @@ export function AuditLog() {
     <>
       <PageTitle
         title="Nhật ký hoạt động"
-        description="Các thay đổi dữ liệu và thao tác xác nhận được ghi lại bởi dịch vụ demo."
+        description="Nhật ký truy cập, đăng nhập và thao tác; không lưu mật khẩu hoặc token."
       />
       <AsyncState query={query} empty={query.data?.length === 0} emptyText="Chưa có hoạt động">
         <Card>
@@ -173,7 +174,12 @@ export function AuditLog() {
                   <tr key={a.id}>
                     <td>{dateTime(a.createdAt)}</td>
                     <td>{a.actor}</td>
-                    <td>{a.action}</td>
+                    <td>
+                      {a.action}{' '}
+                      {a.statusCode != null && (
+                        <Badge tone={a.statusCode < 400 ? 'green' : 'red'}>{a.statusCode}</Badge>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -181,6 +187,83 @@ export function AuditLog() {
           </div>
         </Card>
       </AsyncState>
+    </>
+  );
+}
+function UserCreateForm() {
+  const actor = useSession(s => s.user)!;
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    password: '',
+    role: 'PASSENGER' as Role,
+  });
+  const create = useAction(async () => {
+    await adminApi.create(actor.id, form);
+    setOpen(false);
+    setForm({ name: '', email: '', phone: '', password: '', role: 'PASSENGER' });
+  }, 'Đã tạo tài khoản.');
+  return (
+    <>
+      <Button variant="secondary" onClick={() => setOpen(true)}>
+        Tạo tài khoản
+      </Button>
+      <ActionMessage action={create} />
+      <Modal open={open} onClose={() => setOpen(false)} title="Tạo tài khoản">
+        <form
+          className="stack"
+          onSubmit={e => {
+            e.preventDefault();
+            create.mutate(undefined);
+          }}
+        >
+          <Field label="Họ tên">
+            <input
+              required
+              minLength={2}
+              value={form.name}
+              onChange={e => setForm({ ...form, name: e.target.value })}
+            />
+          </Field>
+          <Field label="Email">
+            <input
+              type="email"
+              required
+              value={form.email}
+              onChange={e => setForm({ ...form, email: e.target.value })}
+            />
+          </Field>
+          <Field label="Số điện thoại">
+            <input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
+          </Field>
+          <Field label="Mật khẩu (ít nhất 10 ký tự)">
+            <input
+              type="password"
+              required
+              minLength={10}
+              autoComplete="new-password"
+              value={form.password}
+              onChange={e => setForm({ ...form, password: e.target.value })}
+            />
+          </Field>
+          <Field label="Vai trò">
+            <select
+              value={form.role}
+              onChange={e => setForm({ ...form, role: e.target.value as Role })}
+            >
+              {Object.entries(roleLabels).map(([r, label]) => (
+                <option key={r} value={r}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <ActionMessage action={create} />
+          <Button disabled={create.isPending}>Lưu tài khoản</Button>
+        </form>
+      </Modal>
     </>
   );
 }

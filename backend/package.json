@@ -6,6 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
+    "demo:api": "npm run build && node scripts/demo-api.cjs",
     "build": "tsc -p tsconfig.express.json",
     "start": "ts-node src/server.ts",
     "start:express": "ts-node src/server.ts",

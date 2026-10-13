@@ -182,15 +182,18 @@ export async function notifyApproachingPassengers(
   const passengers = await query<
     Array<{ user_id: string; ticket_code: string; seat_number: string }>
   >(
-    `SELECT user_id, ticket_code, seat_number
-     FROM tickets
-     WHERE trip_id = $1 AND user_id IS NOT NULL AND status IN ('BOOKED', 'CHECKED_IN')
-     UNION SELECT user_id,'' AS ticket_code,'' AS seat_number FROM trip_subscriptions WHERE trip_id=$1`,
-    [tripId]
+    `SELECT t.user_id,t.ticket_code,t.seat_number FROM tickets t
+     LEFT JOIN ui_bookings b ON b.ticket_id=t.id LEFT JOIN ui_holds h ON h.id=b.hold_id
+     WHERE t.trip_id=$1 AND t.user_id IS NOT NULL AND t.status IN ('BOOKED','CHECKED_IN')
+       AND ($2 IN (h.boarding_stop_id,h.alighting_stop_id) OR (h.boarding_stop_id IS NULL AND $2 IN (
+         SELECT rs.stop_id FROM trips tr JOIN route_stops rs ON rs.route_id=tr.route_id WHERE tr.id=$1
+         AND rs.stop_order IN (SELECT MIN(x.stop_order) FROM route_stops x WHERE x.route_id=tr.route_id UNION SELECT MAX(x.stop_order) FROM route_stops x WHERE x.route_id=tr.route_id))))
+     UNION SELECT user_id,'' AS ticket_code,'' AS seat_number FROM trip_subscriptions WHERE trip_id=$1 AND $2 IN (boarding_stop_id,alighting_stop_id)`,
+    [tripId, nearest.stopId]
   );
   if (!passengers.length) return;
 
-  const body = `Xe buýt đã cách trạm ${nearest.stopName} khoảng ${nearest.distanceMeters} m. Vui lòng tới trạm sớm.`;
+  const body = `Xe buýt đã cách trạm ${nearest.stopName} khoảng ${nearest.distanceMeters} m. Vui lòng chuẩn bị lên hoặc xuống xe.`;
   for (const passenger of [...new Map(passengers.map(p => [p.user_id, p])).values()]) {
     try {
       // Late subscribers still receive their first alert; multi-seat tickets do not duplicate it.

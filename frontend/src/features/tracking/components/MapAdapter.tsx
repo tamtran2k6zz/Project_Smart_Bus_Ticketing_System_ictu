@@ -12,14 +12,14 @@ const VIETNAM_STOPS_COORDS: Record<string, [number, number]> = {
   'bến xe bắc kạn': [22.14682, 105.83471],
   'lạng sơn': [21.84903, 106.75704],
   'bến xe lạng sơn': [21.84903, 106.75704],
-  'đại học ictu': [21.58520, 105.80750],
-  'ictu': [21.58520, 105.80750],
-  'công nghệ thông tin': [21.58520, 105.80750],
-  'gang thép': [21.53670, 105.85940],
-  'bến xe bắc giang': [21.27310, 106.19460],
-  'bắc giang': [21.27310, 106.19460],
-  'hồ núi cốc': [21.57500, 105.71600],
-  'sông công': [21.49100, 105.84500],
+  'đại học ictu': [21.5852, 105.8075],
+  ictu: [21.5852, 105.8075],
+  'công nghệ thông tin': [21.5852, 105.8075],
+  'gang thép': [21.5367, 105.8594],
+  'bến xe bắc giang': [21.2731, 106.1946],
+  'bắc giang': [21.2731, 106.1946],
+  'hồ núi cốc': [21.575, 105.716],
+  'sông công': [21.491, 105.845],
   'bến xe mỹ đình': [21.02851, 105.77832],
   'mỹ đình': [21.02851, 105.77832],
   'đại học quốc gia hà nội': [21.03682, 105.78253],
@@ -31,9 +31,9 @@ const VIETNAM_STOPS_COORDS: Record<string, [number, number]> = {
   'long biên': [21.04223, 105.85052],
   'sân bay quốc tế nội bài': [21.21871, 105.80422],
   'nội bài': [21.21871, 105.80422],
-  'bến xe yên nghĩa': [20.95350, 105.74820],
-  'yên nghĩa': [20.95350, 105.74820],
-  'hà đông': [20.97230, 105.77700],
+  'bến xe yên nghĩa': [20.9535, 105.7482],
+  'yên nghĩa': [20.9535, 105.7482],
+  'hà đông': [20.9723, 105.777],
 };
 
 function getValidCoordinates(stop: Stop, fallbackIndex = 0): [number, number] {
@@ -56,7 +56,8 @@ function getValidCoordinates(stop: Stop, fallbackIndex = 0): [number, number] {
 export function MapAdapter({ stops, location }: { stops: Stop[]; location?: LocationUpdate }) {
   const root = useRef<HTMLDivElement>(null),
     map = useRef<L.Map | null>(null),
-    marker = useRef<L.Marker | null>(null);
+    marker = useRef<L.Marker | null>(null),
+    busIcon = useRef<L.DivIcon | null>(null);
 
   useEffect(() => {
     if (!root.current || !stops.length) return;
@@ -121,9 +122,9 @@ export function MapAdapter({ stops, location }: { stops: Stop[]; location?: Loca
       iconAnchor: [22, 22],
     });
 
-    const initialPos =
-      location?.lat && location?.lng ? ([location.lat, location.lng] as L.LatLngTuple) : coords[0];
-    marker.current = L.marker(initialPos, { icon }).addTo(instance);
+    busIcon.current = icon;
+    if (location?.lat != null && location.lng != null)
+      marker.current = L.marker([location.lat, location.lng], { icon }).addTo(instance);
 
     const resize = new ResizeObserver(() => instance.invalidateSize());
     resize.observe(root.current);
@@ -137,8 +138,12 @@ export function MapAdapter({ stops, location }: { stops: Stop[]; location?: Loca
   }, [stops]);
 
   useEffect(() => {
-    if (location && location.lat && location.lng) {
-      marker.current?.setLatLng([location.lat, location.lng]);
+    if (location?.lat != null && location.lng != null && map.current && busIcon.current) {
+      if (!marker.current)
+        marker.current = L.marker([location.lat, location.lng], { icon: busIcon.current }).addTo(
+          map.current
+        );
+      else marker.current.setLatLng([location.lat, location.lng]);
     }
   }, [location]);
 

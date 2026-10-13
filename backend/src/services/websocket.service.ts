@@ -5,6 +5,7 @@ import { readEnv } from '../config/env';
 import { appLogger } from '../config/logger';
 import { shouldThrottleGpsUpdate } from './gps.service';
 import { updateTripLocation } from './location-update.service';
+import { query } from '../config/database';
 
 const logger = appLogger.child('websocket-gateway');
 
@@ -13,12 +14,18 @@ interface AuthenticatedWebSocket extends WebSocket {
   role?: string;
   tripId?: string;
   isAlive?: boolean;
+  authVersion?: number;
+  expiresAt?: number;
+  checkSession?: () => Promise<boolean>;
 }
 
 const tripRooms = new Map<string, Set<AuthenticatedWebSocket>>();
 // Sprint 3 (US 10): user_id → các kết nối của người dùng đó, dùng để push
 // thông báo realtime (notifications) tới đúng thiết bị của hành khách.
 const userRooms = new Map<string, Set<AuthenticatedWebSocket>>();
+export function disconnectUserSockets(userId: string): void {
+  for (const client of userRooms.get(userId) || []) client.close(1008, 'Session revoked');
+}
 
 /**
  * Push một payload tới mọi kết nối WebSocket của một người dùng.
@@ -53,26 +60,59 @@ export function setupWebSocketGateway(server: HttpServer): WebSocketServer {
     if (token) {
       try {
         const secret = readEnv('JWT_SECRET');
-        const decoded = jwt.verify(token, secret) as { id: string; role: string };
+        const decoded = jwt.verify(token, secret) as {
+          id: string;
+          role: string;
+          authVersion?: number;
+          exp: number;
+        };
         ws.userId = decoded.id;
         ws.role = decoded.role;
+        ws.authVersion = decoded.authVersion ?? 0;
+        ws.expiresAt = decoded.exp * 1000;
       } catch (err) {
         logger.warn('ws_auth_failed', { error: err });
       }
     }
 
-    // Sprint 3: đưa kết nối vào "phòng" của user để nhận thông báo realtime.
-    if (ws.userId) {
+    ws.checkSession = async () => {
+      if (!ws.userId) return true;
+      try {
+        const [user] = await query<any[]>(
+          'SELECT status,role,auth_version FROM users WHERE id=$1',
+          [ws.userId]
+        );
+        if (
+          !user ||
+          user.status !== 'ACTIVE' ||
+          user.auth_version !== ws.authVersion ||
+          Date.now() >= ws.expiresAt!
+        ) {
+          ws.close(1008, 'Session revoked');
+          return false;
+        }
+        ws.role = user.role;
+        return true;
+      } catch {
+        ws.close(1011, 'Authentication unavailable');
+        return false;
+      }
+    };
+    const authReady = ws.checkSession();
+    // Register only after checking the current account/session version.
+    void authReady.then(valid => {
+      if (!valid || !ws.userId || ws.readyState !== WebSocket.OPEN) return;
       let room = userRooms.get(ws.userId);
       if (!room) {
         room = new Set();
         userRooms.set(ws.userId, room);
       }
       room.add(ws);
-    }
+    });
 
     ws.on('message', async data => {
       try {
+        if (!(await authReady) || !(await ws.checkSession!())) return;
         const message = JSON.parse(data.toString());
         const { action, tripId, latitude, longitude, speed, heading } = message;
 
@@ -172,6 +212,7 @@ export function setupWebSocketGateway(server: HttpServer): WebSocketServer {
         continue;
       }
       client.isAlive = false;
+      if (client.userId) void client.checkSession?.();
       client.ping();
     }
   }, 30000);
