@@ -1,5 +1,5 @@
 /**
- * Script seed 10 chuyến xe với thời gian khởi hành 15:00 ngày 13/10/2026
+ * Script seed 10 chuyến xe với thời gian khởi hành 16:00 ngày 13/10/2026
  * Chạy lệnh: node backend/scripts/seed-trips-oct13.js
  */
 require('dotenv/config');
@@ -23,7 +23,7 @@ async function main() {
     const routeId = 'route-1310-hn-dn';
     await client.query(`
       INSERT INTO routes (id, code, name, description, distance_km, base_price, status)
-      VALUES ($1, 'OCT13-HN-DN', 'Hà Nội - Đà Nẵng (Chuyến 13/10)', 'Tuyến chạy thẳng Hà Nội - Đà Nẵng', 780.00, 350000.00, 'ACTIVE')
+      VALUES ($1, 'OCT13-HN-DN', 'Hà Nội - Đà Nẵng (Chuyến 13/10 16:00)', 'Tuyến chạy thẳng Hà Nội - Đà Nẵng', 780.00, 350000.00, 'ACTIVE')
       ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name, base_price=EXCLUDED.base_price;
     `, [routeId]);
 
@@ -43,18 +43,18 @@ async function main() {
       ON CONFLICT (id) DO UPDATE SET full_name=EXCLUDED.full_name;
     `, [driverId]);
 
-    // 4. Tạo 10 chuyến xe có thời gian khởi hành là 15:00 ngày 13/10/2026
-    const departureTime = '2026-10-13T15:00:00+07:00';
-    const arrivalTime = '2026-10-13T23:00:00+07:00'; // 8 tiếng di chuyển
+    // 4. Tạo 10 chuyến xe có thời gian khởi hành là 16:00 ngày 13/10/2026
+    const departureTime = '2026-10-13T16:00:00+07:00';
+    const arrivalTime = '2026-10-14T00:00:00+07:00'; // 8 tiếng di chuyển
 
-    console.log('Đang tạo 10 chuyến xe khởi hành lúc 15:00 ngày 13/10/2026...');
+    console.log('Đang tạo 10 chuyến xe khởi hành lúc 16:00 ngày 13/10/2026...');
 
     for (let i = 1; i <= 10; i++) {
-      const tripId = `trip-20261013-${i}`;
+      const tripId = `trip-20261013-16h-${i}`;
       const plateNumber = `29B-9${String(i).padStart(2, '0')}.88`;
       
       // Đảm bảo xe buýt tương ứng tồn tại cho mỗi chuyến nếu muốn đổi biển số
-      const currentBusId = `bus-1310-${i}`;
+      const currentBusId = `bus-1310-16h-${i}`;
       await client.query(`
         INSERT INTO buses (id, plate_number, bus_type, total_seats, status)
         VALUES ($1, $2, 'SLEEPER', 40, 'READY')
@@ -69,7 +69,7 @@ async function main() {
     }
 
     await client.query('COMMIT');
-    console.log('✅ Đã tạo thành công 10 chuyến xe khởi hành lúc 15:00 ngày 13/10/2026!');
+    console.log('✅ Đã tạo thành công 10 chuyến xe khởi hành lúc 16:00 ngày 13/10/2026!');
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('❌ Lỗi khi seed dữ liệu chuyến xe:', error);
