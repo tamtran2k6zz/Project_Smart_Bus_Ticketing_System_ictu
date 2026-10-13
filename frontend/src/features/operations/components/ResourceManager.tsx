@@ -1,11 +1,17 @@
 import { FarePolicies } from '@/features/passes/components/FarePolicies';
 import { SchedulePlanner } from './SchedulePlanner';
 import { useQuery } from '@tanstack/react-query';
+import { useAction } from '@/hooks/useAction';
 import {
   DataManager,
   type DataField,
   type DataColumn,
 } from '@/components/data-display/DataManager';
+import {
+  Button,
+  Card,
+  ActionMessage,
+} from '@/components/ui/Ui';
 import { useSession } from '@/store/session.store';
 import { operationsApi, type Resource } from '../services/operations.api';
 import { resourceSchemas } from '../schemas/resources';
@@ -170,9 +176,31 @@ export function ResourceManager({ resource }: { resource: Resource }) {
     trips: 'Lịch chạy',
     assignments: 'Phân công chuyến',
   };
+  const cleanupAction = useAction(
+    async () => await operationsApi.cleanupOldTrips(user.id, 7),
+    'Đã giải phóng thành công các chuyến xe quá hạn (> 1 tuần).'
+  );
   return (
     <>
-      {resource === 'trips' && <SchedulePlanner />}
+      {resource === 'trips' && (
+        <div className="stack" style={{ marginBottom: 16 }}>
+          <SchedulePlanner />
+          <Card>
+            <div className="between">
+              <div>
+                <strong>Giải phóng chuyến xe cũ quá hạn</strong>
+                <p className="muted" style={{ margin: 0 }}>
+                  Chuyển trạng thái các chuyến xe có thời gian khởi hành quá 1 tuần (7 ngày) sang hoàn thành.
+                </p>
+              </div>
+              <Button disabled={cleanupAction.isPending} onClick={() => cleanupAction.mutate(undefined)}>
+                {cleanupAction.isPending ? 'Đang xử lý...' : 'Giải phóng chuyến xe quá hạn'}
+              </Button>
+            </div>
+            <ActionMessage action={cleanupAction} />
+          </Card>
+        </div>
+      )}
       {resource === 'routes' && <FarePolicies />}
       <DataManager
         key={resource}
