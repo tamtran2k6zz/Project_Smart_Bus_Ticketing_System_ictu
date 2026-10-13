@@ -5,6 +5,7 @@ import { connectRedis, closeRedis, redisStatus } from './config/redis';
 import { collectEnvironmentIssues, logEnvironmentSummary, readEnv } from './config/env';
 import { appLogger } from './config/logger';
 import { releaseExpiredReservations } from './routes/ticketing.routes';
+import { cleanupOldTrips } from './services/booking';
 import { setupWebSocketGateway } from './services/websocket.service';
 
 const logger = appLogger.child('server');
@@ -24,11 +25,13 @@ async function cleanupExpiredReservations(): Promise<void> {
   cleanupRunning = true;
   try {
     const count = await releaseExpiredReservations();
+    const oldTripsCleaned = await cleanupOldTrips();
     await processRefundJobs(10);
-    if (count) {
+    if (count || oldTripsCleaned) {
       logger.info('expired_reservations_released', {
         released: count,
-        tables: 'tickets/trip_seats/payment_transactions',
+        oldTripsCleaned,
+        tables: 'tickets/trip_seats/payment_transactions/trips',
       });
     }
   } catch (error) {

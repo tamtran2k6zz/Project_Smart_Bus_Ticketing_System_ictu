@@ -204,13 +204,17 @@ export function TicketDetail() {
     enabled: !!query.data,
   });
   const [modal, setModal] = useState<'cancel' | 'exchange' | ''>(''),
-    [target, setTarget] = useState('');
+    [target, setTarget] = useState(''),
+    [bankName, setBankName] = useState(''),
+    [bankAccountNumber, setBankAccountNumber] = useState(''),
+    [accountHolderName, setAccountHolderName] = useState('');
   const action = useAction(async () => {
     await ticketsApi.request(
       ticketId,
       user.id,
       modal as 'cancel' | 'exchange',
-      target || undefined
+      target || undefined,
+      modal === 'cancel' ? { bankName, bankAccountNumber, accountHolderName } : undefined
     );
     setModal('');
   }, 'Đã gửi yêu cầu, vui lòng chờ điều hành xử lý.');
@@ -376,7 +380,7 @@ export function TicketDetail() {
           dụng cho chuyến cùng tuyến, cùng giá còn đủ ghế. QR tạm ngừng sử dụng trong lúc chờ duyệt.
         </p>
         {modal === 'cancel' && b && (
-          <div className="stack" style={{ gap: 8, margin: '16px 0' }}>
+          <div className="stack" style={{ gap: 12, margin: '16px 0' }}>
             <PriceBreakdown booking={b} totalLabel="Số tiền đã thanh toán" />
             <hr className="divider" />
             <div className="between">
@@ -391,10 +395,29 @@ export function TicketDetail() {
               </span>
             </div>
             <p className="muted" style={{ margin: 0 }}>
-              {appConfig.demo
-                ? 'Số tiền hoàn chính xác sẽ được thông báo khi yêu cầu hủy được duyệt.'
-                : 'Hoàn toàn bộ số tiền đã thanh toán sau khi nhà xe duyệt và cổng thanh toán xác nhận.'}
+              Nhập thông tin tài khoản ngân hàng để nhận tiền hoàn (đặc biệt khi thanh toán chuyển khoản thủ công / tiền mặt hoặc khi cần chuyển khoản hoàn tiền):
             </p>
+            <Field label="Tên ngân hàng">
+              <input
+                placeholder="VD: Vietcombank, Techcombank, MB Bank..."
+                value={bankName}
+                onChange={e => setBankName(e.target.value)}
+              />
+            </Field>
+            <Field label="Số tài khoản ngân hàng">
+              <input
+                placeholder="Nhập số tài khoản nhận hoàn tiền"
+                value={bankAccountNumber}
+                onChange={e => setBankAccountNumber(e.target.value)}
+              />
+            </Field>
+            <Field label="Tên chủ tài khoản">
+              <input
+                placeholder="NGUYỄN VĂN A"
+                value={accountHolderName}
+                onChange={e => setAccountHolderName(e.target.value)}
+              />
+            </Field>
           </div>
         )}
         {modal === 'exchange' && (

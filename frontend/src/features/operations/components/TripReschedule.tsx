@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { request } from '@/services/http';
+import { service } from '@/services/adapter';
 import { operationsApi } from '../services/operations.api';
 import { useAction } from '@/hooks/useAction';
 import { Card, Field, Button, ActionMessage } from '@/components/ui/Ui';
 import { dateTime } from '@/utils/format';
-import { appConfig } from '@/configs/app.config';
 
 export function TripReschedule() {
   const catalog = useQuery({ queryKey: ['catalog'], queryFn: operationsApi.catalog });
@@ -13,13 +12,32 @@ export function TripReschedule() {
     [departure, setDeparture] = useState(''),
     [arrival, setArrival] = useState('');
   const action = useAction(async () => {
-    await request('/trips/' + tripId + '/reschedule', 'POST', {
-      departure: new Date(departure).toISOString(),
-      arrival: new Date(arrival).toISOString(),
-    });
+    const start = new Date(departure),
+      end = new Date(arrival);
+    if (
+      !Number.isFinite(start.getTime()) ||
+      !Number.isFinite(end.getTime()) ||
+      end <= start
+    )
+      throw new Error('Giờ chuyến mới không hợp lệ.');
+    await service(
+      '/trips/' + tripId + '/reschedule',
+      db => {
+        const trip = db.trips.find(t => t.id === tripId);
+        if (!trip) throw new Error('Không tìm thấy chuyến.');
+        if (trip.status !== 'scheduled') throw new Error('Chỉ đổi giờ chuyến chưa chạy.');
+        trip.departure = start.toISOString();
+        trip.duration = Math.round((end.getTime() - start.getTime()) / 60000);
+        return { tripId, departure: trip.departure, arrival: end.toISOString() };
+      },
+      'POST',
+      {
+        departure: start.toISOString(),
+        arrival: end.toISOString(),
+      }
+    );
     await catalog.refetch();
   }, 'Đã đổi giờ và gửi thông báo cho hành khách.');
-  if (appConfig.demo) return null;
   return (
     <Card>
       <h3>Đổi giờ chuyến & thông báo</h3>

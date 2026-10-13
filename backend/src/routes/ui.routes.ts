@@ -665,7 +665,7 @@ router.post(
     return paymentDto(updated);
   })
 );
-const ticketsSql = `SELECT t.*,tr.arrival_time,b.id AS booking_id,h.seat_ids,b.name,h.boarding_stop_id,h.alighting_stop_id,q.kind AS request,q.target_trip_id,
+const ticketsSql = `SELECT t.*,tr.arrival_time,b.id AS booking_id,h.seat_ids,b.name,h.boarding_stop_id,h.alighting_stop_id,q.kind AS request,q.target_trip_id,q.bank_name,q.bank_account_number,q.account_holder_name,
   (SELECT min(v.created_at) FROM ticket_validation_logs v WHERE v.ticket_id=t.id AND v.result='VALID') AS checked_in_at
   FROM tickets t JOIN trips tr ON tr.id=t.trip_id JOIN payment_transactions p ON p.ticket_id=t.id
   LEFT JOIN ui_bookings b ON b.ticket_id=t.id LEFT JOIN ui_holds h ON h.id=b.hold_id LEFT JOIN ticket_requests q ON q.ticket_id=t.id WHERE p.status IN ('SUCCESS','REFUNDED')`;
@@ -680,6 +680,9 @@ const ticketDto = (t: any) => ({
   checkedInAt: t.checked_in_at ? iso(t.checked_in_at) : undefined,
   request: t.request ?? undefined,
   exchangeTripId: t.target_trip_id ?? undefined,
+  bankName: t.bank_name ?? undefined,
+  bankAccountNumber: t.bank_account_number ?? undefined,
+  accountHolderName: t.account_holder_name ?? undefined,
 });
 router.get(
   '/tickets',
@@ -704,7 +707,7 @@ router.get(
 router.post(
   '/tickets/:id/requests',
   api(async req => {
-    const { kind, exchangeTripId } = req.body;
+    const { kind, exchangeTripId, bankName, bankAccountNumber, accountHolderName } = req.body;
     if (!['cancel', 'exchange'].includes(kind)) fail('Loại yêu cầu không hợp lệ.');
     await transaction(async client => {
       const {
@@ -731,9 +734,21 @@ router.post(
         )
           fail('Chọn chuyến khác cùng tuyến và cùng giá vé.');
       }
+      const {
+        rows: [existingRequest],
+      } = await client.query('SELECT 1 FROM ticket_requests WHERE ticket_id=$1', [ticket.id]);
+      if (existingRequest) fail('Vé đang chờ xử lý yêu cầu hủy/đổi.', 409);
+
       await client.query(
-        'INSERT INTO ticket_requests(ticket_id,kind,target_trip_id) VALUES($1,$2,$3)',
-        [ticket.id, kind, kind === 'exchange' ? exchangeTripId : null]
+        'INSERT INTO ticket_requests(ticket_id,kind,target_trip_id,bank_name,bank_account_number,account_holder_name) VALUES($1,$2,$3,$4,$5,$6)',
+        [
+          ticket.id,
+          kind,
+          kind === 'exchange' ? exchangeTripId : null,
+          bankName || null,
+          bankAccountNumber || null,
+          accountHolderName || null,
+        ]
       );
     });
     const [t] = await query<any[]>(ticketsSql + ' AND t.id=$1', [req.params.id]);

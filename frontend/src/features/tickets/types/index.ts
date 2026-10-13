@@ -10,4 +10,7 @@ export interface Ticket {
   checkedInAt?: string;
   request?: 'cancel' | 'exchange';
   exchangeTripId?: string;
+  bankName?: string;
+  bankAccountNumber?: string;
+  accountHolderName?: string;
 }

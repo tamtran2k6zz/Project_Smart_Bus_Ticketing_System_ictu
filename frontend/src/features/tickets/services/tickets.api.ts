@@ -16,7 +16,13 @@ export const ticketsApi = {
       if (!t) throw new Error('Không tìm thấy vé của bạn.');
       return t;
     }),
-  request: (id: string, userId: string, kind: 'cancel' | 'exchange', exchangeTripId?: string) =>
+  request: (
+    id: string,
+    userId: string,
+    kind: 'cancel' | 'exchange',
+    exchangeTripId?: string,
+    bankDetails?: { bankName?: string; bankAccountNumber?: string; accountHolderName?: string }
+  ) =>
     service<Ticket>(
       '/tickets/' + id + '/requests',
       db => {
@@ -39,6 +45,11 @@ export const ticketsApi = {
         }
         t.request = kind;
         t.exchangeTripId = exchangeTripId;
+        if (bankDetails) {
+          t.bankName = bankDetails.bankName;
+          t.bankAccountNumber = bankDetails.bankAccountNumber;
+          t.accountHolderName = bankDetails.accountHolderName;
+        }
         audit(db, userId, 'Yêu cầu ' + kind + ' ' + id);
         notify(
           db,
@@ -50,7 +61,7 @@ export const ticketsApi = {
         return t;
       },
       'POST',
-      { kind, exchangeTripId }
+      { kind, exchangeTripId, ...bankDetails }
     ),
   requests: (userId: string) =>
     service<Ticket[]>('/ticket-requests', db => {
