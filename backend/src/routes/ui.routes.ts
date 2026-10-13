@@ -734,8 +734,13 @@ router.post(
         )
           fail('Chọn chuyến khác cùng tuyến và cùng giá vé.');
       }
+      const {
+        rows: [existingRequest],
+      } = await client.query('SELECT 1 FROM ticket_requests WHERE ticket_id=$1', [ticket.id]);
+      if (existingRequest) fail('Vé đang chờ xử lý yêu cầu hủy/đổi.', 409);
+
       await client.query(
-        'INSERT INTO ticket_requests(ticket_id,kind,target_trip_id,bank_name,bank_account_number,account_holder_name) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(ticket_id) DO UPDATE SET kind=$2,target_trip_id=$3,bank_name=$4,bank_account_number=$5,account_holder_name=$6',
+        'INSERT INTO ticket_requests(ticket_id,kind,target_trip_id,bank_name,bank_account_number,account_holder_name) VALUES($1,$2,$3,$4,$5,$6)',
         [
           ticket.id,
           kind,
