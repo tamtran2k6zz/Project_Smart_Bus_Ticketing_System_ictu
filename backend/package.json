@@ -19,6 +19,8 @@
     "test:serverless": "node scripts/test-serverless.cjs",
     "db:create-admin": "node scripts/create-admin.cjs",
     "db:seed-seats": "node scripts/seed_seats.js",
+    "db:seed-oct13": "node scripts/seed-trips-oct13.js",
+    "test:oct13": "node scripts/test-oct13-trips.cjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

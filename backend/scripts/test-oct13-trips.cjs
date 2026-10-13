@@ -44,7 +44,7 @@ async function main() {
 
   const app = require('../dist/app').default;
 
-  console.log('Seeding 10 trips departing at 15:00 on October 13, 2026...');
+  console.log('Seeding 10 trips departing at 16:00 on October 13, 2026...');
 
   // Create route, bus, driver
   const routeId = 'route-oct13-1';
@@ -83,8 +83,8 @@ async function main() {
   `, [passengerId]);
 
   const tripIds = [];
-  const departureTime = '2026-10-13T15:00:00+07:00';
-  const arrivalTime = '2026-10-13T21:00:00+07:00';
+  const departureTime = '2026-10-13T16:00:00+07:00';
+  const arrivalTime = '2026-10-13T22:00:00+07:00';
 
   for (let i = 1; i <= 10; i++) {
     const tripId = `trip-oct13-${i}`;
@@ -96,12 +96,12 @@ async function main() {
     `, [tripId, routeId, busId, driverId, departureTime, arrivalTime]);
   }
 
-  console.log(`Successfully seeded ${tripIds.length} trips departing at 2026-10-13 15:00:00+07:00.`);
+  console.log(`Successfully seeded ${tripIds.length} trips departing at 2026-10-13 16:00:00+07:00.`);
 
   // Verify trips can be queried
   const { rows: trips } = await db.query('SELECT id, departure_time, status FROM trips WHERE route_id=$1', [routeId]);
   assert.equal(trips.length, 10);
-  console.log('Verified: All 10 trips exist in database with departure time 2026-10-13 15:00:00+07:00.');
+  console.log('Verified: All 10 trips exist in database with departure time 2026-10-13 16:00:00+07:00.');
 
   // Test ticket check-in (soát vé) workflow for one of the trips
   const testTripId = tripIds[0];
