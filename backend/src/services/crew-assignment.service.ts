@@ -9,8 +9,7 @@ export async function assignCrew(data: any) {
       rows: [trip],
     } = await client.query('SELECT * FROM trips WHERE id=$1 FOR UPDATE', [data.tripId]);
     if (!trip) fail('Không tìm thấy chuyến.', 404);
-    if (trip.status !== 'SCHEDULED')
-      fail('Chỉ phân công chuyến chưa chạy.', 409);
+    if (trip.status !== 'SCHEDULED') fail('Chỉ phân công chuyến chưa chạy.', 409);
     const {
       rows: [bus],
     } = await client.query("SELECT * FROM buses WHERE id=$1 AND status='READY' FOR UPDATE", [
