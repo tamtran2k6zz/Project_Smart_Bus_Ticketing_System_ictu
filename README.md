@@ -415,8 +415,9 @@ sequenceDiagram
 - **Xác nhận:** backend kiểm tra callback, chữ ký, số tiền và mã giao dịch. Frontend đọc trạng thái từ API; tham số URL không tự phát hành vé.
 - **Thử lại / đổi cổng:** khi giữ chỗ còn hiệu lực, khách có thể mở lại cổng hoặc đổi phương thức. Đổi cổng tạo mã giao dịch mới, giữ nguyên ghế và hạn giữ chỗ. Thành công đến muộn từ giao dịch cũ đi qua xử lý hoàn tiền, không phát hành thêm vé.
 - **Hết hạn:** ghế được giải phóng, khách cần đặt lại. Không đổi cổng cho vé đã thanh toán hoặc đặt chỗ đã đóng.
-- **Hủy / đổi:** giao diện mới gửi yêu cầu trước khởi hành hơn 30 phút, khi vé chưa soát; điều hành/quản trị xét duyệt tại `/admin/support`. Đổi chuyến cần cùng tuyến, cùng giá và còn đủ ghế.
+- **Hủy / đổi:** giao diện mới gửi yêu cầu trước khởi hành hơn 30 phút, khi vé chưa soát; điều hành/quản trị xét duyệt tại `/admin/support`. Đổi chuyến cần cùng tuyến, cùng giá và còn đủ ghế. Khi gửi yêu cầu hủy vé, hành khách có thể nhập thông tin tài khoản ngân hàng (tên ngân hàng, số tài khoản, chủ tài khoản) để nhà xe thuận tiện chuyển khoản hoàn tiền (đặc biệt hữu ích với thanh toán chuyển khoản thủ công hoặc tiền mặt).
 - **Hoàn tiền:** trạng thái hủy được ghi trước lời gọi provider. Khi hoàn chưa thành công, vé vẫn đã hủy; API legacy có thể trả `ticketStatus=CANCELLED`, `refundPending=true` để tiếp tục bằng cùng yêu cầu hoàn tiền.
+- **Giải phóng chuyến định kỳ:** Tiến trình nền tại `server.ts` tự động kiểm tra và chuyển các chuyến `SCHEDULED` hoặc `IN_TRANSIT` đã qua thời gian đến dự kiến (`arrival_time <= NOW()`) sang trạng thái `COMPLETED` định kỳ mỗi 60 giây.
 
 Callback chuẩn, tính từ origin API công khai:
 
