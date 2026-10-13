@@ -30,6 +30,7 @@ jobs:
           npm run test -- --runInBand
           npm run build
           npm run test:postgres
+          npm run test:trip-cleanup
           npm run test:serverless
 
       # Kiểm tra Frontend

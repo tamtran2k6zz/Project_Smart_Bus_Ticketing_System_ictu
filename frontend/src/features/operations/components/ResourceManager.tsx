@@ -7,11 +7,7 @@ import {
   type DataField,
   type DataColumn,
 } from '@/components/data-display/DataManager';
-import {
-  Button,
-  Card,
-  ActionMessage,
-} from '@/components/ui/Ui';
+import { Button, Card, ActionMessage } from '@/components/ui/Ui';
 import { useSession } from '@/store/session.store';
 import { operationsApi, type Resource } from '../services/operations.api';
 import { resourceSchemas } from '../schemas/resources';
@@ -177,8 +173,8 @@ export function ResourceManager({ resource }: { resource: Resource }) {
     assignments: 'Phân công chuyến',
   };
   const cleanupAction = useAction(
-    async () => await operationsApi.cleanupOldTrips(user.id, 7),
-    'Đã giải phóng thành công các chuyến xe quá hạn (> 1 tuần).'
+    async () => await operationsApi.cleanupOldTrips(user.id),
+    result => result.message
   );
   return (
     <>
@@ -190,10 +186,13 @@ export function ResourceManager({ resource }: { resource: Resource }) {
               <div>
                 <strong>Giải phóng chuyến xe cũ quá hạn</strong>
                 <p className="muted" style={{ margin: 0 }}>
-                  Chuyển trạng thái các chuyến xe có thời gian khởi hành quá 1 tuần (7 ngày) sang hoàn thành.
+                  Hoàn tất các chuyến chờ chạy hoặc đang chạy đã qua giờ đến dự kiến.
                 </p>
               </div>
-              <Button disabled={cleanupAction.isPending} onClick={() => cleanupAction.mutate(undefined)}>
+              <Button
+                disabled={cleanupAction.isPending}
+                onClick={() => cleanupAction.mutate(undefined)}
+              >
                 {cleanupAction.isPending ? 'Đang xử lý...' : 'Giải phóng chuyến xe quá hạn'}
               </Button>
             </div>

@@ -207,17 +207,16 @@ export async function holdSeat(tripId: string, seatNumber: string, userId: strin
 }
 
 /**
- * Tự động giải phóng/hoàn tất các chuyến xe có thời gian khởi hành quá 1 tuần (7 ngày)
- * chuyển trạng thái từ SCHEDULED sang COMPLETED.
+ * Hoàn tất chuyến chờ chạy/đang chạy đã qua giờ đến dự kiến.
  */
-export async function cleanupOldTrips(daysThreshold = 7): Promise<number> {
+export async function cleanupOldTrips(): Promise<number> {
   const updated = await query<Array<{ id: string }>>(
     `UPDATE trips
      SET status = 'COMPLETED'
-     WHERE status = 'SCHEDULED'
-       AND departure_time < NOW() - ($1::text || ' days')::interval
+     WHERE status IN ('SCHEDULED', 'IN_TRANSIT')
+       AND arrival_time <= NOW()
      RETURNING id`,
-    [daysThreshold]
+    []
   );
   return updated.length;
 }

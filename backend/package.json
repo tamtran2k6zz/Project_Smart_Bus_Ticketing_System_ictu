@@ -17,6 +17,7 @@
     "test:cov": "jest --coverage",
     "db:migrate": "node scripts/migrate-postgres.cjs",
     "test:postgres": "node scripts/test-postgres.cjs",
+    "test:trip-cleanup": "node scripts/test-trip-cleanup.cjs",
     "test:serverless": "node scripts/test-serverless.cjs",
     "db:create-admin": "node scripts/create-admin.cjs",
     "db:seed-seats": "node scripts/seed_seats.js",

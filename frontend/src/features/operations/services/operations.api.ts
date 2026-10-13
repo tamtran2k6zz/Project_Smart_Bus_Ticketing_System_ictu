@@ -288,22 +288,28 @@ export const operationsApi = {
       'PUT',
       { resolved: true }
     ),
-  cleanupOldTrips: (userId: string, days = 7) =>
+  cleanupOldTrips: (userId: string) =>
     service(
       '/operations/cleanup-old-trips',
       db => {
         if (!can(requireUser(db, userId), 'operations')) throw new Error('Không có quyền.');
         let count = 0;
-        const cutoff = Date.now() - days * 86400_000;
+        const cutoff = Date.now();
         db.trips.forEach(t => {
-          if (t.status === 'scheduled' && new Date(t.departure).getTime() < cutoff) {
+          if (
+            ['scheduled', 'running'].includes(t.status) &&
+            Date.parse(t.departure) + t.duration * 60_000 <= cutoff
+          ) {
             t.status = 'completed';
             count++;
           }
         });
-        return { success: true, oldTripsCleaned: count, message: `Đã hoàn tất ${count} chuyến xe quá hạn.` };
+        return {
+          success: true,
+          oldTripsCleaned: count,
+          message: `Đã hoàn tất ${count} chuyến xe đã qua giờ đến dự kiến.`,
+        };
       },
-      'POST',
-      { days }
+      'POST'
     ),
 };

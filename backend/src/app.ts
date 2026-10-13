@@ -6,6 +6,7 @@ import routesRoutes from './routes/routes.routes';
 import stopsRoutes from './routes/stops.routes';
 import tripsRoutes from './routes/trips.routes';
 import operationsRoutes from './routes/operations.routes';
+import tripCleanupRoutes from './routes/trip-cleanup.routes';
 import ticketingRoutes from './routes/ticketing.routes';
 import seatsRoutes from './routes/seats.routes';
 import usersRoutes from './routes/users.routes';
@@ -36,6 +37,8 @@ app.use(
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 app.use('/api', auditRequests);
+// Static actions must precede the UI router's /operations/:key resource routes.
+app.use('/api/smartbus/v1/operations', tripCleanupRoutes);
 app.use('/api/smartbus/v1', uiRoutes);
 app.get('/api/health', async (_req, res) => {
   const database = describeDatabaseTarget();

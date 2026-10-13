@@ -971,7 +971,7 @@ async function releaseExpiredHandler(req: Request, res: Response): Promise<void>
     const affectedRows = await releaseExpiredReservations();
     const ticketEmailsSent = await processPendingTicketEmails(1);
     const refundsCompleted = await processRefundJobs(10);
-    const oldTripsCleaned = await cleanupOldTrips(7);
+    const oldTripsCleaned = await cleanupOldTrips();
     res.json({ success: true, affectedRows, ticketEmailsSent, refundsCompleted, oldTripsCleaned });
   } catch (error) {
     logger.error('expiry_cleanup_failed', {
