@@ -4,6 +4,7 @@ export const rolePermissions: Record<Role, Permission[]> = {
   DRIVER: ['check-in'],
   MANAGER: ['operations', 'check-in', 'support', 'eligibility', 'reports'],
   FINANCE: ['reports', 'promotions'],
+  MARKETING: ['promotions'],
   ADMIN: [
     'operations',
     'check-in',
@@ -22,5 +23,6 @@ export const roleLabels: Record<Role, string> = {
   DRIVER: 'Tài xế / phụ xe',
   MANAGER: 'Điều hành',
   FINANCE: 'Tài chính',
+  MARKETING: 'Marketing',
   ADMIN: 'Quản trị viên',
 };

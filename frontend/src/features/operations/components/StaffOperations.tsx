@@ -75,8 +75,9 @@ export function Incidents() {
   const query = useQuery({ queryKey: ['incidents'], queryFn: () => operationsApi.incidents() });
   const [tripId, setTripId] = useState(''),
     [message, setMessage] = useState('');
+  const [delayMinutes, setDelayMinutes] = useState(0);
   const report = useAction(async () => {
-    await operationsApi.reportIncident(user.id, tripId, message);
+    await operationsApi.reportIncident(user.id, tripId, message, delayMinutes);
     setMessage('');
   }, 'Đã ghi nhận sự cố. Màn hình tracking đã được cập nhật.');
   const resolve = useAction(
@@ -115,6 +116,15 @@ export function Incidents() {
               value={message}
               onChange={e => setMessage(e.target.value)}
               placeholder="Ví dụ: Xe chậm 10 phút do tắc đường tại…"
+            />
+          </Field>
+          <Field label="Trễ dự kiến (phút)">
+            <input
+              type="number"
+              min={0}
+              max={1440}
+              value={delayMinutes}
+              onChange={e => setDelayMinutes(Number(e.target.value))}
             />
           </Field>
           <Button disabled={report.isPending}>Báo sự cố</Button>

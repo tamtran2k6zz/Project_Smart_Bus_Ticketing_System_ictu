@@ -44,7 +44,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' | 'forgot' }) {
     ),
     defaultValues: { email: '', password: '', name: '', phone: '' },
   });
-  const testAccounts = appConfig.demo ? demoTestAccounts : apiTestAccounts;
+  const testAccounts = appConfig.demo || appConfig.localDemo ? demoTestAccounts : apiTestAccounts;
   const finish = (user: User) => {
     setUser(user);
     client.clear();
@@ -57,11 +57,13 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' | 'forgot' }) {
     }
     const redirect = params.get('redirect');
     let target =
-      user.role === 'DRIVER'
-        ? '/staff/trips'
-        : ['ADMIN', 'MANAGER', 'FINANCE'].includes(user.role)
-          ? '/admin'
-          : '/account/tickets';
+      user.role === 'MARKETING'
+        ? '/admin/promotions'
+        : user.role === 'DRIVER'
+          ? '/staff/trips'
+          : ['ADMIN', 'MANAGER', 'FINANCE', 'MARKETING'].includes(user.role)
+            ? '/admin'
+            : '/account/tickets';
     if (redirect?.startsWith('/')) {
       const url = new URL(redirect, window.location.origin);
       if (url.origin === window.location.origin) target = url.pathname + url.search + url.hash;
@@ -92,9 +94,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' | 'forgot' }) {
       </h1>
       <p>
         {mode === 'forgot'
-          ? appConfig.demo
-            ? 'Nhập email để gửi yêu cầu khôi phục.'
-            : 'Khôi phục mật khẩu trực tuyến chưa mở. Vui lòng liên hệ nhà xe để được hỗ trợ tài khoản.'
+          ? 'Nhập email tài khoản để nhận liên kết đặt lại mật khẩu. Liên kết có hiệu lực 30 phút và chỉ dùng một lần.'
           : 'Quản lý vé và hành trình của bạn trong một nơi.'}
       </p>
       <form
@@ -159,7 +159,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' | 'forgot' }) {
         )}
         <Message error>{error}</Message>
         <Message>{success}</Message>
-        <Button disabled={busy || (mode === 'forgot' && !appConfig.demo)}>
+        <Button disabled={busy}>
           {busy
             ? 'Đang xử lý…'
             : mode === 'login'

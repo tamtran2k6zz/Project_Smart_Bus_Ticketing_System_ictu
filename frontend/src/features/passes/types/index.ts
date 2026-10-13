@@ -4,7 +4,10 @@ export interface Pass {
   routeId: string;
   expiresAt: string;
   price: number;
-  status: 'active' | 'pending';
+  status: 'active' | 'pending' | 'revoked';
+  token?: string;
+  redirectUrl?: string;
+  orderId?: string;
 }
 export interface Eligibility {
   id: string;

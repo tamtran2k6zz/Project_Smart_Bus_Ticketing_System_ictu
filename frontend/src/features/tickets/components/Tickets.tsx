@@ -216,7 +216,19 @@ export function TicketDetail() {
   }, 'Đã gửi yêu cầu, vui lòng chờ điều hành xử lý.');
   const invoice = useAction(async () => {
     const b = booking.data!;
-    await paymentApi.invoice(b.id, user.id);
+    const issued = await paymentApi.invoice(b.id, user.id);
+    if (!appConfig.demo) {
+      const response = await fetch(
+        appConfig.apiUrl + '/bookings/' + encodeURIComponent(b.id) + '/invoice',
+        {
+          headers: { Authorization: 'Bearer ' + sessionStorage.getItem('smartbus.accessToken.v1') },
+        }
+      );
+      if (!response.ok)
+        throw new Error('Hóa đơn đã gửi, nhưng chưa tải được bản lưu. Vui lòng thử lại.');
+      download(await response.blob(), 'smartbus-invoice-' + (issued.number || b.id) + '.html');
+      return;
+    }
     const blob = await createPdf(
       appConfig.demo ? 'SmartBus · Biên nhận DEMO' : 'SmartBus · Biên nhận thanh toán',
       [
@@ -334,7 +346,7 @@ export function TicketDetail() {
                     onClick={() => invoice.mutate(undefined)}
                   >
                     <Download size={16} />
-                    Yêu cầu & tải chứng từ{appConfig.demo ? ' demo' : ''}
+                    Yêu cầu & tải {appConfig.demo ? 'chứng từ demo' : 'hóa đơn điện tử'}
                   </Button>
                 )}
                 {eligible && (
@@ -359,9 +371,9 @@ export function TicketDetail() {
         title={modal === 'cancel' ? 'Yêu cầu hủy vé' : 'Yêu cầu đổi chuyến'}
       >
         <p className="muted">
-          Gửi yêu cầu trước khởi hành ít nhất 30 phút. Khi được duyệt, hủy vé sẽ hoàn tiền qua cổng
-          thanh toán rồi trả ghế về chuyến. Đổi vé áp dụng cho chuyến cùng tuyến, cùng giá còn đủ
-          ghế. QR tạm ngừng sử dụng trong lúc chờ duyệt.
+          Gửi yêu cầu trước khởi hành ít nhất 30 phút. Khi được duyệt, vé bị hủy và ghế được trả về
+          chuyến; hệ thống gửi yêu cầu hoàn tiền và cập nhật kết quả từ cổng thanh toán. Đổi vé áp
+          dụng cho chuyến cùng tuyến, cùng giá còn đủ ghế. QR tạm ngừng sử dụng trong lúc chờ duyệt.
         </p>
         {modal === 'cancel' && b && (
           <div className="stack" style={{ gap: 8, margin: '16px 0' }}>

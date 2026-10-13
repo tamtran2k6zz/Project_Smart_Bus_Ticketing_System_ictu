@@ -1,9 +1,39 @@
 import { service } from '@/services/adapter';
-import { audit, requireUser } from '@/services/mocks/database';
+import { audit, requireUser, uid } from '@/services/mocks/database';
 import { can, rolePermissions } from '@/configs/permissions';
 import type { User, Role, Permission } from '@/features/auth/types';
 import type { Audit } from '../types';
 export const adminApi = {
+  create: (
+    actor: string,
+    data: { name: string; email: string; phone: string; password: string; role: Role }
+  ) =>
+    service<User>(
+      '/users',
+      db => {
+        if (!can(requireUser(db, actor), 'users')) throw new Error('Không có quyền.');
+        if (
+          data.password.length < 10 ||
+          db.users.some(u => u.email.toLowerCase() === data.email.toLowerCase())
+        )
+          throw new Error('Mật khẩu quá ngắn hoặc email đã tồn tại.');
+        const user: User = {
+          id: uid('u'),
+          name: data.name,
+          email: data.email.toLowerCase(),
+          phone: data.phone,
+          role: data.role,
+          active: true,
+          permissions: [...rolePermissions[data.role]],
+        };
+        db.users.push(user);
+        db.credentials[user.id] = data.password;
+        audit(db, actor, 'Tạo tài khoản ' + user.id);
+        return user;
+      },
+      'POST',
+      data
+    ),
   users: (userId: string) =>
     service<User[]>('/users', db => {
       if (!can(requireUser(db, userId), 'users')) throw new Error('Không có quyền.');

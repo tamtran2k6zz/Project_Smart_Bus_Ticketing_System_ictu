@@ -69,6 +69,15 @@ export const authApi = {
       { name, phone }
     ),
   logout: () => service('/auth/logout', () => true, 'POST'),
+  resetPassword: (token: string, password: string) =>
+    service<{ message: string }>(
+      '/auth/reset-password',
+      () => {
+        throw new Error('Đặt lại mật khẩu qua email cần chế độ API.');
+      },
+      'POST',
+      { token, password }
+    ),
   verifyEmail: (token: string) =>
     service<{ email: string; message: string }>(
       '/auth/verify-email',

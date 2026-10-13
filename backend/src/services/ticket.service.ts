@@ -311,7 +311,7 @@ export async function validateTicketQr(
         rows: [ticket],
       } = await client.query<any>(
         `SELECT t.*,u.full_name,u.email,r.name AS route_name,r.code AS route_code,
-                tr.driver_id,tr.departure_time,tr.arrival_time,tr.status AS trip_status,
+                tr.driver_id,tr.conductor_id,tr.departure_time,tr.arrival_time,tr.status AS trip_status,
                 p.status AS payment_status,q.kind AS pending_request
          FROM tickets t LEFT JOIN users u ON u.id=t.user_id
          JOIN trips tr ON tr.id=t.trip_id JOIN routes r ON r.id=tr.route_id
@@ -327,7 +327,11 @@ export async function validateTicketQr(
       };
       if (!['ADMIN', 'MANAGER', 'DRIVER'].includes(input.validatedRole ?? ''))
         reject(403, 'Không có quyền soát vé.', 'FORBIDDEN');
-      if (input.validatedRole === 'DRIVER' && ticket.driver_id !== input.validatedBy)
+      if (
+        input.validatedRole === 'DRIVER' &&
+        ticket.driver_id !== input.validatedBy &&
+        ticket.conductor_id !== input.validatedBy
+      )
         reject(403, 'Chuyến chưa được phân công cho bạn.', 'DRIVER_NOT_ASSIGNED');
 
       // --- Bảo mật QR (Sprint 3) — chạy trước mọi ràng buộc nghiệp vụ ---

@@ -1,4 +1,5 @@
 export interface SupportRequest {
+  tripId?: string;
   id: string;
   userId: string;
   subject: string;

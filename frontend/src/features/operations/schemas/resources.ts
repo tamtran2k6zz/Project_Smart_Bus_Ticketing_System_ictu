@@ -32,5 +32,10 @@ export const resourceSchemas = {
     vehicleId: id,
     status: z.enum(['scheduled', 'running', 'completed']),
   }),
-  assignments: z.object({ tripId: id, vehicleId: id, staffId: id }),
+  assignments: z.object({
+    tripId: id,
+    vehicleId: id,
+    staffId: id,
+    conductorId: z.string().optional(),
+  }),
 };

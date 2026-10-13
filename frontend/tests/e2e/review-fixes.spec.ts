@@ -24,7 +24,7 @@ test('intermediate journey reaches checkout and expired QR disappears without re
   page,
 }) => {
   await page.goto('/login');
-  await page.getByRole('button', { name: 'Hành khách', exact: true }).click();
+  await page.getByRole('button', { name: /^Hành khách / }).click();
   await expect(page.getByRole('button', { name: 'Đăng xuất' })).toBeVisible();
   await page.goto('/trips');
   await page.getByLabel('Điểm đi', { exact: true }).selectOption({ label: 'Đại học ICTU' });
@@ -35,7 +35,7 @@ test('intermediate journey reaches checkout and expired QR disappears without re
   await page.getByRole('link', { name: 'Xem chuyến' }).first().click();
   await page.getByRole('link', { name: 'Đặt vé chuyến này' }).click();
   await page.getByRole('button', { name: 'Ghế 01', exact: true }).click();
-  await page.getByRole('button', { name: 'Giữ chỗ 10 phút' }).click();
+  await page.getByRole('button', { name: 'ĐẶT CHỖ' }).click();
   await expect(page.getByText('Chỗ đang được giữ cho bạn')).toBeVisible();
   const bookingUrl = page.url();
   const changedUrl = new URL(bookingUrl);
@@ -49,7 +49,7 @@ test('intermediate journey reaches checkout and expired QR disappears without re
   const summary = page.getByRole('region', { name: 'Thông tin chuyến đã chọn' });
   await expect(summary).toContainText('Đại học ICTU');
   await expect(summary).toContainText('Hồ Núi Cốc');
-  await expect(summary).toContainText('Khởi hành tại đầu tuyến');
+  await expect(summary).toContainText('Giờ đón dự kiến tại trạm');
   await page.getByRole('button', { name: /Khởi tạo giao dịch demo/ }).click();
   await page.getByRole('button', { name: 'Mô phỏng thành công', exact: true }).click();
   await page.goto('/account/tickets');

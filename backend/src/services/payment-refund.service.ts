@@ -1,10 +1,12 @@
+import { refundZalopay } from './zalopay.service';
+import { localDemoEnabled } from '../config/demo';
 import { createHmac } from 'crypto';
 import { readEnv } from '../config/env';
 import { appLogger } from '../config/logger';
 
 const logger = appLogger.child('refund');
 
-export type RefundPaymentMethod = 'VNPAY' | 'MOMO';
+export type RefundPaymentMethod = 'VNPAY' | 'MOMO' | 'ZALOPAY';
 
 export interface RefundPayment {
   paymentMethod: RefundPaymentMethod;
@@ -27,12 +29,20 @@ export class PaymentRefundError extends Error {
 
 export class PaymentRefundService {
   async refund(payment: RefundPayment): Promise<void> {
+    if (localDemoEnabled()) {
+      logger.info('local_demo_refund', {
+        order_id: payment.bookingCode,
+        amount_vnd: payment.amount,
+      });
+      return;
+    }
     if (!payment.gatewayTransactionId) {
       throw new PaymentRefundError('Giao dịch chưa có mã giao dịch thực từ cổng thanh toán.', 400);
     }
     if (!Number.isSafeInteger(payment.amount) || payment.amount <= 0) {
       throw new PaymentRefundError('Số tiền hoàn phải là số nguyên dương VND.', 400);
     }
+    if (payment.paymentMethod === 'ZALOPAY') return refundZalopay(payment);
     if (payment.paymentMethod === 'VNPAY') return this.refundVnpay(payment);
     if (payment.paymentMethod === 'MOMO') return this.refundMomo(payment);
     throw new PaymentRefundError('Chưa hỗ trợ hoàn tiền cho cổng này.', 400);

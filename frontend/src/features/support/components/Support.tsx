@@ -7,6 +7,7 @@ import { useSession } from '@/store/session.store';
 import { useAction } from '@/hooks/useAction';
 import { supportApi } from '../services/support.api';
 import { ticketsApi } from '@/features/tickets/services/tickets.api';
+import { operationsApi } from '@/features/operations/services/operations.api';
 import {
   PageTitle,
   Card,
@@ -22,9 +23,16 @@ const schema = z.object({
   subject: z.string().trim().min(3, 'Tiêu đề ít nhất 3 ký tự'),
   message: z.string().trim().min(10, 'Nội dung ít nhất 10 ký tự'),
   rating: z.coerce.number().min(1).max(5),
+  tripId: z.string(),
 });
 export function Support({ admin = false }: { admin?: boolean }) {
   const user = useSession(s => s.user)!;
+  const owned = useQuery({
+    queryKey: ['tickets', user.id],
+    queryFn: () => ticketsApi.list(user.id),
+    enabled: !admin,
+  });
+  const catalog = useQuery({ queryKey: ['catalog'], queryFn: operationsApi.catalog });
   const query = useQuery({
     queryKey: ['support', user.id, admin],
     queryFn: () => supportApi.list(user.id, admin),
@@ -36,10 +44,10 @@ export function Support({ admin = false }: { admin?: boolean }) {
   });
   const form = useForm<z.input<typeof schema>, unknown, z.output<typeof schema>>({
     resolver: zodResolver(schema),
-    defaultValues: { subject: '', message: '', rating: 5 },
+    defaultValues: { subject: '', message: '', rating: 5, tripId: '' },
   });
   const send = useAction(async (v: z.output<typeof schema>) => {
-    await supportApi.send(user.id, v.subject, v.message, v.rating);
+    await supportApi.send(user.id, v.subject, v.message, v.rating, v.tripId || undefined);
     form.reset();
   }, 'Đã gửi phản ánh. Theo dõi phản hồi bên dưới.');
   const [selected, setSelected] = useState(''),
@@ -71,6 +79,21 @@ export function Support({ admin = false }: { admin?: boolean }) {
                 {[5, 4, 3, 2, 1].map(n => (
                   <option key={n} value={n}>
                     {n} / 5 sao
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Chuyến được đánh giá (tùy chọn)">
+              <select {...form.register('tripId')}>
+                <option value="">Phản ánh chung</option>
+                {[
+                  ...new Set(owned.data?.filter(t => t.status !== 'canceled').map(t => t.tripId)),
+                ].map(id => (
+                  <option key={id} value={id}>
+                    {catalog.data?.trips.find(t => t.id === id)?.departure
+                      ? dateTime(catalog.data.trips.find(t => t.id === id)!.departure)
+                      : 'Chuyến đã đặt'}{' '}
+                    · {id}
                   </option>
                 ))}
               </select>
@@ -147,6 +170,7 @@ export function Support({ admin = false }: { admin?: boolean }) {
               <p>{s.message}</p>
               <p className="muted">
                 {dateTime(s.createdAt)} · Đánh giá {s.rating}/5
+                {s.tripId && <> · Chuyến {s.tripId}</>}
               </p>
               {s.reply && (
                 <div style={{ padding: 16, background: '#edf7ef', borderRadius: 10, fontSize: 13 }}>

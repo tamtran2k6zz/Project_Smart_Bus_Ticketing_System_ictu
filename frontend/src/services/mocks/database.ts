@@ -44,23 +44,24 @@ export interface Database {
 export const uid = (prefix: string) => prefix + '-' + crypto.randomUUID();
 export const iso = () => new Date().toISOString();
 export function seed(): Database {
-  const users: User[] = (['PASSENGER', 'DRIVER', 'MANAGER', 'FINANCE', 'ADMIN'] as const).map(
-    (role, i) => ({
-      id: 'u' + i,
-      name: [
-        'Nguyễn Minh Anh',
-        'Trần Văn Hùng',
-        'Lê Thu Hà',
-        'Phạm Thanh Mai',
-        'Quản trị SmartBus',
-      ][i],
-      email: role.toLowerCase() + '@smartbus.demo',
-      phone: '090123456' + i,
-      role,
-      active: true,
-      permissions: [...rolePermissions[role]],
-    })
-  );
+  const users: User[] = (
+    ['PASSENGER', 'DRIVER', 'MANAGER', 'FINANCE', 'ADMIN', 'MARKETING'] as const
+  ).map((role, i) => ({
+    id: 'u' + i,
+    name: [
+      'Nguyễn Minh Anh',
+      'Trần Văn Hùng',
+      'Lê Thu Hà',
+      'Phạm Thanh Mai',
+      'Quản trị SmartBus',
+      'Marketing SmartBus',
+    ][i],
+    email: role.toLowerCase() + '@smartbus.demo',
+    phone: '090123456' + i,
+    role,
+    active: true,
+    permissions: [...rolePermissions[role]],
+  }));
   const stops: Stop[] = [
     {
       id: 's1',

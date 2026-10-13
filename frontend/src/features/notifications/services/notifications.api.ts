@@ -21,7 +21,7 @@ export const notificationsApi = {
       'POST',
       { id }
     ),
-  subscribe: (userId: string, tripId: string) =>
+  subscribe: (userId: string, tripId: string, boardingStopId?: string, alightingStopId?: string) =>
     service(
       '/notifications/subscriptions',
       db => {
@@ -40,6 +40,6 @@ export const notificationsApi = {
         return true;
       },
       'POST',
-      { tripId }
+      { tripId, boardingStopId, alightingStopId }
     ),
 };

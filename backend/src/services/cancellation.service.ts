@@ -1,8 +1,7 @@
 import { transaction } from '../config/database';
 import { releaseSeatLock } from '../config/redis';
 import { BookingError } from './booking';
-import { PaymentRefundService } from './payment-refund.service';
-const refunds = new PaymentRefundService();
+import { enqueueRefund, processRefundJobs } from './refund-queue.service';
 export async function cancelTicket(
   id: string,
   userId: string,
@@ -17,6 +16,9 @@ export async function cancelTicket(
       [id]
     );
     if (!t) throw new BookingError(404, 'Không tìm thấy vé.');
+    await client.query('SELECT ticket_id FROM payment_transactions WHERE ticket_id=$1 FOR UPDATE', [
+      id,
+    ]);
     if (requireRequest) {
       const {
         rows: [pending],
@@ -34,26 +36,7 @@ export async function cancelTicket(
     if (t.ticket_status === 'CANCELLED') throw new BookingError(409, 'Vé đã được hủy.');
     if (t.payment_status === 'PENDING')
       throw new BookingError(409, 'Thanh toán đang chờ xác nhận.');
-    if (t.payment_status === 'SUCCESS') {
-      // A deterministic id survives a rollback after a successful gateway refund.
-      const refundRequestId = t.refund_request_id || t.id;
-      await client.query(
-        'UPDATE payment_transactions SET refund_request_id=$1 WHERE ticket_id=$2',
-        [refundRequestId, t.id]
-      );
-      await refunds.refund({
-        paymentMethod: t.payment_method,
-        amount: Math.round(Number(t.amount)),
-        gatewayTransactionId: t.gateway_transaction_id,
-        refundRequestId,
-        paidAt: t.paid_at ? new Date(t.paid_at) : null,
-        bookingCode: t.order_id,
-      });
-      await client.query(
-        "UPDATE payment_transactions SET status='REFUNDED' WHERE ticket_id=$1 AND status='SUCCESS'",
-        [t.id]
-      );
-    }
+    if (t.payment_status === 'SUCCESS') await enqueueRefund(client, t.id);
     await client.query("UPDATE tickets SET status='CANCELLED' WHERE id=$1", [t.id]);
     await client.query(
       `UPDATE trip_seats SET status='AVAILABLE',ticket_id=NULL,locked_at=NULL,lock_expires_at=NULL,locked_by_user_id=NULL,redis_lock_id=NULL WHERE ticket_id=$1`,
@@ -73,5 +56,6 @@ export async function cancelTicket(
     ticket.redis_lock_id || undefined
   ).catch(() => {});
 
+  await processRefundJobs(1, ticket.id);
   return { refundAmount: ticket.payment_status === 'SUCCESS' ? Number(ticket.amount) : 0 };
 }

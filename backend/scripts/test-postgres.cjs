@@ -14,6 +14,9 @@ process.env.PAYMENT_CRON_SECRET = 'test-cron-secret';
 process.env.VNPAY_TMN_CODE = 'test-tmn';
 process.env.VNPAY_HASH_SECRET = 'test-vnpay-secret';
 process.env.NODE_ENV = 'test';
+process.env.ZALOPAY_APP_ID = '9999';
+process.env.ZALOPAY_KEY1 = 'test-zalo-key1';
+process.env.ZALOPAY_KEY2 = 'test-zalo-key2';
 process.env.PAYMENT_DEMO_ENABLED = 'true';
 // The suite must not depend on a running Redis. Seat locking falls back to the
 // PostgreSQL row lock, which is the concurrency guard under test.
@@ -62,14 +65,17 @@ async function main() {
         }
       }
       res.end(
-        req.url === '/refund'
-          ? JSON.stringify({ resultCode: 0, message: 'Refund accepted' })
-          : JSON.stringify({ resultCode: 0, payUrl: 'https://sandbox.example.test/pay' })
+        req.url === '/zalo-create'
+          ? JSON.stringify({ return_code: 1, order_url: 'https://sandbox.example.test/zalo' })
+          : req.url === '/refund'
+            ? JSON.stringify({ resultCode: 0, message: 'Refund accepted' })
+            : JSON.stringify({ resultCode: 0, payUrl: 'https://sandbox.example.test/pay' })
       );
     });
   });
   await new Promise(resolve => gatewayServer.listen(0, '127.0.0.1', resolve));
   const gatewayAddress = gatewayServer.address();
+  process.env.ZALOPAY_CREATE_URL = 'http://127.0.0.1:' + gatewayAddress.port + '/zalo-create';
   process.env.MOMO_CREATE_URL = `http://127.0.0.1:${gatewayAddress.port}/create`;
   process.env.MOMO_REFUND_URL = `http://127.0.0.1:${gatewayAddress.port}/refund`;
   process.env.MOMO_IPN_URL = 'https://callbacks.example.test/api/v1/ticketing/payments/momo/ipn';
@@ -651,6 +657,28 @@ async function main() {
     assert.equal(failedRefund.refundPending, true);
     assert.equal(failedRefund.ticketStatus, 'CANCELLED');
     const refundKey = refundRequests.at(-1).requestId;
+    assert.equal(
+      (
+        await db.query('SELECT status FROM refund_jobs WHERE ticket_id=$1', [
+          retryReservation.ticketId,
+        ])
+      ).rows[0].status,
+      'pending'
+    );
+    const { processRefundJobs } = require('../dist/services/refund-queue.service');
+    assert.equal(
+      await processRefundJobs(1, retryReservation.ticketId),
+      1,
+      'durable worker retries the failed provider call'
+    );
+    assert.equal(
+      (
+        await db.query('SELECT status FROM refund_jobs WHERE ticket_id=$1', [
+          retryReservation.ticketId,
+        ])
+      ).rows[0].status,
+      'done'
+    );
     await call(
       'post',
       '/api/tickets/validate-qr',
@@ -722,10 +750,10 @@ async function main() {
       ).rows[0].status,
       'PENDING'
     );
-    // Preserve main's short callback grace period while the seats still belong
-    // to this reservation and have not been released or reassigned.
+    // On-time verified return confirms a reservation inside the ten-minute window.
+    // Expired reservations are covered separately and must be refunded.
     await db.query(
-      "UPDATE tickets SET reservation_expires_at=NOW()-INTERVAL '1 minute' WHERE id=$1",
+      "UPDATE tickets SET reservation_expires_at=NOW()+INTERVAL '1 minute' WHERE id=$1",
       [vnpayReservation.ticketId]
     );
     const vnpayReturn = await request(app)
@@ -985,6 +1013,9 @@ async function main() {
       404
     );
     process.env.NODE_ENV = 'test';
+    process.env.ZALOPAY_APP_ID = '9999';
+    process.env.ZALOPAY_KEY1 = 'test-zalo-key1';
+    process.env.ZALOPAY_KEY2 = 'test-zalo-key2';
     await call(
       'post',
       `/api/ticketing/bookings/${demoReservation.ticketId}/demo-complete`,
@@ -1214,7 +1245,7 @@ async function main() {
           "SELECT count(*)::int AS n FROM pg_tables WHERE schemaname='public' AND rowsecurity"
         )
       ).rows[0].n,
-      28
+      36
     );
     await require('./test-ui-contract.cjs')({
       app,
@@ -1238,6 +1269,16 @@ async function main() {
       admin,
       momoCallback,
     });
+    await require('./test-product-features.cjs')({
+      app,
+      db,
+      call,
+      request,
+      route,
+      admin,
+      momoCallback,
+    });
+    await require('./test-password-reset.cjs')({ db, call });
     await call('delete', `/api/routes/${route}`, null, admin);
     await call('delete', `/api/routes/${routeWithStops}`, null, admin);
     assert.equal((await call('get', '/api/routes')).data.length, 0);

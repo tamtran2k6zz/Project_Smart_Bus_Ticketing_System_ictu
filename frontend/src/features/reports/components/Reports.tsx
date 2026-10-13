@@ -1,3 +1,4 @@
+import { TransportStrategy } from './TransportStrategy';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Download } from 'lucide-react';
@@ -23,6 +24,8 @@ export const defaultFilter = (): ReportFilter => ({
   from: localDay(),
   to: localDay(new Date(Date.now() + 7 * 86400000)),
   routeId: '',
+  vehicleId: '',
+  groupBy: 'day',
 });
 export function Reports() {
   const user = useSession(s => s.user)!;
@@ -106,7 +109,29 @@ export function Reports() {
               ))}
             </select>
           </Field>
+          <Field label="Xe">
+            <select
+              value={draft.vehicleId || ''}
+              onChange={e => setDraft({ ...draft, vehicleId: e.target.value })}
+            >
+              <option value="">Tất cả xe</option>
+              {catalog.data?.vehicles.map(v => (
+                <option key={v.id} value={v.id}>
+                  {v.plate}
+                </option>
+              ))}
+            </select>
+          </Field>
           <div style={{ alignSelf: 'end' }}>
+            <Field label="Nhóm doanh thu">
+              <select
+                value={draft.groupBy || 'day'}
+                onChange={e => setDraft({ ...draft, groupBy: e.target.value as 'day' | 'month' })}
+              >
+                <option value="day">Theo ngày</option>
+                <option value="month">Theo tháng</option>
+              </select>
+            </Field>
             <Button>Áp dụng bộ lọc</Button>
           </div>
         </form>
@@ -198,6 +223,22 @@ export function Reports() {
           </div>
         )}
       </AsyncState>
+      {!appConfig.demo && (
+        <Card>
+          <h3>Doanh thu vé tháng</h3>
+          <p>{money(query.data?.passRevenue ?? 0)}</p>
+          <p className="muted">
+            Theo ngày thanh toán và tuyến; không phân bổ cho từng xe. Khi lọc một xe, vé tháng được
+            loại khỏi tổng này.
+          </p>
+          {query.data?.passSales?.map((s, i) => (
+            <p key={i}>
+              {s.date} · {s.route} · {s.orders} đơn · {money(s.revenue)}
+            </p>
+          ))}
+        </Card>
+      )}
+      <TransportStrategy filter={filter} />
     </>
   );
 }

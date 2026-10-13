@@ -7,6 +7,7 @@ export interface AuthUserPayload {
   email: string;
   fullName: string;
   role: string;
+  authVersion?: number;
 }
 
 export interface AuthenticatedRequest extends Request {
@@ -40,10 +41,12 @@ export const authenticateJWT = async (
       `SELECT u.*,COALESCE(r.name,u.role) AS current_role FROM users u LEFT JOIN roles r ON r.id=u.role_id WHERE u.id=$1`,
       [decoded.id]
     );
-    if (!user || user.status !== 'ACTIVE') {
-      res
-        .status(401)
-        .json({ success: false, message: 'Tài khoản đã khóa hoặc không còn hoạt động.' });
+    if (!user || user.status !== 'ACTIVE' || (decoded.authVersion ?? 0) !== user.auth_version) {
+      res.status(401).json({
+        success: false,
+        message:
+          'Phiên đăng nhập đã hết hiệu lực hoặc tài khoản không hoạt động. Vui lòng đăng nhập lại.',
+      });
       return;
     }
     req.user = { ...decoded, role: user.current_role, email: user.email, fullName: user.full_name };

@@ -8,6 +8,8 @@ export interface ReportRow {
   occupancy: number;
 }
 export interface Report {
+  passRevenue?: number;
+  passSales?: { route: string; date: string; revenue: number; orders: number }[];
   rows: ReportRow[];
   revenue: number;
   tickets: number;

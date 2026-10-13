@@ -2,6 +2,8 @@
 
 **Đồ án Thực tập Cơ sở 2026 · Nhóm 5 — N5 Innovators**
 
+**Demo báo cáo 13/10/2026:** chạy `.\DEMO_START.ps1` tại thư mục gốc để mở frontend `http://127.0.0.1:3010` cùng API và PostgreSQL nhúng cô lập. Xem [kịch bản 15 phút, tài khoản và giới hạn tích hợp](docs/DEMO_2026-10-13.md) và [đánh giá sau triển khai](docs/IMPLEMENTATION_READINESS_2026-10-12.md). Bản này có vé tháng thanh toán/QR, ZaloPay, lịch theo tần suất, phụ xe, chính sách giá, hàng đợi hoàn tiền, audit truy cập, thống kê từng chuyến và dự báo tham khảo. Thanh toán/hóa đơn/GPS/email demo được đánh dấu mô phỏng; không cần sửa `.env` production.
+
 Trường Đại học Công nghệ Thông tin & Truyền thông — Đại học Thái Nguyên (ICTU).
 
 SmartBus kết nối hành khách, tài xế, bộ phận điều hành và tài chính trong cùng một ứng dụng web: tra cứu chuyến, giữ ghế, thanh toán trực tuyến, nhận vé QR, theo dõi xe và quản lý vận hành. Giao diện sử dụng **tiếng Việt**, tiền tệ **VND** và múi giờ **`Asia/Ho_Chi_Minh` (UTC+7)**.
@@ -63,7 +65,7 @@ Hệ thống cung cấp hai chế độ chạy riêng biệt:
 
 | Hạng mục                | Trạng thái trong chế độ API                                                            |
 | ----------------------- | -------------------------------------------------------------------------------------- |
-| Quên mật khẩu           | Có trang giao diện; endpoint khôi phục trả HTTP `503`                                  |
+| Quên mật khẩu           | Gửi liên kết qua SMTP; đặt lại mật khẩu, giới hạn gửi và hủy phiên cũ                    |
 | Mua vé tháng            | Có khu vực vé tháng/hồ sơ ưu đãi; `POST /passes` trả `503`, chưa mở bán trực tuyến     |
 | ZaloPay                 | Chưa được hỗ trợ bởi endpoint thanh toán của giao diện mới                             |
 | Lựa chọn `Card`         | Đi qua VNPay, không phải tích hợp cổng thẻ riêng                                       |
@@ -469,7 +471,7 @@ Các đường dẫn thuộc giao diện mới, `VITE_LEGACY_APP=false`:
 | Khu vực              | Đường dẫn                                                                                                                             |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | Công khai            | `/`, `/trips`, `/trips/:tripId`, `/tracking/:tripId`                                                                                  |
-| Xác thực             | `/login`, `/register`, `/forgot-password`, `/verify-email`                                                                            |
+| Xác thực             | `/login`, `/register`, `/forgot-password`, `/reset-password`, `/verify-email`                                                         |
 | Đặt vé / thanh toán  | `/booking/:tripId`, `/checkout/:bookingId`, `/payment/result`                                                                         |
 | Hành khách           | `/account/tickets`, `/account/tickets/:ticketId`, `/account/passes`, `/account/notifications`, `/account/support`, `/account/profile` |
 | Vận hành             | `/admin`, `/admin/routes`, `/admin/stops`, `/admin/schedules`, `/admin/vehicles`, `/admin/staff`, `/admin/assignments`                |

@@ -10,12 +10,14 @@ import { Link } from 'react-router-dom';
 import { can } from '@/configs/permissions';
 import { dateTime } from '@/utils/format';
 import { upcomingTrips } from '@/features/booking/utils/journey';
+import { appConfig } from '@/configs/app.config';
 export function Dashboard() {
   const user = useSession(s => s.user)!;
   const catalog = useQuery({ queryKey: ['catalog'], queryFn: operationsApi.catalog });
   const report = useQuery({
     queryKey: ['dashboard-report', user.id],
     queryFn: () => reportsApi.get(user.id, defaultFilter()),
+    enabled: can(user, 'reports'),
   });
   const trips = catalog.data && upcomingTrips(catalog.data.trips).slice(0, 5);
   return (
@@ -24,7 +26,7 @@ export function Dashboard() {
         eyebrow="CỔNG ĐIỀU HÀNH SMARTBUS"
         title={'Xin chào, ' + user.name}
         description="Một góc nhìn chung về vận hành và hành trình của hành khách."
-        action={<Badge>Ứng dụng demo</Badge>}
+        action={<Badge>{appConfig.demo ? 'Ứng dụng demo' : 'SmartBus'}</Badge>}
       />
       <div className="grid3" style={{ marginBottom: 22 }}>
         {[
@@ -40,19 +42,21 @@ export function Dashboard() {
                 <I size={20} color="#15803d" />
               </div>
               <p className="price">{value === undefined ? '—' : String(value)}</p>
-              <small className="muted">Dữ liệu cấu hình demo</small>
+              <small className="muted">Dữ liệu cấu hình {appConfig.demo ? 'demo' : ''}</small>
             </Card>
           );
         })}
       </div>
-      <AsyncState query={report}>
-        {report.data && (
-          <div className="stack">
-            <ReportStats report={report.data} />
-            <RevenueChart report={report.data} />
-          </div>
-        )}
-      </AsyncState>
+      {can(user, 'reports') && (
+        <AsyncState query={report}>
+          {report.data && (
+            <div className="stack">
+              <ReportStats report={report.data} />
+              <RevenueChart report={report.data} />
+            </div>
+          )}
+        </AsyncState>
+      )}
       <div className="grid" style={{ marginTop: 22 }}>
         <Card>
           <div className="between">

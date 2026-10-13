@@ -87,7 +87,7 @@ export const paymentApi = {
       return [...db.payments].reverse().find(p => p.bookingId === bookingId) || null;
     }),
   invoice: (bookingId: string, userId: string) =>
-    service(
+    service<{ message: string; number?: string; kind?: string; documentUrl?: string }>(
       '/bookings/' + bookingId + '/invoice',
       db => {
         const b = ownBooking(db, bookingId, userId);

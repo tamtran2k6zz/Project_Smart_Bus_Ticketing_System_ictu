@@ -9,7 +9,7 @@ export const supportApi = {
       if (admin && !can(user, 'support')) throw new Error('Không có quyền.');
       return db.support.filter(s => admin || s.userId === userId);
     }),
-  send: (userId: string, subject: string, message: string, rating: number) =>
+  send: (userId: string, subject: string, message: string, rating: number, tripId?: string) =>
     service<SupportRequest>(
       '/support',
       db => {
@@ -22,6 +22,7 @@ export const supportApi = {
           subject,
           message,
           rating,
+          tripId,
           status: 'open',
           reply: '',
           createdAt: iso(),
@@ -31,7 +32,7 @@ export const supportApi = {
         return s;
       },
       'POST',
-      { subject, message, rating }
+      { subject, message, rating, tripId }
     ),
   reply: (userId: string, id: string, reply: string) =>
     service(

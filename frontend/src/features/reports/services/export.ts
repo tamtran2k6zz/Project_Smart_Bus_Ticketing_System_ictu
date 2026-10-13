@@ -52,6 +52,7 @@ export async function exportReport(
       'Kỳ: ' + filter.from + ' → ' + filter.to,
       'Tuyến: ' + (filter.routeId || 'Tất cả'),
       'Doanh thu thuần (gồm khoản chưa hoàn): ' + money(report.revenue),
+      'Doanh thu vé tháng theo ngày thanh toán (riêng): ' + money(report.passRevenue ?? 0),
       'Số vé đang có hiệu lực: ' + report.tickets,
       'Tỷ lệ lấp đầy: ' + report.occupancy + '%',
       ...report.rows.map(
@@ -70,6 +71,9 @@ export async function exportReport(
           '%'
       ),
       'Trạng thái hoàn tiền:',
+      ...(report.passSales ?? []).map(
+        s => s.date + ' | Vé tháng | ' + s.route + ' | ' + s.orders + ' đơn | ' + money(s.revenue)
+      ),
       ...report.refunds.map(r => r.id + ' | ' + money(r.total) + ' | ' + r.refund),
     ]);
     download(blob, 'smartbus-report-' + filter.from + '.pdf');
@@ -114,6 +118,12 @@ export async function exportReport(
   sheet.getColumn(4).numFmt = '#,##0';
   sheet.views = [{ state: 'frozen', ySplit: 4 }];
   const refunds = workbook.addWorksheet('Hoan tien');
+  const passes = workbook.addWorksheet('Ve thang');
+  passes.addRow(['Ngày thanh toán', 'Tuyến', 'Số đơn', 'Doanh thu VND']);
+  (report.passSales ?? []).forEach(s => passes.addRow([s.date, s.route, s.orders, s.revenue]));
+  passes.columns.forEach(c => {
+    c.width = 30;
+  });
   refunds.addRow(['Mã đặt vé', 'Số tiền VND', 'Trạng thái']);
   report.refunds.forEach(r => refunds.addRow([r.id, r.total, r.refund]));
   refunds.columns.forEach(c => (c.width = 30));

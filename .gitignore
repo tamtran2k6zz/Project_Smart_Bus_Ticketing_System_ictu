@@ -9,6 +9,8 @@ coverage/
 .playwright/
 playwright-report/
 test-results/
+test-results-*/
+backend/demo-output/
 dependency-audit.json
 .vercel/
 supabase/.temp/
@@ -44,3 +46,4 @@ Desktop.ini
 *.swp
 *.swo
 *~
+.vercel

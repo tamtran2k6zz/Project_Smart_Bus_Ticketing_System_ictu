@@ -1,4 +1,7 @@
 import { randomUUID } from 'crypto';
+import { confirmPassPayment, failPassPayment } from '../services/monthly-pass.service';
+import { verifiedZalopayCallback } from '../services/zalopay.service';
+import { enqueueRefund, processRefundJobs } from '../services/refund-queue.service';
 import { Request, Response, Router } from 'express';
 import { query, transaction } from '../config/database';
 import { getSeatsByTrip } from '../controllers/seats.controller';
@@ -61,12 +64,14 @@ function vnpayParams(req: Request): Record<string, string> {
   };
 }
 
-async function confirmPayment(
+export async function confirmPayment(
   orderId: string,
   method: OnlinePaymentMethod,
   gatewayTransactionId: string,
   amount: number
 ): Promise<'CONFIRMED' | 'LATE' | 'REFUNDED' | 'INVALID'> {
+  const passResult = await confirmPassPayment(orderId, method, gatewayTransactionId, amount);
+  if (passResult !== null) return passResult ? 'CONFIRMED' : 'INVALID';
   const outcome = await transaction<'CONFIRMED' | 'LATE' | 'REFUNDED' | 'INVALID'>(async client => {
     const {
       rows: [payment],
@@ -101,7 +106,7 @@ async function confirmPayment(
       seatsUnavailable ||
       payment.ticket_status === 'CANCELLED' ||
       (payment.reservation_expires_at &&
-        new Date(payment.reservation_expires_at).getTime() + 15 * 60 * 1000 <= Date.now());
+        new Date(payment.reservation_expires_at).getTime() <= Date.now());
 
     await client.query(
       `UPDATE payment_transactions SET status='SUCCESS',gateway_transaction_id=$1,paid_at=NOW()
@@ -139,6 +144,9 @@ async function confirmPayment(
 }
 
 async function refundLatePayment(orderId: string): Promise<void> {
+  await transaction(async client => {
+    await enqueueRefund(client, orderId);
+  });
   const requestId = randomUUID();
   const rows = await query<any[]>(
     `UPDATE payment_transactions
@@ -163,9 +171,14 @@ async function refundLatePayment(orderId: string): Promise<void> {
     "UPDATE payment_transactions SET status='REFUNDED' WHERE order_id=$1 AND status='SUCCESS'",
     [orderId]
   );
+  await query("UPDATE refund_jobs SET status='done',last_error=NULL WHERE ticket_id=$1", [orderId]);
 }
 
-async function recordFailedPayment(orderId: string, method: OnlinePaymentMethod): Promise<void> {
+export async function recordFailedPayment(
+  orderId: string,
+  method: OnlinePaymentMethod
+): Promise<void> {
+  await failPassPayment(orderId, method);
   const releasedSeat = await transaction(async client => {
     const {
       rows: [payment],
@@ -252,7 +265,14 @@ async function handleVnpayCallback(req: Request, res: Response, redirect: boolea
     logger.info('vnpay_callback_applied', { entrypoint, order_id: orderId, outcome: result });
 
     if (redirect) {
-      res.redirect(paymentResultRedirect(orderId, result === 'CONFIRMED' ? 'success' : 'failed'));
+      const [passOrder] = await query<any[]>('SELECT id FROM pass_orders WHERE id=$1', [orderId]);
+      if (passOrder) {
+        const target = new URL(getGatewayCallbacks().paymentResultUrl);
+        target.pathname = '/account/passes';
+        target.search = '';
+        res.redirect(target.toString());
+      } else
+        res.redirect(paymentResultRedirect(orderId, result === 'CONFIRMED' ? 'success' : 'failed'));
     } else {
       res
         .status(200)
@@ -846,6 +866,7 @@ router.post(
             'UPDATE payment_transactions SET refund_request_id=$1 WHERE order_id=$2',
             [result.refund_request_id, payment.order_id]
           );
+          if (payment.payment_method !== 'QR') await enqueueRefund(client, row.id);
         }
         if (!result.newlyCancelled) return result;
         if (payment?.payment_status === 'PENDING') {
@@ -897,6 +918,10 @@ router.post(
           "UPDATE payment_transactions SET status='REFUNDED' WHERE order_id=$1 AND status='SUCCESS'",
           [ticket.order_id]
         );
+        await query(
+          "UPDATE refund_jobs SET status='done',leased_until=NULL,last_error=NULL WHERE ticket_id=$1",
+          [ticket.id]
+        );
       }
       res.json({
         success: true,
@@ -945,7 +970,8 @@ async function releaseExpiredHandler(req: Request, res: Response): Promise<void>
   try {
     const affectedRows = await releaseExpiredReservations();
     const ticketEmailsSent = await processPendingTicketEmails(1);
-    res.json({ success: true, affectedRows, ticketEmailsSent });
+    const refundsCompleted = await processRefundJobs(10);
+    res.json({ success: true, affectedRows, ticketEmailsSent, refundsCompleted });
   } catch (error) {
     logger.error('expiry_cleanup_failed', {
       table: 'tickets/trip_seats/payment_transactions',
@@ -987,4 +1013,28 @@ router.post(
   }
 );
 
+router.post('/payments/zalopay/ipn', async (req, res) => {
+  try {
+    const payment = await verifiedZalopayCallback(req.body);
+    if (!payment) {
+      res.json({ return_code: 2, return_message: 'Invalid' });
+      return;
+    }
+    const result = await confirmPayment(
+      payment.orderId,
+      'ZALOPAY',
+      payment.transactionId,
+      payment.amount
+    );
+    if (result === 'INVALID') {
+      res.json({ return_code: 2, return_message: 'Invalid order' });
+      return;
+    }
+    if (result === 'LATE') await refundLatePayment(payment.orderId);
+    res.json({ return_code: 1, return_message: 'Success' });
+  } catch (error) {
+    logger.error('zalopay_callback_failed', { error });
+    res.json({ return_code: 0, return_message: 'Retry' });
+  }
+});
 export default router;
