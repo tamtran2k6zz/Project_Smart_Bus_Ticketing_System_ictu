@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { PoolClient } from 'pg';
-import { transaction } from '../config/database';
+import { query, transaction } from '../config/database';
 import { acquireSeatLock, releaseSeatLock } from '../config/redis';
 import { assertEmailVerified } from './email-verification.service';
 
@@ -204,4 +204,20 @@ export async function holdSeat(tripId: string, seatNumber: string, userId: strin
     await releaseSeatLock(tripId, seatNumber, redisLockId);
     throw error;
   }
+}
+
+/**
+ * Tự động giải phóng/hoàn tất các chuyến xe có thời gian khởi hành quá 1 tuần (7 ngày)
+ * chuyển trạng thái từ SCHEDULED sang COMPLETED.
+ */
+export async function cleanupOldTrips(daysThreshold = 7): Promise<number> {
+  const updated = await query<Array<{ id: string }>>(
+    `UPDATE trips
+     SET status = 'COMPLETED'
+     WHERE status = 'SCHEDULED'
+       AND departure_time < NOW() - ($1::text || ' days')::interval
+     RETURNING id`,
+    [daysThreshold]
+  );
+  return updated.length;
 }
