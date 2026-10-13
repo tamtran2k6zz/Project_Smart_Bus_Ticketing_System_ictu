@@ -5,10 +5,15 @@ const path = require('node:path');
 const { createHash } = require('node:crypto');
 
 async function main() {
-  const connectionString=process.env.DIRECT_URL || process.env.DATABASE_URL;
-  if(!connectionString)throw new Error('Set DIRECT_URL to the Supabase session/direct connection string.');
+  const rawUrl = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
+  if(!rawUrl)throw new Error('Set DIRECT_URL to the Supabase session/direct connection string.');
+  const connectionString = rawUrl.replace(/[?&]sslmode=[^&]+/g, '');
   if(new URL(connectionString).port==='6543')throw new Error('Run migrations through the session pooler (5432) or direct connection, not transaction pooling.');
-  const db=new Client({connectionString});await db.connect();
+  const db=new Client({
+    connectionString,
+    ssl: { rejectUnauthorized: false }
+  });
+  await db.connect();
   try {
     await db.query('BEGIN');
     await db.query("SELECT pg_advisory_xact_lock(hashtext('smartbus-migrations'))");

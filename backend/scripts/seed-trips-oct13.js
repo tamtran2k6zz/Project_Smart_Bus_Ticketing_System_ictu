@@ -6,13 +6,17 @@ require('dotenv/config');
 const { Client } = require('pg');
 
 async function main() {
-  const connectionString = process.env.DIRECT_URL || process.env.DATABASE_URL;
-  if (!connectionString) {
+  const rawUrl = process.env.DIRECT_URL || process.env.DATABASE_URL;
+  if (!rawUrl) {
     console.error('Lỗi: Vui lòng cấu hình DATABASE_URL hoặc DIRECT_URL trong file .env hoặc biến môi trường.');
     process.exit(1);
   }
+  const connectionString = rawUrl.replace(/[?&]sslmode=[^&]+/g, '');
 
-  const client = new Client({ connectionString });
+  const client = new Client({
+    connectionString,
+    ssl: { rejectUnauthorized: false }
+  });
   await client.connect();
   console.log('Đã kết nối PostgreSQL thành công.');
 
