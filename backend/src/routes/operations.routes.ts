@@ -3,6 +3,7 @@ import { authorizeRoles } from '../middlewares/rbac';
 import { Router, Request, Response } from 'express';
 import { query } from '../config/database';
 import { appLogger } from '../config/logger';
+import { cleanupOldTrips } from '../services/booking';
 
 const logger = appLogger.child('operations');
 const router = Router();
@@ -283,5 +284,29 @@ router.get('/vouchers', async (_req: Request, res: Response): Promise<void> => {
     ],
   });
 });
+
+// Giải phóng / hoàn tất các chuyến xe quá hạn (quá 1 tuần) dành cho Admin / Manager
+router.post(
+  '/cleanup-old-trips',
+  authenticateJWT,
+  authorizeRoles('ADMIN', 'MANAGER'),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const days = Number(req.body.days || 7);
+      const oldTripsCleaned = await cleanupOldTrips(days);
+      res.status(200).json({
+        success: true,
+        oldTripsCleaned,
+        message: `Đã hoàn tất ${oldTripsCleaned} chuyến xe có thời gian khởi hành quá ${days} ngày.`,
+      });
+    } catch (err: any) {
+      logger.error('cleanup_old_trips_failed', { error: err });
+      res.status(500).json({
+        success: false,
+        message: `Lỗi khi giải phóng chuyến xe: ${err.message}`,
+      });
+    }
+  }
+);
 
 export default router;

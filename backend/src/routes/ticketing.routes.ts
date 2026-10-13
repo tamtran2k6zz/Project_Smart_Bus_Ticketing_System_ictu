@@ -12,7 +12,7 @@ import { validateTicketQr } from '../services/ticket.service';
 import { appLogger } from '../config/logger';
 import { getGatewayCallbacks, isProduction, readEnv } from '../config/env';
 import { PaymentGatewayService, OnlinePaymentMethod } from '../services/payment-gateway.service';
-import { BookingError, reserveSeatForPayment } from '../services/booking';
+import { BookingError, reserveSeatForPayment, cleanupOldTrips } from '../services/booking';
 import { PaymentRefundError, PaymentRefundService } from '../services/payment-refund.service';
 import {
   queueTicketEmail,
@@ -971,7 +971,8 @@ async function releaseExpiredHandler(req: Request, res: Response): Promise<void>
     const affectedRows = await releaseExpiredReservations();
     const ticketEmailsSent = await processPendingTicketEmails(1);
     const refundsCompleted = await processRefundJobs(10);
-    res.json({ success: true, affectedRows, ticketEmailsSent, refundsCompleted });
+    const oldTripsCleaned = await cleanupOldTrips(7);
+    res.json({ success: true, affectedRows, ticketEmailsSent, refundsCompleted, oldTripsCleaned });
   } catch (error) {
     logger.error('expiry_cleanup_failed', {
       table: 'tickets/trip_seats/payment_transactions',
