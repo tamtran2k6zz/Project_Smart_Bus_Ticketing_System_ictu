@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getApiUrl, apiFetch } from '../../api/client';
 import { PaymentQrCode } from '../PaymentQrCode';
 import type { BookingResult } from '../../types/booking';
-import type { TicketVerificationResult, TripOccupancy, AdminTicketsResponse } from '../../types/api';
+import type { TicketVerificationResult, TripOccupancy, AdminTicketsResponse, AdminTicketItem } from '../../types/api';
 import { getErrorMessage } from '../../utils/errorMessage';
 import type { Voucher } from '../../features/promotions/types';
 
@@ -72,7 +72,7 @@ export const TicketBookingView: React.FC = () => {
   const [verifyResult, setVerifyResult] = useState<TicketVerificationResult | null>(null);
 
   // Quản lý vé khách hàng (Admin)
-  const [adminTickets, setAdminTickets] = useState<any[]>([]);
+  const [adminTickets, setAdminTickets] = useState<AdminTicketItem[]>([]);
   const [adminSearch, setAdminSearch] = useState<string>('');
   const [adminStatusFilter, setAdminStatusFilter] = useState<string>('');
   const [isLoadingAdminTickets, setIsLoadingAdminTickets] = useState<boolean>(false);

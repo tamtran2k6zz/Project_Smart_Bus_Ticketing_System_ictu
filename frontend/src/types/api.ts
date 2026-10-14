@@ -58,10 +58,28 @@ export interface TicketVerificationResult {
   };
 }
 
+export interface AdminTicketItem {
+  id: string;
+  ticketCode: string;
+  tripId?: string;
+  userId?: string;
+  seatNumber: string;
+  quantity?: number;
+  status: string;
+  createdAt: string;
+  userName?: string;
+  userEmail?: string;
+  userPhone?: string;
+  orderId?: string;
+  paymentMethod?: string;
+  amount?: number;
+  paymentStatus?: string;
+}
+
 export interface AdminTicketsResponse {
   success: boolean;
   message?: string;
-  items?: any[];
+  items?: AdminTicketItem[];
   limit?: number;
   offset?: number;
 }
