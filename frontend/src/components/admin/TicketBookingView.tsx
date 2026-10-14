@@ -71,6 +71,33 @@ export const TicketBookingView: React.FC = () => {
   const [verifyCode, setVerifyCode] = useState<string>('');
   const [verifyResult, setVerifyResult] = useState<TicketVerificationResult | null>(null);
 
+  // Quản lý vé khách hàng (Admin)
+  const [adminTickets, setAdminTickets] = useState<any[]>([]);
+  const [adminSearch, setAdminSearch] = useState<string>('');
+  const [adminStatusFilter, setAdminStatusFilter] = useState<string>('');
+  const [isLoadingAdminTickets, setIsLoadingAdminTickets] = useState<boolean>(false);
+
+  const fetchAdminTickets = async () => {
+    setIsLoadingAdminTickets(true);
+    try {
+      const params = new URLSearchParams();
+      if (adminSearch) params.set('search', adminSearch);
+      if (adminStatusFilter) params.set('status', adminStatusFilter);
+      const res = await apiFetch<any>(`/api/v1/tickets/admin/all?${params.toString()}`);
+      if (res.success) {
+        setAdminTickets(res.items || []);
+      }
+    } catch (err) {
+      // ignore
+    } finally {
+      setIsLoadingAdminTickets(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAdminTickets();
+  }, [adminStatusFilter]);
+
   // =========================================================
   // HÀM QUY ĐỊNH MÀU SẮC GHẾ (Xanh, Cam, Xám) THEO TASK 2
   // =========================================================
@@ -793,6 +820,101 @@ export const TicketBookingView: React.FC = () => {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Phân hệ 3: Quản lý & Theo dõi vé khách hàng (Chỉ Admin / Manager) */}
+      <div className="liquid-glass" style={{ padding: '32px', marginTop: '32px' }}>
+        <h3 style={{ fontSize: '26px', margin: '0 0 6px' }}>
+          🎫 Quản lý & Theo dõi vé khách hàng (Admin / Manager)
+        </h3>
+        <p style={{ fontSize: '13.5px', color: 'rgba(255, 255, 255, 0.55)', marginBottom: '20px' }}>
+          Tra cứu toàn bộ vé đã đặt của khách hàng trong hệ thống, theo dõi trạng thái vé, thông tin hành khách và thanh toán.
+        </p>
+
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Tìm theo mã vé, tên KH, SĐT, email..."
+            value={adminSearch}
+            onChange={(e) => setAdminSearch(e.target.value)}
+            style={{ flex: 1, minWidth: '280px', borderRadius: '9999px', height: '44px' }}
+          />
+          <select
+            className="search-input"
+            value={adminStatusFilter}
+            onChange={(e) => setAdminStatusFilter(e.target.value)}
+            style={{ width: '180px', borderRadius: '9999px', height: '44px', background: '#1e293b', color: '#fff' }}
+          >
+            <option value="">Tất cả trạng thái</option>
+            <option value="BOOKED">Đã đặt (BOOKED)</option>
+            <option value="CHECKED_IN">Đã soát (CHECKED_IN)</option>
+            <option value="CANCELLED">Đã hủy (CANCELLED)</option>
+          </select>
+          <button
+            onClick={fetchAdminTickets}
+            className="primary-button"
+            style={{ padding: '0 24px', height: '44px' }}
+          >
+            🔍 Tìm kiếm
+          </button>
+        </div>
+
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.15)', color: '#94a3b8' }}>
+                <th style={{ padding: '12px' }}>Mã vé</th>
+                <th style={{ padding: '12px' }}>Khách hàng</th>
+                <th style={{ padding: '12px' }}>Ghế</th>
+                <th style={{ padding: '12px' }}>Trạng thái vé</th>
+                <th style={{ padding: '12px' }}>Thanh toán</th>
+                <th style={{ padding: '12px' }}>Thời gian</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoadingAdminTickets ? (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '24px', color: '#94a3b8' }}>Đang tải danh sách vé...</td>
+                </tr>
+              ) : adminTickets.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '24px', color: '#94a3b8' }}>Không tìm thấy vé nào phù hợp.</td>
+                </tr>
+              ) : (
+                adminTickets.map((t) => (
+                  <tr key={t.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                    <td style={{ padding: '12px', fontFamily: 'monospace', color: '#38bdf8', fontWeight: 600 }}>{t.ticketCode}</td>
+                    <td style={{ padding: '12px' }}>
+                      <div style={{ fontWeight: 600, color: '#f8fafc' }}>{t.userName || 'Khách vãng lai'}</div>
+                      <div style={{ fontSize: '12px', color: '#94a3b8' }}>{t.userPhone || t.userEmail || 'Chưa cập nhật'}</div>
+                    </td>
+                    <td style={{ padding: '12px', fontWeight: 600, color: '#f97316' }}>{t.seatNumber}</td>
+                    <td style={{ padding: '12px' }}>
+                      <span style={{
+                        padding: '4px 10px',
+                        borderRadius: '9999px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        background: t.status === 'CHECKED_IN' ? 'rgba(16, 185, 129, 0.2)' : t.status === 'CANCELLED' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(56, 189, 248, 0.2)',
+                        color: t.status === 'CHECKED_IN' ? '#34d399' : t.status === 'CANCELLED' ? '#f87171' : '#38bdf8',
+                      }}>
+                        {t.status}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px' }}>
+                      <div style={{ color: '#f8fafc' }}>{Number(t.amount || 0).toLocaleString('vi-VN')} đ</div>
+                      <div style={{ fontSize: '11px', color: '#94a3b8' }}>{t.paymentMethod} • {t.paymentStatus || 'PENDING'}</div>
+                    </td>
+                    <td style={{ padding: '12px', fontSize: '12px', color: '#94a3b8' }}>
+                      {new Date(t.createdAt).toLocaleString('vi-VN')}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

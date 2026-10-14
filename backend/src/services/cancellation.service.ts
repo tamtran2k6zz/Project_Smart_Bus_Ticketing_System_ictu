@@ -2,6 +2,7 @@ import { transaction } from '../config/database';
 import { releaseSeatLock } from '../config/redis';
 import { BookingError } from './booking';
 import { enqueueRefund, processRefundJobs } from './refund-queue.service';
+import { creditRefundToWallet } from './wallet.service';
 export async function cancelTicket(
   id: string,
   userId: string,
@@ -36,7 +37,22 @@ export async function cancelTicket(
     if (t.ticket_status === 'CANCELLED') throw new BookingError(409, 'Vé đã được hủy.');
     if (t.payment_status === 'PENDING')
       throw new BookingError(409, 'Thanh toán đang chờ xác nhận.');
-    if (t.payment_status === 'SUCCESS') await enqueueRefund(client, t.id);
+    
+    if (t.payment_status === 'SUCCESS') {
+      const refundedToWallet = await creditRefundToWallet(
+        client,
+        t.user_id,
+        Number(t.amount),
+        t.id,
+        `Hoàn tiền vé xe #${t.id}`
+      );
+      if (refundedToWallet) {
+        await client.query("UPDATE payment_transactions SET status='REFUNDED' WHERE ticket_id=$1", [t.id]);
+      } else {
+        await enqueueRefund(client, t.id);
+      }
+    }
+
     await client.query("UPDATE tickets SET status='CANCELLED' WHERE id=$1", [t.id]);
     await client.query(
       `UPDATE trip_seats SET status='AVAILABLE',ticket_id=NULL,locked_at=NULL,lock_expires_at=NULL,locked_by_user_id=NULL,redis_lock_id=NULL WHERE ticket_id=$1`,
@@ -56,6 +72,8 @@ export async function cancelTicket(
     ticket.redis_lock_id || undefined
   ).catch(() => {});
 
-  await processRefundJobs(1, ticket.id);
+  if (ticket.payment_status === 'SUCCESS') {
+    await processRefundJobs(1, ticket.id).catch(() => {});
+  }
   return { refundAmount: ticket.payment_status === 'SUCCESS' ? Number(ticket.amount) : 0 };
 }
