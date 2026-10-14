@@ -2,6 +2,7 @@ import { service } from '@/services/adapter';
 import { audit, iso, uid, requireUser, tripAvailability } from '@/services/mocks/database';
 import type { Database } from '@/services/mocks/database';
 import type { Booking, Hold, Seat, Trip, VoucherPreview } from '../types';
+import type { Voucher } from '@/features/promotions/types';
 import { localDay, time } from '@/utils/format';
 import { journeyStops } from '../utils/journey';
 export const getTrip = (db: Database, id: string) => {
@@ -232,7 +233,7 @@ export const bookingApi = {
   booking: (id: string, userId: string) =>
     service<Booking>('/bookings/' + id, db => ownBooking(db, id, userId)),
   activeVouchers: (userId?: string) =>
-    service<any[]>('/vouchers/active', db => {
+    service<Voucher[]>('/vouchers/active', db => {
       if (userId) requireUser(db, userId);
       return db.vouchers.filter(v => v.active && Date.parse(v.expiresAt) > Date.now());
     }),

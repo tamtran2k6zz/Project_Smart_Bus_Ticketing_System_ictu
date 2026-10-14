@@ -4,6 +4,7 @@ import { PaymentQrCode } from '../PaymentQrCode';
 import type { BookingResult } from '../../types/booking';
 import type { TicketVerificationResult, TripOccupancy } from '../../types/api';
 import { getErrorMessage } from '../../utils/errorMessage';
+import type { Voucher } from '../../features/promotions/types';
 
 interface SeatInfo {
   id: string;
@@ -61,7 +62,7 @@ export const TicketBookingView: React.FC = () => {
   const [seats, setSeats] = useState<SeatInfo[]>([]);
   const [selectedSeat, setSelectedSeat] = useState<string>('');
   const [voucherCode, setVoucherCode] = useState<string>('');
-  const [activeVouchers, setActiveVouchers] = useState<any[]>([]);
+  const [activeVouchers, setActiveVouchers] = useState<Voucher[]>([]);
   const [bookingResult, setBookingResult] = useState<BookingResult | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);

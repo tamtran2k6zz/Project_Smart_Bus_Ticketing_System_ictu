@@ -11,6 +11,7 @@ import { getErrorMessage } from '../../utils/errorMessage';
 import { isPaymentPageState, loadPaymentDraft, savePaymentDraft } from '../../utils/paymentDraft';
 import type { PaymentPageState } from '../../types/payment';
 import { applyCancellationResult, canDisplayBookingQr } from '../../utils/bookingCancellation';
+import type { Voucher } from '../../features/promotions/types';
 
 interface SeatInfo {
   id: string;
@@ -118,7 +119,7 @@ export const PassengerPortalPage: React.FC = () => {
   const [seatsLoadedTripId, setSeatsLoadedTripId] = useState('');
   const [seatReload, setSeatReload] = useState(0);
   const [bookingResult, setBookingResult] = useState<BookingResult | null>(null);
-  const [activeVouchers, setActiveVouchers] = useState<any[]>([]);
+  const [activeVouchers, setActiveVouchers] = useState<Voucher[]>([]);
   const [myTickets, setMyTickets] = useState<MyTicketItem[]>([]);
   const [isBooking, setIsBooking] = useState<boolean>(false);
   const [bookingMsg, setBookingMsg] = useState<string | null>(null);
