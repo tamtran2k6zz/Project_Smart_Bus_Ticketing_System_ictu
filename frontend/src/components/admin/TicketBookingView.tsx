@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getApiUrl, apiFetch } from '../../api/client';
 import { PaymentQrCode } from '../PaymentQrCode';
 import type { BookingResult } from '../../types/booking';
-import type { TicketVerificationResult, TripOccupancy } from '../../types/api';
+import type { TicketVerificationResult, TripOccupancy, AdminTicketsResponse } from '../../types/api';
 import { getErrorMessage } from '../../utils/errorMessage';
 import type { Voucher } from '../../features/promotions/types';
 

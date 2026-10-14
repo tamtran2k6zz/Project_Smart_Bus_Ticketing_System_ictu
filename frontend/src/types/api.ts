@@ -57,3 +57,11 @@ export interface TicketVerificationResult {
     trip?: { route?: { name?: string } };
   };
 }
+
+export interface AdminTicketsResponse {
+  success: boolean;
+  message?: string;
+  items?: any[];
+  limit?: number;
+  offset?: number;
+}
