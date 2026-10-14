@@ -231,4 +231,9 @@ export const bookingApi = {
     ),
   booking: (id: string, userId: string) =>
     service<Booking>('/bookings/' + id, db => ownBooking(db, id, userId)),
+  activeVouchers: (userId?: string) =>
+    service<any[]>('/vouchers/active', db => {
+      if (userId) requireUser(db, userId);
+      return db.vouchers.filter(v => v.active && Date.parse(v.expiresAt) > Date.now());
+    }),
 };

@@ -999,6 +999,17 @@ router.get(
   })
 );
 router.get(
+  '/vouchers/active',
+  api(async req => {
+    return (await query<any[]>(
+      'SELECT * FROM vouchers WHERE active = true AND expires_at > NOW() ORDER BY code'
+    )).map(v => ({
+      ...v,
+      expiresAt: iso(v.expires_at),
+    }));
+  })
+);
+router.get(
   '/vouchers',
   api(async req => {
     roles(req, ['ADMIN', 'FINANCE', 'MARKETING']);

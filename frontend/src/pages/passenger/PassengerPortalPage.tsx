@@ -118,6 +118,7 @@ export const PassengerPortalPage: React.FC = () => {
   const [seatsLoadedTripId, setSeatsLoadedTripId] = useState('');
   const [seatReload, setSeatReload] = useState(0);
   const [bookingResult, setBookingResult] = useState<BookingResult | null>(null);
+  const [activeVouchers, setActiveVouchers] = useState<any[]>([]);
   const [myTickets, setMyTickets] = useState<MyTicketItem[]>([]);
   const [isBooking, setIsBooking] = useState<boolean>(false);
   const [bookingMsg, setBookingMsg] = useState<string | null>(null);
@@ -395,10 +396,23 @@ export const PassengerPortalPage: React.FC = () => {
     }
   }, []);
 
+  const fetchActiveVouchers = useCallback(async () => {
+    try {
+      const res = await apiFetch(getApiUrl('/api/v1/vouchers/active'));
+      const json = await res.json();
+      if (res.ok && Array.isArray(json?.data)) {
+        setActiveVouchers(json.data);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
   useEffect(() => {
     fetchTrips();
     fetchOtherData();
-  }, [fetchTrips, fetchOtherData]);
+    fetchActiveVouchers();
+  }, [fetchTrips, fetchOtherData, fetchActiveVouchers]);
 
   useEffect(() => {
     const orderId = searchParams.get('paymentOrder') || searchParams.get('orderId');
@@ -738,16 +752,35 @@ export const PassengerPortalPage: React.FC = () => {
 
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'rgba(255, 255, 255, 0.75)', marginBottom: '8px' }}>
-                    Mã khuyến mãi Voucher (Gợi ý: BUYT5K, ICTU2026):
+                    Mã khuyến mãi Voucher (Chọn có sẵn hoặc nhập mã):
                   </label>
-                  <input
-                    type="text"
-                    className="search-input"
-                    placeholder="Nhập mã voucher giảm giá..."
-                    value={voucherCode}
-                    onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
-                    style={{ width: '100%', borderRadius: '12px', height: '46px' }}
-                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {activeVouchers.length > 0 && (
+                      <select
+                        className="filter-select"
+                        value={activeVouchers.some(v => v.code === voucherCode) ? voucherCode : ''}
+                        onChange={(e) => {
+                          if (e.target.value) setVoucherCode(e.target.value);
+                        }}
+                        style={{ width: '100%', borderRadius: '12px', height: '42px' }}
+                      >
+                        <option value="">-- Chọn voucher có sẵn trong hệ thống --</option>
+                        {activeVouchers.map((v) => (
+                          <option key={v.id || v.code} value={v.code}>
+                            🎟️ {v.code} (-{v.percent || v.discountPercent}%){v.description ? ` - ${v.description}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <input
+                      type="text"
+                      className="search-input"
+                      placeholder="Hoặc nhập mã voucher thủ công..."
+                      value={voucherCode}
+                      onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+                      style={{ width: '100%', borderRadius: '12px', height: '46px', textTransform: 'uppercase' }}
+                    />
+                  </div>
                 </div>
                 <div style={{ alignSelf: 'end', padding: '12px 16px', borderRadius: '12px', background: 'rgba(56, 189, 248, 0.08)', color: '#bae6fd', fontSize: '13px' }}>
                   Chọn ghế rồi tiếp tục để chọn VNPay, MoMo hoặc QR demo.

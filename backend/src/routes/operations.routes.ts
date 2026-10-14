@@ -275,6 +275,17 @@ router.post('/feedbacks', authenticateJWT, async (req: Request, res: Response): 
 });
 
 // 6. Danh sách Voucher (US 18)
+router.get('/vouchers/active', async (_req: Request, res: Response): Promise<void> => {
+  res.status(200).json({
+    success: true,
+    data: [
+      { id: 'vc1', code: 'SMART10', percent: 10, expiresAt: new Date(Date.now() + 30 * 86400000).toISOString(), active: true },
+      { id: 'vc2', code: 'ICTU2026', percent: 20, expiresAt: new Date(Date.now() + 30 * 86400000).toISOString(), active: true },
+      { id: 'vc3', code: 'BUYT5K', percent: 15, expiresAt: new Date(Date.now() + 30 * 86400000).toISOString(), active: true },
+    ],
+  });
+});
+
 router.get('/vouchers', async (_req: Request, res: Response): Promise<void> => {
   res.status(200).json({
     success: true,
