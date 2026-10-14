@@ -1,216 +1,141 @@
-# SmartBus — Hệ thống bán vé và quản lý xe buýt thông minh
+# SmartBus
 
-**Đồ án Thực tập Cơ sở 2026 · Nhóm 5 — N5 Innovators**
+**Hệ thống bán vé và quản lý vận hành xe buýt thông minh**
 
-**Demo báo cáo 13/10/2026:** chạy `.\DEMO_START.ps1` tại thư mục gốc để mở frontend `http://127.0.0.1:3010` cùng API và PostgreSQL nhúng cô lập. Xem [kịch bản 15 phút, tài khoản và giới hạn tích hợp](docs/DEMO_2026-10-13.md) và [đánh giá sau triển khai](docs/IMPLEMENTATION_READINESS_2026-10-12.md). Bản này có vé tháng thanh toán/QR, ZaloPay, lịch theo tần suất, phụ xe, chính sách giá, hàng đợi hoàn tiền, audit truy cập, thống kê từng chuyến và dự báo tham khảo. Thanh toán/hóa đơn/GPS/email demo được đánh dấu mô phỏng; không cần sửa `.env` production.
+[![CI](https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu/actions/workflows/ci.yml/badge.svg)](https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu/actions/workflows/ci.yml)
 
-Trường Đại học Công nghệ Thông tin & Truyền thông — Đại học Thái Nguyên (ICTU).
+[Ứng dụng](https://smart-bus-ticketing-system.vercel.app/) · [Báo lỗi](https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu/issues) · [Tài liệu](#tài-liệu)
 
-SmartBus kết nối hành khách, tài xế, bộ phận điều hành và tài chính trong cùng một ứng dụng web: tra cứu chuyến, giữ ghế, thanh toán trực tuyến, nhận vé QR, theo dõi xe và quản lý vận hành. Giao diện sử dụng **tiếng Việt**, tiền tệ **VND** và múi giờ **`Asia/Ho_Chi_Minh` (UTC+7)**.
+SmartBus số hóa quy trình tra cứu, đặt vé, thanh toán và soát vé xe buýt; đồng thời hỗ trợ nhà xe quản lý tuyến, lịch chạy, đội xe, nhân sự và doanh thu. Dự án sử dụng tiếng Việt, đơn vị tiền tệ VND và múi giờ `Asia/Ho_Chi_Minh`.
 
-[Mã nguồn](https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu) · [Web app](https://smart-bus-ticketing-system.vercel.app) · [CI](https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu/actions/workflows/ci.yml) · [Báo lỗi](https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu/issues)
+Được phát triển bởi **Nhóm 5 — N5 Innovators**, Trường Đại học Công nghệ Thông tin & Truyền thông, Đại học Thái Nguyên (ICTU), trong khuôn khổ Đồ án Thực tập Cơ sở 2026.
 
-![Trang chủ SmartBus trên màn hình desktop](frontend/docs/previews/smartbus-hero-1440.png)
-
-> README được đối chiếu với mã nguồn ngày **12/10/2026**. Liên kết web app là địa chỉ triển khai của dự án; tính sẵn sàng và phiên bản đang phục vụ cần kiểm tra trên môi trường triển khai. Ảnh minh họa là bản chụp giao diện đã lưu trong repository.
+![Giao diện SmartBus](frontend/docs/previews/smartbus-hero-1440.png)
 
 ## Mục lục
 
-- [Tổng quan và phạm vi chức năng](#tổng-quan-và-phạm-vi-chức-năng)
-- [Vai trò và phân quyền](#vai-trò-và-phân-quyền)
-- [Công nghệ và kiến trúc](#công-nghệ-và-kiến-trúc)
-- [Yêu cầu môi trường](#yêu-cầu-môi-trường)
-- [Chạy nhanh chế độ demo](#chạy-nhanh-chế-độ-demo)
-- [Chạy với API và PostgreSQL](#chạy-với-api-và-postgresql)
-- [Cấu hình môi trường](#cấu-hình-môi-trường)
-- [Chạy bằng Docker Compose](#chạy-bằng-docker-compose)
-- [Luồng đặt vé và thanh toán](#luồng-đặt-vé-và-thanh-toán)
-- [Xác minh email và gửi vé](#xác-minh-email-và-gửi-vé)
-- [Soát vé và theo dõi xe](#soát-vé-và-theo-dõi-xe)
-- [Đường dẫn giao diện](#đường-dẫn-giao-diện)
-- [API chính](#api-chính)
-- [Cơ sở dữ liệu và migration](#cơ-sở-dữ-liệu-và-migration)
-- [Kiểm thử và build](#kiểm-thử-và-build)
+- [Phạm vi sản phẩm](#phạm-vi-sản-phẩm)
+- [Kiến trúc và công nghệ](#kiến-trúc-và-công-nghệ)
+- [Khởi chạy](#khởi-chạy)
+- [Cấu hình](#cấu-hình)
+- [Kiểm thử](#kiểm-thử)
 - [Triển khai và vận hành](#triển-khai-và-vận-hành)
-- [Xử lý lỗi thường gặp](#xử-lý-lỗi-thường-gặp)
-- [Cấu trúc repository và tài liệu](#cấu-trúc-repository-và-tài-liệu)
-- [Quy trình đóng góp](#quy-trình-đóng-góp)
-- [Đội ngũ phát triển](#đội-ngũ-phát-triển)
-- [Giấy phép](#giấy-phép)
+- [Cấu trúc mã nguồn](#cấu-trúc-mã-nguồn)
+- [Tài liệu](#tài-liệu)
+- [Đóng góp và bảo mật](#đóng-góp-và-bảo-mật)
 
-## Tổng quan và phạm vi chức năng
+## Phạm vi sản phẩm
 
-Hệ thống cung cấp hai chế độ chạy riêng biệt:
+| Phân hệ                | Chức năng chính                                                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Đặt vé và vé điện tử   | Tìm chuyến theo hành trình/thời gian, chọn ghế, giữ chỗ 10 phút, phát hành QR, gửi yêu cầu hủy/đổi vé                    |
+| Thanh toán và chứng từ | Adapter MoMo, VNPay, ZaloPay; thẻ ngân hàng qua VNPay; xác minh callback, hàng đợi hoàn tiền, hóa đơn và email vé        |
+| Điều hành              | Quản lý tuyến/trạm/giá, đội xe, lịch theo tần suất, phân công tài xế/phụ xe, đổi giờ và hoàn tất chuyến quá giờ đến      |
+| Hành trình và soát vé  | Nhận GPS, hiển thị độ mới của dữ liệu/ETA, đăng ký thông báo trạm, báo sự cố/trễ chuyến, quét QR và danh sách hành khách |
+| Vé tháng và ưu đãi     | Mua/gia hạn vé tháng, duyệt đối tượng ưu tiên, chính sách giá và quản lý voucher                                         |
+| Báo cáo và phân tích   | Doanh thu theo thời gian/tuyến/xe, tỷ lệ lấp đầy từng chuyến, xuất Excel/PDF, mật độ khách và dự báo nhu cầu tham khảo   |
+| Quản trị và hỗ trợ     | Phân quyền tài khoản, nhật ký truy cập/thao tác, phản ánh và phản hồi, xác minh email và khôi phục mật khẩu              |
 
-| Nội dung           | Chế độ demo                            | Chế độ API                             |
-| ------------------ | -------------------------------------- | -------------------------------------- |
-| Cấu hình           | `VITE_APP_MODE=demo`                   | `VITE_APP_MODE=api` — mặc định         |
-| Dữ liệu            | Dữ liệu mẫu trong localStorage         | PostgreSQL qua Express API             |
-| Backend / database | Không cần                              | Bắt buộc                               |
-| Xác thực           | Tài khoản và phiên demo                | JWT, bcrypt, trạng thái tài khoản      |
-| Thanh toán         | Mô phỏng kết quả giao dịch             | VNPay / MoMo khi cấu hình merchant     |
-| Email              | Không gửi email thật                   | Xác minh và gửi vé qua SMTP            |
-| Vị trí xe          | Chuyển động và ETA mô phỏng            | Vị trí đã được cập nhật vào backend    |
-| Mục đích           | Trải nghiệm giao diện, trình diễn, E2E | Tích hợp, kiểm thử dịch vụ, triển khai |
+Các phân hệ tương ứng với **24 user story và 5 product goal**. Việc có chức năng và kiểm thử tự động chưa thay thế nghiệm thu tích hợp bên ngoài hoặc đo hiệu quả kinh doanh trên dữ liệu vận hành thực.
 
-**Các chức năng đã có trong mã nguồn:**
+### Vai trò sử dụng
 
-- **Hành khách:** đăng ký, đăng nhập bằng email/số điện thoại, xác minh email, tìm chuyến theo hành trình/ngày, chọn và giữ 1–6 ghế, đặt vé, áp dụng voucher, thanh toán, xem vé QR, gửi yêu cầu hủy/đổi và phản ánh.
-- **Tài xế / nhân viên:** xem chuyến được phân công, soát vé, xem danh sách đã lên xe, cập nhật vị trí và báo cáo sự cố.
-- **Điều hành:** quản lý tuyến, thứ tự trạm, xe, lịch chạy, nhân sự và phân công; xử lý hỗ trợ, yêu cầu vé và hồ sơ ưu đãi.
-- **Tài chính / quản trị:** báo cáo theo bộ lọc, xuất Excel/PDF, quản lý khuyến mãi; quản trị viên quản lý thêm người dùng và nhật ký thao tác.
-- **Backend:** transaction và khóa hàng PostgreSQL, Redis tùy chọn cho luồng khóa legacy, xác minh callback thanh toán, xử lý hoàn tiền, giải phóng giữ chỗ hết hạn và hàng đợi email vé.
-
-**Giới hạn hiện tại:**
-
-| Hạng mục                | Trạng thái trong chế độ API                                                            |
-| ----------------------- | -------------------------------------------------------------------------------------- |
-| Quên mật khẩu           | Gửi liên kết qua SMTP; đặt lại mật khẩu, giới hạn gửi và hủy phiên cũ                    |
-| Mua vé tháng            | Có khu vực vé tháng/hồ sơ ưu đãi; `POST /passes` trả `503`, chưa mở bán trực tuyến     |
-| ZaloPay                 | Chưa được hỗ trợ bởi endpoint thanh toán của giao diện mới                             |
-| Lựa chọn `Card`         | Đi qua VNPay, không phải tích hợp cổng thẻ riêng                                       |
-| Đặt vé không chọn ghế   | Có trong demo; API giữ chỗ yêu cầu danh sách ghế cụ thể                                |
-| GPS / ETA               | Cần nguồn cập nhật vị trí; hiển thị bản đồ không xác nhận đã kết nối thiết bị GPS thật |
-| PDF / biên nhận         | Không thay thế tích hợp hóa đơn điện tử hợp pháp                                       |
-| Thanh toán / email thật | Cần merchant, callback công khai, SMTP và nghiệm thu riêng                             |
-
-API báo lỗi khi không kết nối được dịch vụ; không tự chuyển sang dữ liệu demo.
-
-## Vai trò và phân quyền
-
-| Vai trò         | Mã          | Phạm vi chính trên giao diện                       |
+| Vai trò         | Mã          | Phạm vi chính                                      |
 | --------------- | ----------- | -------------------------------------------------- |
-| Hành khách      | `PASSENGER` | Đặt vé và quản lý dữ liệu cá nhân                  |
-| Tài xế / phụ xe | `DRIVER`    | Chuyến được phân công, soát vé và sự cố            |
-| Điều hành       | `MANAGER`   | Vận hành, soát vé, hỗ trợ, duyệt ưu đãi và báo cáo |
+| Hành khách      | `PASSENGER` | Đặt vé, vé tháng, hành trình và dữ liệu cá nhân    |
+| Tài xế / phụ xe | `DRIVER`    | Chuyến được phân công, soát vé, vị trí và sự cố    |
+| Điều hành       | `MANAGER`   | Vận hành, hỗ trợ, soát vé, duyệt ưu đãi và báo cáo |
 | Tài chính       | `FINANCE`   | Báo cáo và khuyến mãi                              |
-| Quản trị viên   | `ADMIN`     | Toàn bộ phân hệ quản trị, người dùng và audit      |
+| Marketing       | `MARKETING` | Quản lý khuyến mãi                                 |
+| Quản trị viên   | `ADMIN`     | Quản trị toàn hệ thống                             |
 
-Frontend dùng [permissions.ts](frontend/src/configs/permissions.ts) để bảo vệ các khu vực. Backend kiểm tra JWT, vai trò, quyền sở hữu tài nguyên và phân công chuyến trên các endpoint tương ứng; ẩn nút ở frontend không thay thế kiểm tra quyền tại API.
+Backend xác thực JWT, kiểm tra vai trò hiện tại, quyền sở hữu dữ liệu và phân công chuyến. Quyền truy cập được kiểm tra tại API bên cạnh các guard trên giao diện.
 
-## Công nghệ và kiến trúc
-
-| Thành phần            | Công nghệ / vai trò                                                      |
-| --------------------- | ------------------------------------------------------------------------ |
-| Giao diện             | React 19, TypeScript, Vite 8, React Router 7, CSS Modules, anime.js 4    |
-| Dữ liệu / biểu mẫu    | TanStack Query, Axios, Zustand, React Hook Form, Zod                     |
-| Bản đồ / báo cáo / QR | Leaflet, Recharts, ExcelJS, jsPDF, qrcode, html5-qrcode                  |
-| Backend               | Express 4, TypeScript, JWT, bcrypt, Nodemailer, `ws`                     |
-| Database              | PostgreSQL trên Supabase, truy vấn bằng `pg`, migration SQL, RLS         |
-| Redis                 | Tùy chọn; bổ sung khóa, cache và chống lặp cho các service sử dụng Redis |
-| Kiểm thử              | Jest, Vitest, Testing Library, Playwright, PostgreSQL nhúng PGlite       |
-| Triển khai            | Docker Compose, Nginx, Vercel, GitHub Actions                            |
-
-Phiên bản cụ thể nằm trong `package.json` và lockfile của từng thư mục. Backend đang chạy là **Express + node-postgres**; cài đặt hiện tại không yêu cầu Prisma, NestJS hay Supabase Auth.
+## Kiến trúc và công nghệ
 
 ```mermaid
 flowchart LR
-    User[Hành khách / Nhân viên] --> UI[React + Vite]
-    UI --> Mode{Chế độ chạy}
-    Mode -->|demo| Local[(localStorage)]
-    Mode -->|api / JWT| API[Express API]
-    API --> DB[(Supabase PostgreSQL)]
-    API -. Tùy chọn .-> Redis[(Redis)]
-    API --> Gateway[VNPay / MoMo]
-    Gateway -->|Callback / IPN| API
-    API --> SMTP[SMTP: xác minh và vé QR]
-    Cron[Scheduler bên ngoài] -->|Bearer secret| API
+    User[Trình duyệt] --> Web[React / Vite]
+    Web --> API[Express API]
+    API --> DB[(PostgreSQL / Supabase)]
+    API --> Redis[(Redis tùy chọn)]
+    API --> Mail[SMTP]
+    API --> Payment[Cổng thanh toán]
+    API --> Invoice[Nhà cung cấp hóa đơn]
+    Scheduler[Scheduler] --> API
 ```
 
-- **Node.js + Vite:** frontend cổng `3000`; Vite proxy `/api` tới `http://localhost:5000`.
-- **Docker:** Nginx cổng `3000` phục vụ SPA và proxy `/api/` tới `backend:5000`.
-- **Vercel:** `api/index.js` nạp Express từ `backend/dist/app.js`; rewrite API trước fallback SPA.
-- **GPS:** giao diện mới dùng HTTP polling. WebSocket `/ws` được khởi tạo bởi `backend/src/server.ts`; entrypoint Vercel chỉ nạp Express app.
+| Thành phần                     | Công nghệ                                                                                 |
+| ------------------------------ | ----------------------------------------------------------------------------------------- |
+| Frontend                       | React 19, TypeScript, Vite 8, React Router, TanStack Query, Zustand, React Hook Form, Zod |
+| Giao diện và dữ liệu trực quan | CSS Modules, anime.js, Leaflet, Recharts, ExcelJS, jsPDF                                  |
+| Backend                        | Express, TypeScript, node-postgres, JWT, bcrypt, Nodemailer, WebSocket                    |
+| Lưu trữ                        | PostgreSQL trên Supabase; Redis tùy chọn                                                  |
+| Kiểm thử                       | Jest, Vitest, Testing Library, Playwright, PGlite                                         |
+| Triển khai                     | Vercel, Docker Compose, Nginx, GitHub Actions                                             |
 
-## Yêu cầu môi trường
+Các thao tác đặt vé sử dụng transaction và khóa hàng PostgreSQL. Redis bổ sung khóa/cache cho các luồng có cấu hình sử dụng. Schema được quản lý bằng migration SQL; backend sử dụng trực tiếp `pg`.
 
-| Công cụ / dịch vụ             | Yêu cầu                                                                                                                |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Node.js                       | Dùng **Node.js 24** để khớp môi trường local; nhánh Node.js 22 cần **22.13 trở lên** theo dependency frontend hiện tại |
-| npm                           | Môi trường local dùng npm 11; cài theo lockfile bằng `npm ci`                                                          |
-| Git                           | Cần khi clone và đóng góp mã nguồn                                                                                     |
-| PostgreSQL / Supabase         | Cần cho API; tài khoản database có quyền chạy migration                                                                |
-| SMTP                          | Cần để xác minh tài khoản và gửi vé thật                                                                               |
-| Merchant sandbox VNPay / MoMo | Cần cho thanh toán API qua cổng tương ứng                                                                              |
-| Docker Engine + Compose v2    | Chỉ cần khi chạy Docker                                                                                                |
-| Trình duyệt                   | Trình duyệt hiện đại; cấp quyền camera/vị trí khi sử dụng                                                              |
+## Khởi chạy
 
-Ví dụ quản lý file/env bên dưới dùng **PowerShell**; bước nhập mật khẩu ẩn dùng PowerShell 7. Các lệnh `npm`, `git`, `docker` dùng được trên hệ điều hành khác với cú pháp copy/env tương ứng.
+### Yêu cầu
 
-## Chạy nhanh chế độ demo
+- Node.js **22.12 trở lên** và npm; CI sử dụng Node.js 22.
+- PostgreSQL/Supabase cho chế độ API thật.
+- PowerShell để sử dụng các script demo trên Windows; PowerShell 7 hỗ trợ nhập mật khẩu ẩn ở ví dụ tạo admin.
 
-### 1. Lấy mã nguồn và cài frontend
+### Cài đặt dependency
 
 ```powershell
 git clone https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu.git
 cd Project_Smart_Bus_Ticketing_System_ictu
-npm --prefix frontend ci
-Copy-Item frontend/.env.example frontend/.env.local
-```
-
-Nếu đã có repository, mở terminal tại thư mục chứa `package.json`, `backend/` và `frontend/`. Chỉ copy mẫu khi chưa có env riêng để tránh ghi đè cấu hình đang dùng.
-
-### 2. Bật demo
-
-Sửa `frontend/.env.local`:
-
-```dotenv
-VITE_APP_MODE=demo
-VITE_API_BASE_URL=/api/smartbus/v1
-VITE_LEGACY_APP=false
-```
-
-```powershell
-npm --prefix frontend run dev
-```
-
-Mở [http://localhost:3000](http://localhost:3000).
-
-### 3. Đăng nhập và trải nghiệm
-
-Tài khoản demo có mật khẩu chung **`SmartBus123!`**:
-
-| Vai trò       | Email                     |
-| ------------- | ------------------------- |
-| Hành khách    | `passenger@smartbus.demo` |
-| Tài xế        | `driver@smartbus.demo`    |
-| Điều hành     | `manager@smartbus.demo`   |
-| Tài chính     | `finance@smartbus.demo`   |
-| Quản trị viên | `admin@smartbus.demo`     |
-
-1. Đăng nhập hành khách bằng nút đăng nhập nhanh hoặc tài khoản trên.
-2. Tìm chuyến **trong tương lai** trên tuyến 02 hoặc 03 để chọn ghế. Tuyến 01 demo là tuyến không chọn ghế.
-3. Chọn ghế → giữ chỗ → nhập thông tin → checkout → khởi tạo giao dịch.
-4. Chọn thanh toán mô phỏng thành công, xem vé và QR trong tài khoản.
-5. Đăng nhập tài xế để soát vé trên chuyến được phân công; dùng quản trị/điều hành để trải nghiệm vận hành và hỗ trợ.
-
-Dữ liệu nằm dưới khóa **`smartbus.demo.v1`** trong localStorage, không chia sẻ giữa các thiết bị. Xóa khóa trong DevTools → Application → Local Storage rồi tải lại để tạo lại dữ liệu mẫu. Refresh không kéo dài hạn giữ chỗ; tham số callback trên URL không tự xác nhận thanh toán.
-
-## Chạy với API và PostgreSQL
-
-### 1. Cài dependency và chuẩn bị env
-
-Từ thư mục gốc:
-
-```powershell
 npm ci
 npm --prefix backend ci
 npm --prefix frontend ci
+```
+
+### Demo nghiệp vụ với database cô lập
+
+Từ thư mục gốc repository:
+
+```powershell
+.\DEMO_START.ps1
+```
+
+Mở **http://127.0.0.1:3010**. Script khởi tạo PostgreSQL nhúng từ migration, dữ liệu mẫu và API tại cổng `5010`.
+
+Tài khoản demo có dạng `<vai-trò>@smartbus.demo`, gồm `passenger`, `driver`, `conductor`, `manager`, `finance`, `admin`, `marketing`. Mật khẩu dùng riêng cho demo: `SmartBus123!`.
+
+Thanh toán, hóa đơn, email và GPS trong chế độ này được mô phỏng, có nhãn nhận diện trên giao diện. Database demo được tạo lại mỗi lần khởi động.
+
+```powershell
+.\DEMO_STOP.ps1
+```
+
+### Phát triển với API và PostgreSQL
+
+**1. Chuẩn bị cấu hình** cho checkout mới, từ thư mục gốc:
+
+```powershell
 Copy-Item .env.example backend/.env
 Copy-Item frontend/.env.example frontend/.env.local
 ```
 
-Điền `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET` và cấu hình cần dùng vào `backend/.env`. Backend nạp `.env` theo thư mục làm việc; các lệnh chạy/migration dưới đây thực hiện trong `backend/`.
-
-Tạo secret ngẫu nhiên:
+Điền cấu hình database, JWT và các dịch vụ cần sử dụng vào `backend/.env`. Backend nạp `.env` theo thư mục làm việc. Tạo JWT secret riêng thay cho giá trị mẫu:
 
 ```powershell
 node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
 ```
 
-Đặt kết quả vào `JWT_SECRET`. Khi dùng cron production, tạo secret riêng cho `PAYMENT_CRON_SECRET`.
+Frontend dùng cấu hình:
 
-### 2. Migration và tài khoản quản trị
+```dotenv
+VITE_APP_MODE=api
+VITE_API_BASE_URL=/api/smartbus/v1
+VITE_LEGACY_APP=false
+```
+
+**2. Áp dụng migration** và tạo admin, từ `backend/`:
 
 ```powershell
 cd backend
@@ -222,566 +147,161 @@ Remove-Item Env:ADMIN_PASSWORD
 Remove-Item Env:ADMIN_EMAIL
 ```
 
-`-MaskInput` yêu cầu PowerShell 7. Với Windows PowerShell 5.1, điền tạm `ADMIN_EMAIL` và `ADMIN_PASSWORD` vào `backend/.env`, chạy `npm run db:create-admin`, rồi xóa hai biến khỏi file.
+`-MaskInput` yêu cầu PowerShell 7. Migration tạo schema/vai trò; không tự tạo tài khoản demo hoặc dữ liệu vận hành. Script tạo admin không ghi đè mật khẩu của tài khoản đã tồn tại. Giữ nguyên các migration đã áp dụng; bổ sung migration mới khi thay đổi schema.
 
-Migration tạo schema và vai trò; **không tự tạo tài khoản demo, tuyến, xe hoặc lịch mẫu**. Script tạo admin thêm tài khoản mới, không đặt lại mật khẩu tài khoản đã tồn tại. Dùng email mà bạn quản lý nếu cần xác minh và trải nghiệm đặt vé.
-
-### 3. Khởi chạy hai dịch vụ
-
-Trong terminal đang ở `backend/`:
+**3. Khởi chạy dịch vụ** trong hai terminal:
 
 ```powershell
+# Terminal 1 — tại backend/
 npm run start:express
 ```
 
-Trong terminal mới từ thư mục gốc, sửa `frontend/.env.local`:
-
-```dotenv
-VITE_APP_MODE=api
-VITE_API_BASE_URL=/api/smartbus/v1
-VITE_LEGACY_APP=false
-```
-
 ```powershell
+# Terminal 2 — tại thư mục gốc repository
 npm --prefix frontend run dev
 ```
 
-| Dịch vụ               | Địa chỉ local                                                        |
-| --------------------- | -------------------------------------------------------------------- |
-| Frontend              | [http://localhost:3000](http://localhost:3000)                       |
-| Health trực tiếp      | [http://localhost:5000/api/health](http://localhost:5000/api/health) |
-| Health qua Vite proxy | [http://localhost:3000/api/health](http://localhost:3000/api/health) |
-| Base API mới          | `http://localhost:5000/api/smartbus/v1`                              |
+| Dịch vụ  | Địa chỉ                               |
+| -------- | ------------------------------------- |
+| Frontend | http://localhost:3000                 |
+| API      | http://localhost:5000/api/smartbus/v1 |
+| Health   | http://localhost:5000/api/health      |
 
-```powershell
-Invoke-RestMethod http://localhost:5000/api/health
-```
+Quản trị viên tạo tuyến, trạm, xe, lịch chạy và phân công nhân sự trước khi thử đặt vé. Hành khách cần xác minh email để thực hiện các nghiệp vụ yêu cầu xác minh.
 
-Kết quả mong đợi: `status=UP`, `database=CONNECTED_POSTGRESQL`. HTTP `503` cho biết health check database chưa đạt.
+Frontend cũng hỗ trợ `VITE_APP_MODE=demo` để chạy dữ liệu mô phỏng trong localStorage. Giao diện cũ được bật riêng bằng `VITE_LEGACY_APP=true`.
 
-### 4. Chuẩn bị dữ liệu nghiệp vụ
+## Cấu hình
 
-1. Đăng nhập quản trị viên; tạo trạm và tuyến, sắp xếp trạm đúng chiều hành trình.
-2. Tạo xe hoạt động và lịch chạy trong tương lai.
-3. Tạo tài khoản `DRIVER`, hồ sơ nhân sự liên kết và phân công cho chuyến cần soát vé/GPS.
-4. Đăng ký hành khách bằng email nhận được thư, hoàn tất xác minh.
-5. Tra cứu chuyến, giữ ghế và thử thanh toán với merchant sandbox đã cấu hình.
+Danh sách đầy đủ nằm trong [cấu hình backend mẫu](.env.example) và [cấu hình frontend mẫu](frontend/.env.example).
 
-Đăng nhập chấp nhận email hoặc số điện thoại; số Việt Nam có thể nhập dạng `0…` hoặc `+84…`. Tài khoản `@smartbus.demo` chỉ thuộc demo trình duyệt.
+| Nhóm              | Biến chính                                                                         | Mục đích                                                |
+| ----------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Database          | `DATABASE_URL`, `DIRECT_URL`, `DB_POOL_MAX`                                        | Kết nối runtime, migration và giới hạn pool             |
+| Ứng dụng          | `NODE_ENV`, `PORT`, `JWT_SECRET`, `CORS_ORIGIN`                                    | Môi trường, xác thực và origin frontend                 |
+| Email             | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Xác minh tài khoản, khôi phục mật khẩu, gửi vé/chứng từ |
+| Liên kết frontend | `FRONTEND_PUBLIC_URL`                                                              | Origin nhận liên kết email; dùng HTTPS trên production  |
+| Thanh toán        | `MOMO_*`, `VNPAY_*`, `ZALOPAY_*`                                                   | Merchant, chữ ký, callback và kết quả thanh toán        |
+| Hóa đơn           | `INVOICE_API_URL`, `INVOICE_API_TOKEN`, `INVOICE_SELLER_NAME`                      | Adapter nhà cung cấp hóa đơn                            |
+| Job và Redis      | `PAYMENT_CRON_SECRET` hoặc `CRON_SECRET`, `REDIS_URL`                              | Bảo vệ job định kỳ; khóa/cache tùy chọn                 |
+| Frontend          | `VITE_APP_MODE`, `VITE_API_BASE_URL`, `VITE_LEGACY_APP`                            | Chế độ dữ liệu, API và giao diện                        |
 
-Nút đăng nhập nhanh API dùng tài khoản thử trong [testAccounts.ts](frontend/src/features/auth/testAccounts.ts), **không phải dữ liệu migration tự tạo**. Nút chỉ hoạt động khi database có đúng tài khoản/mật khẩu và tài khoản còn hoạt động. Development/demo hiển thị nút; build production chỉ bật khi `VITE_ENABLE_QUICK_LOGIN=true`. Chỉ bật trên môi trường thử nghiệm.
+Dùng session/direct connection cho migration; transaction pooler cổng `6543` dành cho runtime. Cấu hình chứng chỉ TLS theo môi trường triển khai và yêu cầu của nhà cung cấp.
 
-## Cấu hình môi trường
+Các biến `VITE_*` được đưa vào mã frontend và có thể đọc từ trình duyệt. Credential database, SMTP, merchant, JWT secret và file môi trường thật phải được quản lý riêng, không đưa vào Git.
 
-### Backend
+## Kiểm thử
 
-Dùng [.env.example](.env.example) cho `backend/.env` khi chạy Node.js, hoặc `.env` gốc khi chạy Compose. Chỉ copy mẫu chưa đủ bật database, email và payment.
-
-| Biến                                           | Mục đích / giá trị điển hình                                                              |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                                 | Connection string PostgreSQL cho API; Transaction pooler Supabase thường dùng cổng `6543` |
-| `DIRECT_URL`                                   | Session pooler/direct `5432` cho migration; runner ưu tiên biến này                       |
-| `DB_POOL_MAX`                                  | Giới hạn kết nối mỗi pool; mẫu dùng `2`, cần tính theo số instance                        |
-| `JWT_SECRET`                                   | Secret riêng ngẫu nhiên, tối thiểu 32 ký tự; bắt buộc để nạp app                          |
-| `PORT`                                         | `5000`, khớp Vite proxy và Docker                                                         |
-| `NODE_ENV`                                     | `development` khi local; `production` khi triển khai                                      |
-| `CORS_ORIGIN`                                  | Origin được phép, phân tách bằng dấu phẩy, ví dụ `http://localhost:3000`                  |
-| `LOG_LEVEL`                                    | `debug`, `info`, `warn`, `error`; mặc định `info`                                         |
-| `REDIS_URL`                                    | URL Redis; bỏ trống và không đặt `REDIS_HOST` nếu không dùng                              |
-| `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`   | Cấu hình thay thế; `REDIS_URL` được ưu tiên                                               |
-| `FRONTEND_PUBLIC_URL`                          | Origin frontend cho email xác minh/vé; production cần HTTPS                               |
-| `QR_HMAC_SECRET`                               | Secret ký QR; để trống thì dùng `JWT_SECRET`                                              |
-| `QR_EXP_MINUTES`                               | Hạn QR của luồng ticket-details; mặc định `1440` phút                                     |
-| `PAYMENT_PUBLIC_BASE_URL`                      | Origin HTTPS công khai của API cho callback                                               |
-| `PAYMENT_RESULT_URL`                           | Trang kết quả mới: `http://localhost:3000/payment/result` khi local                       |
-| `PAYMENT_CLIENT_IP`                            | IP gửi gateway; dùng giá trị phù hợp merchant/môi trường                                  |
-| `PAYMENT_REFUND_OPERATOR`, `PAYMENT_REFUND_IP` | Thông tin gửi trong yêu cầu hoàn tiền                                                     |
-| `PAYMENT_CRON_SECRET`                          | Bearer secret cho job giữ chỗ/email; bắt buộc production; hỗ trợ alias `CRON_SECRET`      |
-| `PAYMENT_DEMO_ENABLED`                         | Mặc định `false`; mô phỏng QR legacy chỉ trong development riêng, production luôn từ chối |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`        | Máy chủ SMTP; ví dụ cổng `587`, secure `false` theo nhà cung cấp                          |
-| `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`      | Tài khoản SMTP và địa chỉ người gửi hợp lệ                                                |
-
-Lấy nguyên connection string từ mục **Connect** của Supabase, giữ host/username và URL-encode ký tự đặc biệt trong mật khẩu. Cấu hình TLS theo connection string dịch vụ. Không dùng Transaction pooler để migration.
-
-### Cổng thanh toán
-
-| Cổng  | Biến cấu hình                                                                                                                        |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| VNPay | `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET`, `VNPAY_PAYMENT_URL`, `VNPAY_RETURN_URL`, `VNPAY_IPN_URL`, `VNPAY_REFUND_URL`                  |
-| MoMo  | `MOMO_PARTNER_CODE`, `MOMO_ACCESS_KEY`, `MOMO_SECRET_KEY`, `MOMO_CREATE_URL`, `MOMO_IPN_URL`, `MOMO_REDIRECT_URL`, `MOMO_REFUND_URL` |
-
-Mẫu chứa URL gateway sandbox; credential trống không tạo giao dịch đã thanh toán. Với giao diện mới, **đổi `PAYMENT_RESULT_URL` và `MOMO_REDIRECT_URL` sang `/payment/result`** trên origin frontend; một số giá trị mẫu/Compose còn trỏ tới `/passenger/booking` của legacy.
-
-### Frontend
-
-| Biến                                        | Mục đích                                                            |
-| ------------------------------------------- | ------------------------------------------------------------------- |
-| `VITE_APP_MODE`                             | `api` hoặc `demo`; chỉ `demo` bật adapter mô phỏng                  |
-| `VITE_API_BASE_URL`                         | Base API mới; mặc định `/api/smartbus/v1`                           |
-| `VITE_LEGACY_APP`                           | `true` mở giao diện cũ; mặc định `false`                            |
-| `VITE_ENABLE_QUICK_LOGIN`                   | Bật nút tài khoản thử trên bản build API                            |
-| `VITE_PAYMENT_GATEWAY_HOSTS`                | Host gateway bổ sung cho phép chuyển hướng, phân tách bằng dấu phẩy |
-| `VITE_MAP_TILE_URL`, `VITE_MAP_ATTRIBUTION` | Nguồn tile bản đồ và attribution                                    |
-| `VITE_API_URL`                              | Base URL client legacy, không thay thế base API mới                 |
-
-`VITE_*` được đưa vào frontend lúc build, có thể đọc từ trình duyệt. **Không đặt password database, JWT, SMTP hoặc merchant secret vào nhóm này.** Đổi cấu hình cần restart Vite hoặc build/deploy lại. Env riêng được Git ignore.
-
-## Chạy bằng Docker Compose
-
-Compose có **frontend**, **backend**, **redis**; không có service PostgreSQL local, cần database bên ngoài.
-
-### 1. Chuẩn bị
-
-Từ thư mục gốc, nếu chưa có `.env`:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-Điền database/JWT/payment và `PAYMENT_CRON_SECRET` nếu chạy production. Chạy migration bằng hướng dẫn Node.js trước khi dùng app, bảo đảm `backend/.env` và `.env` gốc trỏ tới cùng database dự định sử dụng. Chuẩn bị `frontend/.env.local` ở chế độ API trước build.
-
-Compose chưa truyền toàn bộ SMTP/QR. Để dùng email và cấu hình bổ sung, tạo `docker-compose.override.yml` ở thư mục gốc:
-
-```yaml
-services:
-  backend:
-    environment:
-      SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_SECURE: ${SMTP_SECURE:-false}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      SMTP_FROM: ${SMTP_FROM:-}
-      FRONTEND_PUBLIC_URL: ${FRONTEND_PUBLIC_URL:-http://localhost:3000}
-      QR_HMAC_SECRET: ${QR_HMAC_SECRET:-}
-      QR_EXP_MINUTES: ${QR_EXP_MINUTES:-1440}
-      PAYMENT_DEMO_ENABLED: ${PAYMENT_DEMO_ENABLED:-false}
-```
-
-Override tham chiếu biến; điền giá trị riêng trong `.env` gốc. Compose dùng Redis nội bộ `redis://redis:6379`, không công khai cổng Redis ra host. Backend Node.js ngoài container cần Redis có cổng truy cập được hoặc để Redis tắt.
-
-### 2. Khởi chạy
-
-```powershell
-docker compose up -d --build
-docker compose ps
-docker compose logs --tail 50 backend frontend
-```
-
-- Frontend: [http://localhost:3000](http://localhost:3000).
-- Health qua Nginx: [http://localhost:3000/api/health](http://localhost:3000/api/health).
-- Health trực tiếp: [http://localhost:5000/api/health](http://localhost:5000/api/health).
-- Đổi `FRONTEND_PORT` nếu cổng `3000` bận; đồng bộ origin, liên kết email và kết quả thanh toán.
-
-Dockerfile backend dùng `node:22-alpine`; frontend dùng `node:20-alpine`. Nếu gặp `EBADENGINE`, đối chiếu phiên bản Node thực tế trong image với [yêu cầu môi trường](#yêu-cầu-môi-trường).
-
-### 3. Cập nhật và dừng
-
-```powershell
-git pull --ff-only
-docker compose up -d --build
-docker compose down
-```
-
-Chỉ đổi frontend: `docker compose up -d --no-deps --build frontend`. Đổi env backend cần tạo lại container; đổi `VITE_*` cần build lại frontend. `docker compose down` giữ volume Redis; sao lưu database thực hiện riêng trên PostgreSQL/Supabase.
-
-## Luồng đặt vé và thanh toán
-
-```mermaid
-sequenceDiagram
-    actor P as Hành khách
-    participant UI as Frontend
-    participant API as Express API
-    participant DB as PostgreSQL
-    participant G as VNPay / MoMo
-    P->>UI: Chọn chuyến và ghế
-    UI->>API: POST /holds
-    API->>DB: Khóa ghế và giữ chỗ 10 phút
-    API-->>UI: holdId, expiresAt
-    UI->>API: POST /bookings
-    API-->>UI: bookingId
-    UI->>API: POST /payments
-    API->>G: Khởi tạo giao dịch
-    API-->>UI: redirectUrl
-    UI->>G: Chuyển tới cổng thanh toán
-    G->>API: Callback / IPN
-    API->>DB: Xác nhận giao dịch hợp lệ và cập nhật vé
-    UI->>API: Đọc trạng thái đặt vé / vé
-    API-->>UI: Trạng thái và QR khi đủ điều kiện
-```
-
-- **Giữ chỗ:** 1–6 ghế khác nhau, email đã xác minh, tuyến hoạt động và chuyến chưa khởi hành. Giá và hạn giữ chỗ do backend xác định; refresh không gia hạn.
-- **Chờ thanh toán:** vé ở `RESERVED`, giao dịch ở `PENDING`; QR giữ chỗ legacy không phải bằng chứng thanh toán hay QR đủ điều kiện lên xe.
-- **Xác nhận:** backend kiểm tra callback, chữ ký, số tiền và mã giao dịch. Frontend đọc trạng thái từ API; tham số URL không tự phát hành vé.
-- **Thử lại / đổi cổng:** khi giữ chỗ còn hiệu lực, khách có thể mở lại cổng hoặc đổi phương thức. Đổi cổng tạo mã giao dịch mới, giữ nguyên ghế và hạn giữ chỗ. Thành công đến muộn từ giao dịch cũ đi qua xử lý hoàn tiền, không phát hành thêm vé.
-- **Hết hạn:** ghế được giải phóng, khách cần đặt lại. Không đổi cổng cho vé đã thanh toán hoặc đặt chỗ đã đóng.
-- **Hủy / đổi:** giao diện mới gửi yêu cầu trước khởi hành hơn 30 phút, khi vé chưa soát; điều hành/quản trị xét duyệt tại `/admin/support`. Đổi chuyến cần cùng tuyến, cùng giá và còn đủ ghế. Khi gửi yêu cầu hủy vé, hành khách có thể nhập thông tin tài khoản ngân hàng (tên ngân hàng, số tài khoản, chủ tài khoản) để nhà xe thuận tiện chuyển khoản hoàn tiền (đặc biệt hữu ích với thanh toán chuyển khoản thủ công hoặc tiền mặt).
-- **Hoàn tiền:** trạng thái hủy được ghi trước lời gọi provider. Khi hoàn chưa thành công, vé vẫn đã hủy; API legacy có thể trả `ticketStatus=CANCELLED`, `refundPending=true` để tiếp tục bằng cùng yêu cầu hoàn tiền.
-- **Giải phóng chuyến định kỳ:** Tiến trình nền tại `server.ts` tự động kiểm tra và chuyển các chuyến `SCHEDULED` hoặc `IN_TRANSIT` đã qua thời gian đến dự kiến (`arrival_time <= NOW()`) sang trạng thái `COMPLETED` định kỳ mỗi 60 giây.
-
-Callback chuẩn, tính từ origin API công khai:
-
-| Mục đích                 | Method                 | Đường dẫn                                 |
-| ------------------------ | ---------------------- | ----------------------------------------- |
-| VNPay return trình duyệt | `GET`                  | `/api/v1/ticketing/payments/vnpay/return` |
-| VNPay IPN                | `GET`, `POST`          | `/api/v1/ticketing/payments/vnpay/ipn`    |
-| MoMo IPN                 | `POST`                 | `/api/v1/ticketing/payments/momo/ipn`     |
-| Kết quả frontend mới     | Điều hướng trình duyệt | `/payment/result`                         |
-
-Gateway bên ngoài không gọi được `localhost`. Kiểm thử local cần tunnel/origin HTTPS công khai cho `PAYMENT_PUBLIC_BASE_URL` và IPN; browser return cần quay về đúng origin frontend. Production dùng tên miền công khai ổn định, tránh URL deployment có lớp đăng nhập chặn callback.
-
-API legacy `POST /api/v1/ticketing/bookings` yêu cầu `paymentMethod` là `MOMO`, `VNPAY` hoặc `QR`. `/bookings/:ticketId/demo-complete` chỉ chạy khi `PAYMENT_DEMO_ENABLED=true` ngoài production; đây là mô phỏng, không phải thanh toán thật.
-
-## Xác minh email và gửi vé
-
-Luồng hành khách API: **đăng ký → nhận email → xác minh → giữ ghế → thanh toán → nhận vé QR**.
-
-```dotenv
-FRONTEND_PUBLIC_URL=http://localhost:3000
-SMTP_HOST=your-smtp-host
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=your-smtp-user
-SMTP_PASSWORD=your-smtp-password
-SMTP_FROM=SmartBus <your-sender@example.com>
-```
-
-- Token xác minh có hiệu lực **30 phút**, dùng một lần; gửi lại làm vô hiệu token cũ.
-- Gửi lại tối thiểu cách nhau **60 giây**, tối đa **5 lần mỗi giờ/tài khoản**.
-- Chưa xác minh vẫn có thể đăng nhập để gửi lại; giữ ghế/khởi tạo thanh toán bị từ chối. Thiếu SMTP không tự bỏ qua xác minh.
-- Khi xác nhận thanh toán, backend lưu công việc trong `ticket_email_deliveries`. Thư gồm hành trình, ghế/số lượng, số tiền, mã vé, QR PNG và liên kết tới vé hiện tại.
-- SMTP lỗi không đảo ngược thanh toán. Job giữ chỗ xử lý thêm tối đa **một email đến hạn/lần gọi**, tối đa **5 lần thử**, cách nhau **5 phút**.
-- `sent` nghĩa SMTP chấp nhận thư; cần kiểm tra hộp thư/spam khi nghiệm thu thực tế.
-
-Nguồn triển khai: [email-verification.service.ts](backend/src/services/email-verification.service.ts), [ticket-email.service.ts](backend/src/services/ticket-email.service.ts), [email.service.ts](backend/src/services/email.service.ts).
-
-## Soát vé và theo dõi xe
-
-**Soát vé:** backend kiểm tra chữ ký, thời hạn/nonce QR, trạng thái thanh toán, đúng chuyến, quyền người soát và cửa sổ soát vé. Vé chưa thanh toán, đã hủy hoặc hết hạn bị từ chối; yêu cầu lặp không tạo thêm lần check-in. Một QR của đặt vé nhóm đại diện cho toàn bộ nhóm ghế.
-
-Tài xế chỉ soát/cập nhật chuyến được phân công. Luồng legacy nhập mã thủ công cần `manual=true` và quyền tương ứng. Khi dùng camera/vị trí, cấp quyền trình duyệt và dùng môi trường hỗ trợ API thiết bị, thường là HTTPS hoặc localhost.
-
-**Theo dõi xe:** giao diện mới polling vị trí khoảng 5 giây/lần. Dữ liệu API từ `trip_locations` cần được cập nhật bởi người có quyền hoặc nguồn GPS tích hợp; demo tạo vị trí/ETA mô phỏng. WebSocket `/ws` chỉ khởi tạo bởi server Node.js. Vite proxy/Nginx hiện chỉ proxy `/api`, chưa có proxy riêng `/ws`.
-
-Leaflet tải tile theo [MapAdapter.tsx](frontend/src/features/tracking/components/MapAdapter.tsx). Đổi `VITE_MAP_TILE_URL` và `VITE_MAP_ATTRIBUTION` theo nhà cung cấp phù hợp. Khi bản đồ không tải, kiểm tra mạng/nguồn tile riêng với trạng thái tín hiệu vị trí xe.
-
-## Đường dẫn giao diện
-
-Các đường dẫn thuộc giao diện mới, `VITE_LEGACY_APP=false`:
-
-| Khu vực              | Đường dẫn                                                                                                                             |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Công khai            | `/`, `/trips`, `/trips/:tripId`, `/tracking/:tripId`                                                                                  |
-| Xác thực             | `/login`, `/register`, `/forgot-password`, `/reset-password`, `/verify-email`                                                         |
-| Đặt vé / thanh toán  | `/booking/:tripId`, `/checkout/:bookingId`, `/payment/result`                                                                         |
-| Hành khách           | `/account/tickets`, `/account/tickets/:ticketId`, `/account/passes`, `/account/notifications`, `/account/support`, `/account/profile` |
-| Vận hành             | `/admin`, `/admin/routes`, `/admin/stops`, `/admin/schedules`, `/admin/vehicles`, `/admin/staff`, `/admin/assignments`                |
-| Quản trị / tài chính | `/admin/reports`, `/admin/promotions`, `/admin/eligibility`, `/admin/users`, `/admin/audit-logs`, `/admin/support`                    |
-| Nhân viên            | `/staff/trips`, `/staff/scan`, `/staff/incidents`                                                                                     |
-| Lỗi quyền truy cập   | `/403`                                                                                                                                |
-
-Route không tồn tại hiển thị trang 404. `/search`, `/passenger/booking`, `/driver/portal`, `/unauthorized` có điều hướng tương thích. Danh sách/guard nằm trong [AppRouter.tsx](frontend/src/routes/AppRouter.tsx).
-
-Để mở giao diện cũ khi chạy local, cấu hình rồi restart/build lại:
-
-```dotenv
-VITE_APP_MODE=api
-VITE_LEGACY_APP=true
-VITE_API_URL=http://localhost:5000
-VITE_API_BASE_URL=
-```
-
-Legacy dùng client/DTO riêng. `VITE_API_URL` là origin backend, client tự ghép `/api`; trên hosting cùng origin, để trống cả hai biến URL để dùng đường dẫn tương đối. Không giữ base `/api/smartbus/v1` của giao diện mới khi cấu hình client legacy.
-
-## API chính
-
-### Giao diện mới — `/api/smartbus/v1`
-
-Ghép các path dưới đây với base trên. Bảng liệt kê endpoint chính; payload/DTO/quyền chi tiết cần đối chiếu [ui.routes.ts](backend/src/routes/ui.routes.ts), router được mount và service frontend.
-
-| Nhóm               | Method và endpoint tiêu biểu                                                                                                                           |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Xác thực           | `POST /auth/register`, `/auth/login`, `/auth/verify-email`, `/auth/resend-verification`; `GET /auth/session`; `PUT /auth/profile`; `POST /auth/logout` |
-| Tra cứu            | `GET /catalog`, `/trips`, `/trips/:id`, `/trips/:id/seats`, `/trips/:id/location`                                                                      |
-| Giữ chỗ            | `POST /holds`; `GET /holds/:id`; `DELETE /holds/:id`                                                                                                   |
-| Đặt vé             | `POST /bookings`; `GET /bookings`, `/bookings/:id`, `/bookings/:id/payment`                                                                            |
-| Thanh toán / email | `POST /payments`, `/bookings/:id/invoice`; `GET /payments/:id/booking`                                                                                 |
-| Vé / yêu cầu       | `GET /tickets`, `/tickets/:id`, `/ticket-requests`; `POST /tickets/:id/requests`; `PUT /ticket-requests/:id`                                           |
-| Soát vé / vị trí   | `POST /ticket-validations`, `/trips/:id/location`; `GET /ticket-validations/checked-in`, `/staff/trips`                                                |
-| Vận hành           | `/operations/:key`, với `key`: `routes`, `stops`, `vehicles`, `staff`, `trips`, `assignments`                                                          |
-| Người dùng         | `GET /users`; `POST /users`; `PUT /users/:id`                                                                                                          |
-| Khuyến mãi         | `GET /vouchers`; `POST /vouchers`, `/vouchers/preview`; `PUT /vouchers/:id`; `DELETE /vouchers/:id`                                                    |
-| Thông báo          | `GET /notifications`; `POST /notifications/read`, `/notifications/subscriptions`                                                                       |
-| Hỗ trợ / sự cố     | `GET`, `POST /support`, `/incidents`; `PUT /support/:id`, `/incidents/:id`                                                                             |
-| Ưu đãi / vé tháng  | `GET /passes`, `/eligibility/pending`; `POST /eligibility`; `PUT /eligibility/:id`                                                                     |
-| Báo cáo / nhật ký  | `GET /reports`, `/audit-logs`                                                                                                                          |
-
-Frontend lưu token trong **sessionStorage** dưới khóa `smartbus.accessToken.v1`, gửi `Authorization: Bearer <token>`; HTTP `401` xóa token. Client mới dùng `withCredentials=false`, không dùng cookie xác thực. Logout xóa token phía client; endpoint hiện không triển khai danh sách thu hồi JWT.
-
-[http.ts](frontend/src/services/http.ts) nhận JSON trực tiếp hoặc envelope `{success: true, data: ...}`, chuẩn hóa dữ liệu đăng nhập. [API_CONTRACT.md](frontend/API_CONTRACT.md) là tài liệu thiết kế/DTO; mô tả cookie hoặc tích hợp còn cũ cần đối chiếu source hiện tại.
-
-Ví dụ đọc API công khai:
-
-```powershell
-Invoke-RestMethod http://localhost:5000/api/smartbus/v1/catalog
-```
-
-### Legacy — `/api/v1` và alias `/api`
-
-Các nhóm: `/auth`, `/routes`, `/stops`, `/trips`, `/seats`, `/operations`, `/ticketing`, `/tickets`, `/devices`, `/notifications`, `/users`. Chi tiết mount trong [app.ts](backend/src/app.ts). Health là `GET /api/health`, không phải `/api/smartbus/v1/health`.
-
-| HTTP status | Ý nghĩa thường gặp                                                         |
-| ----------- | -------------------------------------------------------------------------- |
-| `400`       | Payload/tham số không hợp lệ                                               |
-| `401`       | Thiếu/sai token hoặc secret của job                                        |
-| `403`       | Thiếu quyền, sai phân công hoặc chưa xác minh email                        |
-| `404`       | Không có tài nguyên/endpoint phù hợp                                       |
-| `409`       | Ghế/trạng thái thay đổi, giữ chỗ hết hạn hoặc xung đột nghiệp vụ           |
-| `429`       | Vượt giới hạn gửi lại email xác minh                                       |
-| `502`       | Không khởi tạo được gateway                                                |
-| `503`       | Dịch vụ chưa cấu hình, database/Redis chưa sẵn sàng hoặc chức năng chưa mở |
-
-## Cơ sở dữ liệu và migration
-
-Nguồn schema áp dụng là **[supabase/migrations/](supabase/migrations/)**:
-
-| Nhóm               | Bảng tiêu biểu                                                                                                   |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| Tài khoản          | `roles`, `users`, `staff_profiles`                                                                               |
-| Vận hành           | `routes`, `bus_stops`, `route_stops`, `buses`, `seats`, `fares`, `trips`, `trip_seats`                           |
-| Vé / thanh toán    | `ui_holds`, `ui_bookings`, `tickets`, `payment_transactions`, `ticket_requests`, `vouchers`                      |
-| Vị trí / tương tác | `trip_locations`, `trip_subscriptions`, `incidents`, `feedbacks`, `support_requests`, `eligibility_applications` |
-| Audit / gửi vé     | `audit_events`, `ticket_email_deliveries` và các bảng validation/notification trong migration Sprint 3           |
-
-Migration runner:
-
-- Ưu tiên `DIRECT_URL`, từ chối cổng Transaction pooler `6543`.
-- Đọc SQL theo thứ tự tên, áp dụng trong transaction với advisory lock.
-- Lưu checksum tại `smartbus_private.migrations`; từ chối file đã áp dụng bị sửa.
-- Đồng bộ `supabase_migrations.schema_migrations` nếu bảng lịch sử này tồn tại.
-- Chạy lại được với migration không thay đổi; không tự xóa bảng/dữ liệu để hòa giải schema.
-
-Đổi schema bằng **migration mới**, kiểm thử trước khi áp dụng database dùng chung. Không dùng lại SQL lịch sử trong `migrations/` để thay runner. Truy cập ứng dụng đi qua Express/`pg`; custom JWT không phải Supabase Auth JWT. Migration bật RLS/hạn chế truy cập trực tiếp cho `anon`/`authenticated` của Data API.
-
-[Sơ đồ ERD](docs/ERD_SMART_BUS_TICKETING_SYSTEM.md) mô tả mô hình nền; migration bổ sung là nguồn đối chiếu cho bảng mới.
-
-## Kiểm thử và build
-
-### Kiểm tra chính
-
-Từ thư mục gốc, sau khi cài dependency:
+Từ thư mục gốc repository:
 
 ```powershell
 npm --prefix backend run typecheck
-npm --prefix frontend run typecheck
 npm run lint
 npm test
 npm run build
 npm --prefix backend run test:postgres
+npm --prefix backend run test:trip-cleanup
 npm --prefix backend run test:serverless
+npm --prefix frontend run test:e2e
 ```
 
-| Lệnh                     | Phạm vi                                                         |
-| ------------------------ | --------------------------------------------------------------- |
-| `typecheck` từng thư mục | Kiểm tra TypeScript theo cấu hình thư mục                       |
-| `npm run lint`           | ESLint backend và frontend                                      |
-| `npm test`               | Jest backend, Node landing-theme tests, Vitest frontend         |
-| `npm run build`          | Backend → `backend/dist`; frontend → `frontend/dist`            |
-| `test:postgres`          | Migrations thật trên PGlite, API/nghiệp vụ, gateway và SMTP giả |
-| `test:serverless`        | Nạp entrypoint Vercel đã build, kiểm tra API trả JSON           |
-
-Hai bộ kiểm tra backend cuối cần **build backend trước**. `test:postgres` không cần Supabase hoặc merchant thật. Kết quả giả lập không xác nhận thanh toán/email thật hay khả năng chịu tải của môi trường triển khai.
-
-Nếu Vitest timeout khởi tạo worker trên Windows, chạy từ `frontend/`:
+Kiểm thử trình duyệt qua API cần khởi động demo cô lập trước:
 
 ```powershell
-node node_modules/vitest/vitest.mjs run --pool=threads --maxWorkers=1
+.\DEMO_START.ps1
+Push-Location frontend
+npx playwright test --config playwright.demo.config.ts
+Pop-Location
+.\DEMO_STOP.ps1
 ```
 
-### E2E demo bằng Playwright
+Playwright cần trình duyệt đã cài đặt; có thể chỉ định Chrome bằng biến `PLAYWRIGHT_EXECUTABLE_PATH`. Trên máy hạn chế tài nguyên, chạy frontend test với `npm --prefix frontend test -- --maxWorkers=1`.
 
-Từ thư mục gốc:
+Mốc kiểm chứng cục bộ ngày **14/10/2026**:
 
-```powershell
-cd frontend
-npx playwright install chromium
-$env:PLAYWRIGHT_PORT = '3010'
-npm run test:e2e
-Remove-Item Env:PLAYWRIGHT_PORT
-```
+| Nhóm                   | Kết quả                      |
+| ---------------------- | ---------------------------- |
+| Backend unit           | 83 test / 12 suite đạt       |
+| Frontend unit và theme | 85 Vitest và 8 test Node đạt |
+| API / PostgreSQL       | 394 kiểm tra đạt             |
+| E2E frontend           | 13 kịch bản đạt              |
+| E2E qua API cô lập     | 3 kịch bản đạt               |
 
-Playwright tự chạy Vite với `VITE_APP_MODE=demo`; chọn cổng riêng nếu có Vite API đang chạy. Dùng `PLAYWRIGHT_EXECUTABLE_PATH` khi cần browser đã cài. Screenshot/trace lỗi ở `test-results/`, báo cáo HTML ở `playwright-report/`.
-
-### Build production local
-
-```powershell
-npm run build
-cd backend
-npm run start:prod
-```
-
-Frontend cần Nginx/hosting có API proxy và SPA fallback, hoặc Vite dev server để kiểm thử local. `npm --prefix frontend run preview` xem build tĩnh; cấu hình hiện chỉ khai báo API proxy cho dev server, nên preview chưa phải cách chạy toàn bộ hệ thống API.
-
-[CI Pipeline](.github/workflows/ci.yml) chạy khi push/PR tới `main` hoặc `develop`, dùng Node.js 22, kiểm tra lint, test, build, backend typecheck, API/PostgreSQL và entrypoint serverless. Frontend build kiểm tra TypeScript. CI hiện không chạy Playwright; E2E là bước riêng.
-
-Kết quả kiểm chứng lịch sử/phạm vi từng lần chạy nằm trong [báo cáo sửa lỗi](docs/AUDIT_FIXES_2026-10-11.md) và [frontend/IMPLEMENTATION.md](frontend/IMPLEMENTATION.md). Chạy lại các lệnh trên để xác nhận checkout hiện tại.
+PGlite và provider giả lập giúp kiểm tra nghiệp vụ, migration, phân quyền và các tình huống lỗi. Kết quả này chưa thay thế kiểm thử tải trên PostgreSQL nhiều kết nối, giao dịch provider thật hoặc thiết bị GPS/camera thực.
 
 ## Triển khai và vận hành
 
 ### Vercel
 
-Dùng **repository root** làm Root Directory. [vercel.json](vercel.json) hiện cấu hình:
+Sử dụng thư mục gốc repository làm **Root Directory**. [vercel.json](vercel.json) cấu hình build backend/frontend, output `frontend/dist`, function `api/index.js` và SPA fallback.
 
-- Cài package root/backend/frontend bằng `npm install`.
-- Build backend/frontend, output `frontend/dist`.
-- Function **`api/index.js`**, `maxDuration=30` trong cấu hình, nạp `backend/dist/app.js`.
-- Rewrite `/api/:path*` tới `/api/index` trước SPA fallback `/index.html`.
+- Đặt các biến backend ở môi trường triển khai; frontend/API cùng origin sử dụng `/api/smartbus/v1`.
+- Dùng database riêng cho Preview và production; áp dụng migration trước khi triển khai mã phụ thuộc schema mới.
+- Xác nhận `/api/health` trả HTTP `200` và database kết nối thành công sau triển khai.
+- Cấu hình scheduler gọi `/api/v1/ticketing/release-expired` với Bearer job secret. Interval trong `server.ts` chỉ chạy trên server thường trực.
+- Tracking/thông báo sử dụng polling HTTP trên frontend. WebSocket cần hạ tầng hỗ trợ kết nối thường trực.
 
-Các bước chuẩn bị:
+### Docker Compose
 
-1. Đặt `DATABASE_URL`, `JWT_SECRET`, `DB_POOL_MAX`, `NODE_ENV`, origin frontend, SMTP và merchant/callback cần dùng.
-2. Đặt `FRONTEND_PUBLIC_URL`, `PAYMENT_PUBLIC_BASE_URL`, `PAYMENT_RESULT_URL`, `MOMO_REDIRECT_URL` theo tên miền công khai thực tế.
-3. Đặt `VITE_APP_MODE=api`, `VITE_API_BASE_URL=/api/smartbus/v1`, `VITE_LEGACY_APP=false`; quick login chỉ cho môi trường thử.
-4. Migration qua Session pooler/direct trước khi dùng phiên bản cần schema mới. Tách database Preview/Production khi thử giao dịch và dữ liệu.
-5. Build/deploy; thay env cần deployment mới. Kiểm tra health và các luồng sau deploy.
+[docker-compose.yml](docker-compose.yml) cung cấp frontend Nginx, backend và Redis. Database PostgreSQL được kết nối từ bên ngoài.
 
-Tham khảo [docs/supabase-vercel.md](docs/supabase-vercel.md). Tài liệu còn mô tả lịch sử về importer/adapter; scripts, entrypoint và rewrite hiện tại cần đối chiếu `package.json`, `api/index.js`, `vercel.json`.
-
-### Job giải phóng giữ chỗ và gửi lại email
-
-Server Node.js có timer giải phóng giữ chỗ mỗi 60 giây. **Email chờ gửi được xử lý qua endpoint dưới đây**; timer `server.ts` không thay thế job email. Entrypoint Vercel không chạy timer của server, cần scheduler bên ngoài.
-
-| Thiết lập       | Giá trị                                                |
-| --------------- | ------------------------------------------------------ |
-| URL             | `<PUBLIC_API_ORIGIN>/api/v1/ticketing/release-expired` |
-| Method          | `POST` — cũng hỗ trợ `GET`                             |
-| Authorization   | `Bearer <PAYMENT_CRON_SECRET>`                         |
-| Chu kỳ vận hành | Mỗi phút để giải phóng giữ chỗ/xử lý email đến hạn     |
-| Body            | Không cần                                              |
-
-Endpoint trả `{success: true, affectedRows, ticketEmailsSent}`. `401` nghĩa secret không khớp; production thiếu secret trả `503`. `vercel.json` chưa khai báo cron, cần lịch gọi riêng. Không đặt secret vào URL/frontend.
-
-### Kiểm tra sau triển khai
-
-- Health `UP` / `CONNECTED_POSTGRESQL`; runtime log không có lỗi cấu hình quan trọng.
-- Đăng nhập, đăng ký, xác minh email; từ chối truy cập đúng vai trò.
-- Có chuyến tương lai; hai yêu cầu giữ cùng ghế chỉ cho một yêu cầu hợp lệ.
-- Merchant sandbox gọi được IPN; số tiền/vé khớp, callback lặp không tạo thêm vé/hoàn tiền.
-- QR đúng chuyến soát một lần; vé hủy/chưa thanh toán, tài xế sai phân công bị từ chối.
-- Email đến hộp thư; job giữ chỗ/email nhận HTTP `200` theo lịch.
-- Refresh đường dẫn sâu không bị 404 từ hosting; API trả JSON thay vì HTML SPA.
-- Kiểm tra camera, vị trí, tracking, báo cáo và màn hình nhỏ trên thiết bị thực tế.
-
-Sao lưu PostgreSQL trước thay đổi schema/dữ liệu dùng chung. Khi rollback, đối chiếu tương thích ứng dụng/schema; rollback mã không tự hoàn tác dữ liệu đã phát sinh.
-
-## Xử lý lỗi thường gặp
-
-| Hiện tượng                                       | Kiểm tra / cách xử lý                                                                         |
-| ------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| `JWT_SECRET must contain at least 32 characters` | Điền secret đủ dài, chạy backend từ `backend/` để đọc đúng env                                |
-| Health `503` / database không kết nối            | Kiểm tra URL, password URL-encoded, host, TLS và quyền database                               |
-| Migration từ chối `6543`                         | Dùng `DIRECT_URL` qua Session pooler/direct `5432`                                            |
-| `Applied migration changed`                      | Giữ nguyên migration đã áp dụng, thêm migration mới                                           |
-| `relation ... does not exist`                    | Chạy migration trên đúng database backend đang dùng                                           |
-| Không có chuyến                                  | Tạo tuyến/xe hoạt động, chuyến tương lai; kiểm tra UTC+7 và chiều trạm                        |
-| Demo không đăng nhập API                         | Bật demo hoặc tạo tài khoản thật; migration không tạo tài khoản mẫu                           |
-| Giữ ghế `403`                                    | Xác minh email, kiểm tra quyền và SMTP                                                        |
-| Email không tới / `emailSent=false`              | Kiểm tra SMTP, người gửi, log, spam; gửi lại sau thời gian giới hạn                           |
-| Thanh toán `502`                                 | Kiểm tra merchant/URL sandbox/log; thử lại hoặc đổi cổng khi hold còn hạn                     |
-| IPN không gọi được                               | Origin HTTPS công khai, đúng path/method, không bị lớp đăng nhập deployment chặn              |
-| Quay về trang legacy                             | Đặt result/redirect URL tới `/payment/result`, restart/redeploy                               |
-| Hold hết hạn / ghế bị giữ                        | Đọc lại tồn ghế và giữ chỗ mới; refresh không gia hạn                                         |
-| Redis `503`                                      | Sửa kết nối nếu đã bật; khi không dùng, bỏ `REDIS_URL`, `REDIS_HOST` rồi restart              |
-| API trả HTML                                     | Kiểm tra base API, proxy, rewrite API trước SPA và backend đã chạy/build                      |
-| CORS / `401`                                     | Kiểm tra origin, Bearer token; đăng nhập lại khi hết hạn                                      |
-| Cổng `3000` bận                                  | Dev: `npm --prefix frontend run dev -- --port 3010 --strictPort`; Docker: đổi `FRONTEND_PORT` |
-| Đổi env không có tác dụng                        | Restart Vite hoặc build/deploy lại vì `VITE_*` đọc lúc build                                  |
-| `EBADENGINE`                                     | Dùng Node.js 24 hoặc Node.js 22.13+ theo lockfile                                             |
-| Playwright mở API thay vì demo                   | Chọn `PLAYWRIGHT_PORT` riêng, tránh server API đang chạy                                      |
-| Bản đồ/GPS không cập nhật                        | Phân biệt lỗi tile với thiếu vị trí; kiểm tra quyền, phân công và nguồn GPS                   |
-
-## Cấu trúc repository và tài liệu
-
-```text
-Project_Smart_Bus_Ticketing_System_ictu/
-├── api/
-│   └── index.js                  Entrypoint Vercel nạp Express đã build
-├── backend/
-│   ├── api/                      Entrypoint TypeScript tham chiếu app
-│   ├── src/
-│   │   ├── app.ts                Express app, middleware, mount API
-│   │   ├── server.ts             HTTP server, WebSocket, cleanup timer
-│   │   ├── config/               Database, env, JWT, Redis, logger
-│   │   ├── controllers/          Controller API nền
-│   │   ├── middlewares/          Xác thực và phân quyền
-│   │   ├── routes/               API mới (ui.routes.ts) và legacy
-│   │   └── services/             Booking, payment/refund, QR, GPS, email
-│   ├── scripts/                  Migration, tạo admin, test API/database
-│   └── Dockerfile
-├── frontend/
-│   ├── src/
-│   │   ├── configs/              Chế độ chạy, đường dẫn, quyền
-│   │   ├── features/             Nghiệp vụ và service từng phân hệ
-│   │   ├── layouts/              Hành khách, quản trị, nhân viên
-│   │   ├── pages/                Trang mới và legacy
-│   │   ├── routes/               Router và guard
-│   │   └── services/             HTTP/JWT, adapter, database demo
-│   ├── tests/e2e/                Playwright
-│   ├── docs/previews/            Ảnh giao diện
-│   ├── Dockerfile
-│   └── nginx.conf
-├── supabase/migrations/          Schema PostgreSQL, RLS và thay đổi
-├── migrations/                   SQL tham khảo/lịch sử Sprint
-├── docs/                         ERD, báo cáo, hướng dẫn triển khai
-├── .github/workflows/ci.yml      Pipeline kiểm tra
-├── .env.example                  Mẫu backend / Compose
-├── docker-compose.yml            Frontend + backend + Redis
-├── package.json                  Lệnh điều phối từ thư mục gốc
-└── vercel.json                   Build, function và rewrite
+```powershell
+# Tại thư mục gốc; điền các biến cần thiết vào .env trước khi chạy
+Copy-Item .env.example .env
+docker compose up --build -d
 ```
 
-| Tài liệu                                                                  | Nội dung                                                                 |
-| ------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| [Frontend README](frontend/README.md)                                     | Cấu trúc frontend, demo, E2E; phần tích hợp lịch sử cần đối chiếu source |
-| [Checklist frontend](frontend/IMPLEMENTATION.md)                          | Phạm vi S1–S6, bằng chứng kiểm thử                                       |
-| [Hợp đồng frontend](frontend/API_CONTRACT.md)                             | Interface/DTO thiết kế và mapping                                        |
-| [Supabase và Vercel](docs/supabase-vercel.md)                             | Kết nối database, triển khai                                             |
-| [ERD](docs/ERD_SMART_BUS_TICKETING_SYSTEM.md)                             | Mô hình dữ liệu nền                                                      |
-| [Báo cáo sửa lỗi](docs/AUDIT_FIXES_2026-10-11.md)                         | Lỗi đã xử lý, kiểm chứng lịch sử                                         |
-| [Báo cáo Sprint 1](docs/Bao_Cao_Sprint_1_Smart_Bus_Ticketing_System.docx) | Báo cáo học phần                                                         |
-| [Slide Sprint 1](docs/Slide_Thuyet_Trinh_Sprint_1_Smart_Bus.pptx)         | Tài liệu thuyết trình                                                    |
-| [Nguồn hình minh họa](frontend/src/assets/images/README.md)               | Tài nguyên hình ảnh và ghi chú                                           |
+Đối chiếu các biến được truyền trong Compose khi bật SMTP hoặc tích hợp bổ sung; một số biến cần khai báo thêm bằng override hoặc cấu hình môi trường triển khai.
 
-## Quy trình đóng góp
+### Điều kiện nghiệm thu production
 
-1. Tạo nhánh theo công việc, ví dụ `feat/trip-search`, `fix/payment-callback`, `docs/readme`.
-2. Cài bằng `npm ci` từng thư mục; giữ lockfile đồng bộ khi thay dependency.
-3. Giữ đúng DTO frontend/API; kiểm tra quyền/ownership ở backend khi thêm endpoint.
-4. Đổi database bằng migration mới, bổ sung kiểm thử nghiệp vụ phù hợp.
-5. Chạy typecheck, lint, test, build; đổi booking/payment/schema chạy thêm `test:postgres` và kiểm tra liên quan.
-6. Tạo Pull Request nêu vấn đề, hành vi sau sửa, kiểm chứng và yêu cầu migration/env.
+Cần hoàn tất nghiệm thu merchant/callback/hoàn tiền, hợp đồng API hóa đơn, nhận email thực, camera/GPS, scheduler, backup/khôi phục và kiểm thử tải. Rà soát TLS của các script quản trị/migration trước khi sử dụng trên dữ liệu thật. Các đề xuất tần suất và dự báo cần được đánh giá bằng dữ liệu vận hành cùng chỉ số sai số đã thống nhất.
 
-Không commit env riêng, credential, token hay dữ liệu cá nhân thử nghiệm. Khi báo lỗi, cung cấp chế độ chạy, bước tái hiện, kết quả mong đợi/thực tế và log đã loại bỏ thông tin riêng.
+## Cấu trúc mã nguồn
 
-## Đội ngũ phát triển
+```text
+.
+├── api/                         Entrypoint serverless
+├── backend/
+│   ├── src/                     Express app, cấu hình, routes và services
+│   └── scripts/                 Migration, công cụ quản trị, demo và kiểm tra API
+├── frontend/
+│   ├── src/
+│   │   ├── features/            Các phân hệ nghiệp vụ
+│   │   └── ...                  Trang, layout, component, service và trạng thái
+│   ├── tests/                   Kiểm thử trình duyệt
+│   └── public/                  Font, favicon và tài nguyên công khai
+├── supabase/migrations/         Schema và lịch sử thay đổi PostgreSQL
+├── docs/                        Kiến trúc, hướng dẫn và báo cáo
+├── DEMO_START.ps1 / DEMO_STOP.ps1
+├── docker-compose.yml
+├── vercel.json
+└── package.json
+```
 
-| STT | Họ và tên              | Vai trò                  | Phân hệ phụ trách chính                           |
-| :-: | ---------------------- | ------------------------ | ------------------------------------------------- |
-|  1  | **Trần Đặng Công Tâm** | Scrum Master kiêm Leader | Quản lý dự án, Sprint, Cloud/Docker, review PR    |
-|  2  | **Nguyễn Hoàng Đức**   | Frontend Developer       | Layout Auth, AuthContext, đăng nhập, RBAC         |
-|  3  | **Hà Quang Vinh**      | Frontend Developer       | Quản trị tuyến, sắp xếp trạm kéo thả              |
-|  4  | **Triệu Văn Thiệp**    | Frontend Developer       | Trang chủ, tra cứu tuyến, kết quả tìm kiếm        |
-|  5  | **La Công Tuấn**       | Backend Developer        | Kiến trúc API, đặt vé, sơ đồ ghế, QR              |
-|  6  | **Tào Hoàng Minh Vũ**  | Backend Developer        | PostgreSQL, migration Supabase, UTF-8             |
-|  7  | **Nguyễn Minh Đức**    | Backend Developer        | API tìm chuyến, tối ưu truy vấn                   |
-|  8  | **Mạch Thị Ngọc Ánh**  | Quality Assurance (QA)   | Test case, chất lượng phần mềm, soát vé QR        |
-|  9  | **Đinh Hữu Phúc**      | Quality Assurance (QA)   | Kiểm thử chức năng, API và UI                     |
-| 10  | **Hoàng Quốc Toản**    | Quality Assurance (QA)   | Hiệu năng, bảo mật, nghiệm thu Definition of Done |
+Các lệnh npm của từng thành phần được định nghĩa trong [package root](package.json), [backend](backend/package.json) và [frontend](frontend/package.json).
 
-## Giấy phép
+## Tài liệu
 
-Đây là dự án học phần TTCS2026. Repository hiện chưa có file `LICENSE`; backend khai báo `UNLICENSED`, các package ứng dụng đặt `private: true`. Khi tái sử dụng/phân phối, cần thống nhất quyền sử dụng với nhóm tác giả và tuân thủ giấy phép dependency, font, hình ảnh và dịch vụ bản đồ.
+Các liên kết dưới đây trỏ tới phiên bản tài liệu đã lưu cùng mã nguồn, để giữ ổn định khi vị trí file được tổ chức lại:
 
----
+| Tài liệu                                                                                                                                                                                           | Nội dung                                                                |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| [Hướng dẫn demo](https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu/blob/745108a0217267ee29cb65e88d94437d853f5f45/docs/DEMO_2026-10-13.md)                                    | Kịch bản 15 phút, tài khoản và dữ liệu mẫu                              |
+| [Sơ đồ dữ liệu](https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu/blob/745108a0217267ee29cb65e88d94437d853f5f45/docs/ERD_SMART_BUS_TICKETING_SYSTEM.md)                      | ERD nền và quan hệ nghiệp vụ                                            |
+| [Khôi phục mật khẩu](https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu/blob/745108a0217267ee29cb65e88d94437d853f5f45/docs/PASSWORD_RECOVERY_2026-10-13.md)                   | Email khôi phục, thời hạn liên kết và hủy phiên cũ                      |
+| [Hoàn tất chuyến](https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu/blob/745108a0217267ee29cb65e88d94437d853f5f45/docs/TRIP_CLEANUP_2026-10-13.md)                           | Điều kiện giờ đến, quyền truy cập và tính an toàn khi chạy lặp          |
+| [Đánh giá chức năng ngày 12/10](https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu/blob/745108a0217267ee29cb65e88d94437d853f5f45/docs/IMPLEMENTATION_READINESS_2026-10-12.md) | Đối chiếu user story/goal và giới hạn nghiệm thu tại thời điểm đánh giá |
 
-© 2026 **N5 Innovators — SmartBus** · Đồ án Thực tập Cơ sở, ICTU.
+Điểm vào API được định nghĩa tại [backend/src/app.ts](backend/src/app.ts); điều hướng giao diện chính tại [frontend/src/routes/AppRouter.tsx](frontend/src/routes/AppRouter.tsx).
+
+## Đóng góp và bảo mật
+
+1. Tạo nhánh từ phiên bản `main` mới nhất, mô tả rõ phạm vi thay đổi.
+2. Bổ sung migration mới cho thay đổi dữ liệu; không chỉnh migration đã áp dụng.
+3. Chạy các kiểm tra liên quan và cập nhật tài liệu/config mẫu khi thay đổi hành vi.
+4. Gửi pull request kèm mục đích, cách kiểm tra và tác động triển khai.
+
+Dùng Issues cho lỗi chức năng và đề xuất cải tiến. Với vấn đề bảo mật, liên hệ riêng người quản lý repository; không đăng credential, token, connection string hoặc dữ liệu cá nhân vào issue công khai.
+
+Repository hiện chưa công bố tệp `LICENSE`. Thông tin nhóm phát triển: **N5 Innovators — ICTU, 2026**.
