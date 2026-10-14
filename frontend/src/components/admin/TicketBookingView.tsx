@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getApiUrl, apiFetch } from '../../api/client';
 import { PaymentQrCode } from '../PaymentQrCode';
 import type { BookingResult } from '../../types/booking';
-import type { TicketVerificationResult, TripOccupancy } from '../../types/api';
+import type { TicketVerificationResult, TripOccupancy, AdminTicketsResponse, AdminTicketItem } from '../../types/api';
 import { getErrorMessage } from '../../utils/errorMessage';
 import type { Voucher } from '../../features/promotions/types';
 
@@ -31,26 +31,6 @@ interface RouteOption {
   status: string;
   stops: Array<{ stopId: string; name: string; stopOrder: number }>;
   basePrice: number;
-}
-
-interface AdminTicket {
-  id: string;
-  ticketCode: string;
-  seatNumber: string | null;
-  status: string;
-  createdAt: string;
-  userName: string | null;
-  userEmail: string | null;
-  userPhone: string | null;
-  amount: number | null;
-  paymentMethod: string | null;
-  paymentStatus: string | null;
-}
-
-interface AdminTicketsResponse {
-  success: boolean;
-  items?: AdminTicket[];
-  message?: string;
 }
 
 function toDateTimeLocalValue(date: Date): string {
@@ -92,7 +72,7 @@ export const TicketBookingView: React.FC = () => {
   const [verifyResult, setVerifyResult] = useState<TicketVerificationResult | null>(null);
 
   // Quản lý vé khách hàng (Admin)
-  const [adminTickets, setAdminTickets] = useState<AdminTicket[]>([]);
+  const [adminTickets, setAdminTickets] = useState<AdminTicketItem[]>([]);
   const [adminSearch, setAdminSearch] = useState<string>('');
   const [adminStatusFilter, setAdminStatusFilter] = useState<string>('');
   const [isLoadingAdminTickets, setIsLoadingAdminTickets] = useState<boolean>(false);
@@ -855,6 +835,12 @@ export const TicketBookingView: React.FC = () => {
           Tra cứu toàn bộ vé đã đặt của khách hàng trong hệ thống, theo dõi trạng thái vé, thông tin hành khách và thanh toán.
         </p>
 
+        {adminTicketsError && (
+          <div className="form-error" role="alert" style={{ marginBottom: '16px', color: '#f87171', background: 'rgba(239, 68, 68, 0.1)', padding: '12px 16px', borderRadius: '8px' }}>
+            {adminTicketsError}
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
           <input
             type="text"
@@ -900,12 +886,6 @@ export const TicketBookingView: React.FC = () => {
               {isLoadingAdminTickets ? (
                 <tr>
                   <td colSpan={6} style={{ textAlign: 'center', padding: '24px', color: '#94a3b8' }}>Đang tải danh sách vé...</td>
-                </tr>
-              ) : adminTicketsError ? (
-                <tr>
-                  <td colSpan={6} style={{ padding: '24px', color: '#f87171' }}>
-                    <span role="alert">{adminTicketsError}</span>
-                  </td>
                 </tr>
               ) : adminTickets.length === 0 ? (
                 <tr>
