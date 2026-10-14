@@ -143,6 +143,11 @@ export function BookingFlow() {
     enabled: active && !!voucherCode,
     retry: false,
   });
+  const vouchers = useQuery({
+    queryKey: ['active-vouchers'],
+    queryFn: () => bookingApi.activeVouchers(user.id),
+    enabled: active,
+  });
   const voucherChecking =
     active && !!voucherInput && (voucherInput !== voucherCode || preview.isFetching);
   const voucherError =
@@ -323,12 +328,29 @@ export function BookingFlow() {
                     }
                     error={voucherError}
                   >
-                    <input
-                      placeholder="Nhập mã nếu có"
-                      autoComplete="off"
-                      style={{ textTransform: 'uppercase' }}
-                      {...form.register('voucher')}
-                    />
+                    <div className="stack" style={{ gap: 8 }}>
+                      {vouchers.data && vouchers.data.length > 0 && (
+                        <select
+                          className="filter-select"
+                          onChange={(e) => form.setValue('voucher', e.target.value)}
+                          value={vouchers.data.some(v => v.code === voucherInput) ? voucherInput : ''}
+                          style={{ width: '100%' }}
+                        >
+                          <option value="">-- Chọn voucher có sẵn trong hệ thống --</option>
+                          {vouchers.data.map((v) => (
+                            <option key={v.id} value={v.code}>
+                              🎟️ {v.code} (-{v.percent}%) {v.description ? `- ${v.description}` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      <input
+                        placeholder="Hoặc nhập mã thủ công"
+                        autoComplete="off"
+                        style={{ textTransform: 'uppercase' }}
+                        {...form.register('voucher')}
+                      />
+                    </div>
                   </Field>
                   {voucherInput && !active && (
                     <p className="muted" style={{ margin: 0 }}>

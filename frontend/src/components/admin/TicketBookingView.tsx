@@ -4,6 +4,7 @@ import { PaymentQrCode } from '../PaymentQrCode';
 import type { BookingResult } from '../../types/booking';
 import type { TicketVerificationResult, TripOccupancy } from '../../types/api';
 import { getErrorMessage } from '../../utils/errorMessage';
+import type { Voucher } from '../../features/promotions/types';
 
 interface SeatInfo {
   id: string;
@@ -61,6 +62,7 @@ export const TicketBookingView: React.FC = () => {
   const [seats, setSeats] = useState<SeatInfo[]>([]);
   const [selectedSeat, setSelectedSeat] = useState<string>('');
   const [voucherCode, setVoucherCode] = useState<string>('');
+  const [activeVouchers, setActiveVouchers] = useState<Voucher[]>([]);
   const [bookingResult, setBookingResult] = useState<BookingResult | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -129,7 +131,7 @@ export const TicketBookingView: React.FC = () => {
     return tripList;
   };
 
-  // Nạp danh sách tuyến và chuyến xe từ cơ sở dữ liệu.
+  // Nạp danh sách tuyến, chuyến xe và voucher từ cơ sở dữ liệu.
   useEffect(() => {
     let active = true;
     Promise.all([
@@ -148,10 +150,15 @@ export const TicketBookingView: React.FC = () => {
             basePrice: Number(route.basePrice) || 10000,
           }));
       }),
+      apiFetch(getApiUrl('/api/v1/vouchers/active')).then(async res => {
+        const json = await res.json();
+        return res.ok && Array.isArray(json?.data) ? json.data : [];
+      }).catch(() => []),
     ])
-      .then(([tripList, routeList]) => {
+      .then(([tripList, routeList, voucherList]) => {
         if (!active) return;
         setRoutes(routeList);
+        setActiveVouchers(voucherList);
         if (tripList.length > 0) setSelectedTripId(tripList[0].id);
         setNewTrip(current => ({
           ...current,
@@ -512,16 +519,35 @@ export const TicketBookingView: React.FC = () => {
 
           <div>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'rgba(255, 255, 255, 0.75)', marginBottom: '8px' }}>
-              Mã giảm giá Voucher (US 18 - Gợi ý: BUYT5K, ICTU2026):
+              Mã giảm giá Voucher (Chọn có sẵn hoặc nhập mã):
             </label>
-            <input
-              type="text"
-              className="search-input"
-              placeholder="Nhập mã khuyến mãi..."
-              value={voucherCode}
-              onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
-              style={{ width: '100%', borderRadius: '12px', height: '46px' }}
-            />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {activeVouchers.length > 0 && (
+                <select
+                  className="filter-select"
+                  value={activeVouchers.some(v => v.code === voucherCode) ? voucherCode : ''}
+                  onChange={(e) => {
+                    if (e.target.value) setVoucherCode(e.target.value);
+                  }}
+                  style={{ width: '100%', borderRadius: '12px', height: '42px' }}
+                >
+                  <option value="">-- Chọn voucher có sẵn trong hệ thống --</option>
+                  {activeVouchers.map((v) => (
+                    <option key={v.id || v.code} value={v.code}>
+                      🎟️ {v.code} (-{v.percent || v.discountPercent}%){v.description ? ` - ${v.description}` : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <input
+                type="text"
+                className="search-input"
+                placeholder="Hoặc nhập mã khuyến mãi thủ công..."
+                value={voucherCode}
+                onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+                style={{ width: '100%', borderRadius: '12px', height: '46px', textTransform: 'uppercase' }}
+              />
+            </div>
           </div>
         </div>
 
