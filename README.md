@@ -82,7 +82,7 @@ Các thao tác đặt vé sử dụng transaction và khóa hàng PostgreSQL. Re
 
 - Node.js **22.12 trở lên** và npm; CI sử dụng Node.js 22.
 - PostgreSQL/Supabase cho chế độ API thật.
-- PowerShell để sử dụng các script demo trên Windows; PowerShell 7 hỗ trợ nhập mật khẩu ẩn ở ví dụ tạo admin.
+- Các ví dụ CLI dưới đây dùng PowerShell; PowerShell 7 hỗ trợ nhập mật khẩu ẩn ở ví dụ tạo admin.
 
 ### Cài đặt dependency
 
@@ -92,24 +92,6 @@ cd Project_Smart_Bus_Ticketing_System_ictu
 npm ci
 npm --prefix backend ci
 npm --prefix frontend ci
-```
-
-### Demo nghiệp vụ với database cô lập
-
-Từ thư mục gốc repository:
-
-```powershell
-.\DEMO_START.ps1
-```
-
-Mở **http://127.0.0.1:3010**. Script khởi tạo PostgreSQL nhúng từ migration, dữ liệu mẫu và API tại cổng `5010`.
-
-Tài khoản demo có dạng `<vai-trò>@smartbus.demo`, gồm `passenger`, `driver`, `conductor`, `manager`, `finance`, `admin`, `marketing`. Mật khẩu dùng riêng cho demo: `SmartBus123!`.
-
-Thanh toán, hóa đơn, email và GPS trong chế độ này được mô phỏng, có nhãn nhận diện trên giao diện. Database demo được tạo lại mỗi lần khởi động.
-
-```powershell
-.\DEMO_STOP.ps1
 ```
 
 ### Phát triển với API và PostgreSQL
@@ -205,14 +187,12 @@ npm --prefix backend run test:serverless
 npm --prefix frontend run test:e2e
 ```
 
-Kiểm thử trình duyệt qua API cần khởi động demo cô lập trước:
+Kiểm thử trình duyệt qua API sử dụng cấu hình riêng, yêu cầu API và dữ liệu thử nghiệm cô lập đã được khởi tạo:
 
 ```powershell
-.\DEMO_START.ps1
 Push-Location frontend
 npx playwright test --config playwright.demo.config.ts
 Pop-Location
-.\DEMO_STOP.ps1
 ```
 
 Playwright cần trình duyệt đã cài đặt; có thể chỉ định Chrome bằng biến `PLAYWRIGHT_EXECUTABLE_PATH`. Trên máy hạn chế tài nguyên, chạy frontend test với `npm --prefix frontend test -- --maxWorkers=1`.
@@ -273,7 +253,6 @@ Cần hoàn tất nghiệm thu merchant/callback/hoàn tiền, hợp đồng API
 │   └── public/                  Font, favicon và tài nguyên công khai
 ├── supabase/migrations/         Schema và lịch sử thay đổi PostgreSQL
 ├── docs/                        Kiến trúc, hướng dẫn và báo cáo
-├── DEMO_START.ps1 / DEMO_STOP.ps1
 ├── docker-compose.yml
 ├── vercel.json
 └── package.json
