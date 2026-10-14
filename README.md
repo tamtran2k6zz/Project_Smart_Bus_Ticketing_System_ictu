@@ -75,12 +75,12 @@ Việc bán vé, kiểm soát chỗ, phân công chuyến và tổng hợp doanh
 | Phân hệ                | Chức năng chính                                                                                                          |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | Đặt vé và vé điện tử   | Tìm chuyến theo hành trình/thời gian, chọn ghế, giữ chỗ 10 phút, phát hành QR, gửi yêu cầu hủy/đổi vé                    |
-| Thanh toán và chứng từ | Adapter MoMo, VNPay, ZaloPay; thẻ ngân hàng qua VNPay; xác minh callback, hàng đợi hoàn tiền, hóa đơn và email vé        |
+| Thanh toán và chứng từ | Adapter MoMo, VNPay, ZaloPay; ví điện tử người dùng, hoàn tiền tức thì, hóa đơn và email vé        |
 | Điều hành              | Quản lý tuyến/trạm/giá, đội xe, lịch theo tần suất, phân công tài xế/phụ xe, đổi giờ và hoàn tất chuyến quá giờ đến      |
 | Hành trình và soát vé  | Nhận GPS, hiển thị độ mới của dữ liệu/ETA, đăng ký thông báo trạm, báo sự cố/trễ chuyến, quét QR và danh sách hành khách |
 | Vé tháng và ưu đãi     | Mua/gia hạn vé tháng, duyệt đối tượng ưu tiên, chính sách giá và quản lý voucher                                         |
 | Báo cáo và phân tích   | Doanh thu theo thời gian/tuyến/xe, tỷ lệ lấp đầy từng chuyến, xuất Excel/PDF, mật độ khách và dự báo nhu cầu tham khảo   |
-| Quản trị và hỗ trợ     | Phân quyền tài khoản, nhật ký truy cập/thao tác, phản ánh và phản hồi, xác minh email và khôi phục mật khẩu              |
+| Quản trị và hỗ trợ     | Phân quyền tài khoản, quản lý yêu cầu hủy/đổi vé kèm thông tin ngân hàng, nhật ký truy cập/thao tác, phản ánh và khôi phục mật khẩu |
 
 Các phân hệ tương ứng với **24 user story và 5 product goal**. Việc có chức năng và kiểm thử tự động chưa thay thế nghiệm thu tích hợp bên ngoài hoặc đo hiệu quả kinh doanh trên dữ liệu vận hành thực.
 
@@ -169,11 +169,11 @@ Nguồn schema áp dụng là **[supabase/migrations/](supabase/migrations/)**:
 | ------------------ | ---------------------------------------------------------------------------------------------------------------- |
 | Tài khoản          | `roles`, `users`, `staff_profiles`                                                                               |
 | Vận hành           | `routes`, `bus_stops`, `route_stops`, `buses`, `seats`, `fares`, `trips`, `trip_seats`                           |
-| Vé / thanh toán    | `ui_holds`, `ui_bookings`, `tickets`, `payment_transactions`, `ticket_requests`, `vouchers`                      |
+| Vé / thanh toán    | `ui_holds`, `ui_bookings`, `tickets`, `payment_transactions`, `ticket_requests`, `vouchers`, `user_wallets`                      |
 | Vị trí / tương tác | `trip_locations`, `trip_subscriptions`, `incidents`, `feedbacks`, `support_requests`, `eligibility_applications` |
 | Audit / gửi vé     | `audit_events`, `ticket_email_deliveries` và các bảng validation/notification trong migration Sprint 3           |
 
-Các migration bổ sung quản lý `monthly_passes`, `pass_orders`, `pass_checkins`, `fare_policies`, `refund_jobs`, `electronic_invoices`, đơn ZaloPay và các trường khôi phục mật khẩu/thông tin ngân hàng.
+Các migration bổ sung quản lý `monthly_passes`, `pass_orders`, `pass_checkins`, `fare_policies`, `refund_jobs`, `electronic_invoices`, đơn ZaloPay, `user_wallets` (ví điện tử) và các trường khôi phục mật khẩu/thông tin ngân hàng.
 
 Migration runner:
 

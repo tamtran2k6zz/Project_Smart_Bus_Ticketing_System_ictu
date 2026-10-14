@@ -15,6 +15,7 @@ import devicesRoutes from './routes/devices.routes';
 import notificationsRoutes from './routes/notifications.routes';
 import ticketDetailsRoutes from './routes/ticket-details.routes';
 import uiRoutes from './routes/ui.routes';
+import walletRoutes from './routes/wallet.routes';
 import { auditRequests } from './services/audit.service';
 import { query } from './config/database';
 import { getJwtSecret } from './config/auth';
@@ -109,6 +110,8 @@ app.use('/api/notifications', notificationsRoutes);
 app.use('/api/v1/notifications', notificationsRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/v1/users', usersRoutes);
+app.use('/api/wallet', walletRoutes);
+app.use('/api/v1/wallet', walletRoutes);
 
 app.use((req, res) => {
   logger.warn('route_not_found', { method: req.method, path: req.originalUrl });

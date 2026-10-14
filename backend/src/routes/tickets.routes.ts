@@ -93,4 +93,55 @@ router.get(
   }
 );
 
+// GET /api/v1/tickets/admin/all — ADMIN/MANAGER quản lý toàn bộ vé khách hàng.
+router.get(
+  '/admin/all',
+  authenticateJWT,
+  authorizeRoles('ADMIN', 'MANAGER'),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+      const status = typeof req.query.status === 'string' ? req.query.status.trim() : '';
+      const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
+      const offset = Math.max(Number(req.query.offset) || 0, 0);
+
+      const conditions: string[] = [];
+      const params: unknown[] = [];
+
+      if (search) {
+        params.push(`%${search}%`);
+        conditions.push(
+          `(t.ticket_code ILIKE $${params.length} OR u.full_name ILIKE $${params.length} OR u.email ILIKE $${params.length} OR u.phone_number ILIKE $${params.length})`
+        );
+      }
+      if (status) {
+        params.push(status);
+        conditions.push(`t.status = $${params.length}`);
+      }
+
+      const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+      params.push(limit, offset);
+      const items = await query<any[]>(
+        `SELECT t.id, t.ticket_code AS "ticketCode", t.trip_id AS "tripId", t.user_id AS "userId",
+                t.seat_number AS "seatNumber", t.quantity, t.status, t.created_at AS "createdAt",
+                u.full_name AS "userName", u.email AS "userEmail", u.phone_number AS "userPhone",
+                p.order_id AS "orderId", p.payment_method AS "paymentMethod", p.amount, p.status AS "paymentStatus"
+         FROM tickets t
+         LEFT JOIN users u ON u.id = t.user_id
+         LEFT JOIN payment_transactions p ON p.ticket_id = t.id
+         ${whereClause}
+         ORDER BY t.created_at DESC
+         LIMIT $${params.length - 1} OFFSET $${params.length}`,
+        params
+      );
+
+      res.json({ success: true, items, limit, offset });
+    } catch (error) {
+      logger.error('admin_tickets_list_failed', { user_id: req.user?.id, error });
+      res.status(500).json({ success: false, message: 'Không thể tải danh sách vé quản lý.' });
+    }
+  }
+);
+
 export default router;
