@@ -45,7 +45,7 @@ router.post('/register', authenticateJWT, async (req: AuthenticatedRequest, res:
 router.get('/transactions', authenticateJWT, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
-    const transactions = awaitgetTransactionHistory(userId);
+    const transactions = await getTransactionHistory(userId);
     res.json({ success: true, transactions });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message || 'Lỗi khi tải lịch sử giao dịch ví.' });

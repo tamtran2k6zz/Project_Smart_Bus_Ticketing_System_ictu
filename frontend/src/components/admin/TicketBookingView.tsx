@@ -83,7 +83,7 @@ export const TicketBookingView: React.FC = () => {
       const params = new URLSearchParams();
       if (adminSearch) params.set('search', adminSearch);
       if (adminStatusFilter) params.set('status', adminStatusFilter);
-      const res = await apiFetch<any>(`/api/v1/tickets/admin/all?${params.toString()}`);
+      const res = (await apiFetch(getApiUrl(`/api/v1/tickets/admin/all?${params.toString()}`))) as any;
       if (res.success) {
         setAdminTickets(res.items || []);
       }
