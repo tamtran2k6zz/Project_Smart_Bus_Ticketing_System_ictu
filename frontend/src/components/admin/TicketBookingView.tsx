@@ -76,19 +76,23 @@ export const TicketBookingView: React.FC = () => {
   const [adminSearch, setAdminSearch] = useState<string>('');
   const [adminStatusFilter, setAdminStatusFilter] = useState<string>('');
   const [isLoadingAdminTickets, setIsLoadingAdminTickets] = useState<boolean>(false);
+  const [adminTicketsError, setAdminTicketsError] = useState<string | null>(null);
 
   const fetchAdminTickets = async () => {
     setIsLoadingAdminTickets(true);
+    setAdminTicketsError(null);
     try {
       const params = new URLSearchParams();
       if (adminSearch) params.set('search', adminSearch);
       if (adminStatusFilter) params.set('status', adminStatusFilter);
-      const res = (await apiFetch(getApiUrl(`/api/v1/tickets/admin/all?${params.toString()}`))) as any;
-      if (res.success) {
-        setAdminTickets(res.items || []);
+      const response = await apiFetch(getApiUrl(`/api/v1/tickets/admin/all?${params.toString()}`));
+      const result: AdminTicketsResponse = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Không thể tải danh sách vé quản lý.');
       }
-    } catch (err) {
-      // ignore
+      setAdminTickets(result.items || []);
+    } catch (err: unknown) {
+      setAdminTicketsError(getErrorMessage(err, 'Không thể tải danh sách vé quản lý.'));
     } finally {
       setIsLoadingAdminTickets(false);
     }
@@ -830,6 +834,12 @@ export const TicketBookingView: React.FC = () => {
         <p style={{ fontSize: '13.5px', color: 'rgba(255, 255, 255, 0.55)', marginBottom: '20px' }}>
           Tra cứu toàn bộ vé đã đặt của khách hàng trong hệ thống, theo dõi trạng thái vé, thông tin hành khách và thanh toán.
         </p>
+
+        {adminTicketsError && (
+          <div className="form-error" role="alert" style={{ marginBottom: '16px', color: '#f87171', background: 'rgba(239, 68, 68, 0.1)', padding: '12px 16px', borderRadius: '8px' }}>
+            {adminTicketsError}
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
           <input
