@@ -30,8 +30,17 @@ export async function getWalletByUserId(userId: string) {
 }
 
 export async function registerWallet(userId: string, data: WalletKYCData) {
-  if (!data.fullName || !data.dateOfBirth || !data.citizenId || !data.bankName || !data.bankAccountNumber) {
-    throw new WalletError(400, 'Vui lòng cung cấp đầy đủ thông tin: Họ tên, Ngày sinh, Căn cước công dân, Tên ngân hàng và Số tài khoản.');
+  if (
+    !data.fullName ||
+    !data.dateOfBirth ||
+    !data.citizenId ||
+    !data.bankName ||
+    !data.bankAccountNumber
+  ) {
+    throw new WalletError(
+      400,
+      'Vui lòng cung cấp đầy đủ thông tin: Họ tên, Ngày sinh, Căn cước công dân, Tên ngân hàng và Số tài khoản.'
+    );
   }
 
   return await transaction(async client => {
@@ -48,14 +57,28 @@ export async function registerWallet(userId: string, data: WalletKYCData) {
         `UPDATE user_wallets 
          SET full_name = $1, date_of_birth = $2, citizen_id = $3, bank_name = $4, bank_account_number = $5, updated_at = CURRENT_TIMESTAMP
          WHERE id = $6`,
-        [data.fullName, data.dateOfBirth, data.citizenId, data.bankName, data.bankAccountNumber, walletId]
+        [
+          data.fullName,
+          data.dateOfBirth,
+          data.citizenId,
+          data.bankName,
+          data.bankAccountNumber,
+          walletId,
+        ]
       );
     } else {
       const { rows: created } = await client.query(
         `INSERT INTO user_wallets (user_id, full_name, date_of_birth, citizen_id, bank_name, bank_account_number, balance)
          VALUES ($1, $2, $3, $4, $5, $6, 0.00)
          RETURNING id`,
-        [userId, data.fullName, data.dateOfBirth, data.citizenId, data.bankName, data.bankAccountNumber]
+        [
+          userId,
+          data.fullName,
+          data.dateOfBirth,
+          data.citizenId,
+          data.bankName,
+          data.bankAccountNumber,
+        ]
       );
       walletId = created[0].id;
     }
@@ -85,7 +108,11 @@ export async function getTransactionHistory(userId: string) {
   return rows;
 }
 
-export async function topupWallet(userId: string, amount: number, description = 'Nạp tiền vào ví mô phỏng') {
+export async function topupWallet(
+  userId: string,
+  amount: number,
+  description = 'Nạp tiền vào ví mô phỏng'
+) {
   if (amount <= 0) {
     throw new WalletError(400, 'Số tiền nạp phải lớn hơn 0.');
   }
@@ -96,7 +123,10 @@ export async function topupWallet(userId: string, amount: number, description = 
       [userId]
     );
     if (wallets.length === 0) {
-      throw new WalletError(404, 'Bạn chưa đăng ký ví điện tử. Vui lòng đăng ký thông tin ví trước.');
+      throw new WalletError(
+        404,
+        'Bạn chưa đăng ký ví điện tử. Vui lòng đăng ký thông tin ví trước.'
+      );
     }
 
     const wallet = wallets[0];

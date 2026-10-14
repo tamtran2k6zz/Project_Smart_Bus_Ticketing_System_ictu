@@ -48,7 +48,9 @@ router.get('/transactions', authenticateJWT, async (req: AuthenticatedRequest, r
     const transactions = await getTransactionHistory(userId);
     res.json({ success: true, transactions });
   } catch (error: any) {
-    res.status(500).json({ success: false, message: error.message || 'Lỗi khi tải lịch sử giao dịch ví.' });
+    res
+      .status(500)
+      .json({ success: false, message: error.message || 'Lỗi khi tải lịch sử giao dịch ví.' });
   }
 });
 
@@ -56,7 +58,11 @@ router.post('/topup', authenticateJWT, async (req: AuthenticatedRequest, res: Re
   try {
     const userId = req.user!.id;
     const { amount, description } = req.body;
-    const result = await topupWallet(userId, Number(amount), description || 'Nạp tiền vào ví mô phỏng');
+    const result = await topupWallet(
+      userId,
+      Number(amount),
+      description || 'Nạp tiền vào ví mô phỏng'
+    );
     res.json({ success: true, message: 'Nạp tiền vào ví thành công!', ...result });
   } catch (error: any) {
     const status = error instanceof WalletError ? error.statusCode : 500;

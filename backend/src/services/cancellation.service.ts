@@ -37,7 +37,7 @@ export async function cancelTicket(
     if (t.ticket_status === 'CANCELLED') throw new BookingError(409, 'Vé đã được hủy.');
     if (t.payment_status === 'PENDING')
       throw new BookingError(409, 'Thanh toán đang chờ xác nhận.');
-    
+
     if (t.payment_status === 'SUCCESS') {
       const refundedToWallet = await creditRefundToWallet(
         client,
@@ -47,7 +47,9 @@ export async function cancelTicket(
         `Hoàn tiền vé xe #${t.id}`
       );
       if (refundedToWallet) {
-        await client.query("UPDATE payment_transactions SET status='REFUNDED' WHERE ticket_id=$1", [t.id]);
+        await client.query("UPDATE payment_transactions SET status='REFUNDED' WHERE ticket_id=$1", [
+          t.id,
+        ]);
       } else {
         await enqueueRefund(client, t.id);
       }

@@ -110,7 +110,9 @@ router.get(
 
       if (search) {
         params.push(`%${search}%`);
-        conditions.push(`(t.ticket_code ILIKE $${params.length} OR u.full_name ILIKE $${params.length} OR u.email ILIKE $${params.length} OR u.phone_number ILIKE $${params.length})`);
+        conditions.push(
+          `(t.ticket_code ILIKE $${params.length} OR u.full_name ILIKE $${params.length} OR u.email ILIKE $${params.length} OR u.phone_number ILIKE $${params.length})`
+        );
       }
       if (status) {
         params.push(status);
