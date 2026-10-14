@@ -1000,10 +1000,12 @@ router.get(
 );
 router.get(
   '/vouchers/active',
-  api(async req => {
-    return (await query<any[]>(
-      'SELECT * FROM vouchers WHERE active = true AND expires_at > NOW() ORDER BY code'
-    )).map(v => ({
+  api(async _req => {
+    return (
+      await query<any[]>(
+        'SELECT * FROM vouchers WHERE active = true AND expires_at > NOW() ORDER BY code'
+      )
+    ).map(v => ({
       ...v,
       expiresAt: iso(v.expires_at),
     }));

@@ -279,9 +279,27 @@ router.get('/vouchers/active', async (_req: Request, res: Response): Promise<voi
   res.status(200).json({
     success: true,
     data: [
-      { id: 'vc1', code: 'SMART10', percent: 10, expiresAt: new Date(Date.now() + 30 * 86400000).toISOString(), active: true },
-      { id: 'vc2', code: 'ICTU2026', percent: 20, expiresAt: new Date(Date.now() + 30 * 86400000).toISOString(), active: true },
-      { id: 'vc3', code: 'BUYT5K', percent: 15, expiresAt: new Date(Date.now() + 30 * 86400000).toISOString(), active: true },
+      {
+        id: 'vc1',
+        code: 'SMART10',
+        percent: 10,
+        expiresAt: new Date(Date.now() + 30 * 86400000).toISOString(),
+        active: true,
+      },
+      {
+        id: 'vc2',
+        code: 'ICTU2026',
+        percent: 20,
+        expiresAt: new Date(Date.now() + 30 * 86400000).toISOString(),
+        active: true,
+      },
+      {
+        id: 'vc3',
+        code: 'BUYT5K',
+        percent: 15,
+        expiresAt: new Date(Date.now() + 30 * 86400000).toISOString(),
+        active: true,
+      },
     ],
   });
 });
