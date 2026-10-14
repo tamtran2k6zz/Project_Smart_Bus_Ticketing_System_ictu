@@ -33,26 +33,6 @@ interface RouteOption {
   basePrice: number;
 }
 
-interface AdminTicket {
-  id: string;
-  ticketCode: string;
-  seatNumber: string | null;
-  status: string;
-  createdAt: string;
-  userName: string | null;
-  userEmail: string | null;
-  userPhone: string | null;
-  amount: number | null;
-  paymentMethod: string | null;
-  paymentStatus: string | null;
-}
-
-interface AdminTicketsResponse {
-  success: boolean;
-  items?: AdminTicket[];
-  message?: string;
-}
-
 function toDateTimeLocalValue(date: Date): string {
   const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
   return localDate.toISOString().slice(0, 16);
@@ -92,27 +72,23 @@ export const TicketBookingView: React.FC = () => {
   const [verifyResult, setVerifyResult] = useState<TicketVerificationResult | null>(null);
 
   // Quản lý vé khách hàng (Admin)
-  const [adminTickets, setAdminTickets] = useState<AdminTicket[]>([]);
+  const [adminTickets, setAdminTickets] = useState<any[]>([]);
   const [adminSearch, setAdminSearch] = useState<string>('');
   const [adminStatusFilter, setAdminStatusFilter] = useState<string>('');
   const [isLoadingAdminTickets, setIsLoadingAdminTickets] = useState<boolean>(false);
-  const [adminTicketsError, setAdminTicketsError] = useState<string | null>(null);
 
   const fetchAdminTickets = async () => {
     setIsLoadingAdminTickets(true);
-    setAdminTicketsError(null);
     try {
       const params = new URLSearchParams();
       if (adminSearch) params.set('search', adminSearch);
       if (adminStatusFilter) params.set('status', adminStatusFilter);
-      const response = await apiFetch(getApiUrl(`/api/v1/tickets/admin/all?${params.toString()}`));
-      const result: AdminTicketsResponse = await response.json();
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || 'Không thể tải danh sách vé quản lý.');
+      const res = (await apiFetch(getApiUrl(`/api/v1/tickets/admin/all?${params.toString()}`))) as any;
+      if (res.success) {
+        setAdminTickets(res.items || []);
       }
-      setAdminTickets(result.items || []);
-    } catch (err: unknown) {
-      setAdminTicketsError(getErrorMessage(err, 'Không thể tải danh sách vé quản lý.'));
+    } catch (err) {
+      // ignore
     } finally {
       setIsLoadingAdminTickets(false);
     }
@@ -900,12 +876,6 @@ export const TicketBookingView: React.FC = () => {
               {isLoadingAdminTickets ? (
                 <tr>
                   <td colSpan={6} style={{ textAlign: 'center', padding: '24px', color: '#94a3b8' }}>Đang tải danh sách vé...</td>
-                </tr>
-              ) : adminTicketsError ? (
-                <tr>
-                  <td colSpan={6} style={{ padding: '24px', color: '#f87171' }}>
-                    <span role="alert">{adminTicketsError}</span>
-                  </td>
                 </tr>
               ) : adminTickets.length === 0 ? (
                 <tr>
