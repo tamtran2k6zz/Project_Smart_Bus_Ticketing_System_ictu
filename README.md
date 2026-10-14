@@ -1,30 +1,76 @@
-# SmartBus
+# SmartBus — Hệ thống bán vé xe buýt thông minh
 
-**Hệ thống bán vé và quản lý vận hành xe buýt thông minh**
+**Đồ án Thực tập Cơ sở 2026 · Nhóm 5 — N5 Innovators**
+
+**Trường Đại học Công nghệ Thông tin & Truyền thông — Đại học Thái Nguyên (ICTU).**
 
 [![CI](https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu/actions/workflows/ci.yml/badge.svg)](https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu/actions/workflows/ci.yml)
 
 [Ứng dụng](https://smart-bus-ticketing-system.vercel.app/) · [Báo lỗi](https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu/issues) · [Tài liệu](#tài-liệu)
 
-SmartBus số hóa quy trình tra cứu, đặt vé, thanh toán và soát vé xe buýt; đồng thời hỗ trợ nhà xe quản lý tuyến, lịch chạy, đội xe, nhân sự và doanh thu. Dự án sử dụng tiếng Việt, đơn vị tiền tệ VND và múi giờ `Asia/Ho_Chi_Minh`.
-
-Được phát triển bởi **Nhóm 5 — N5 Innovators**, Trường Đại học Công nghệ Thông tin & Truyền thông, Đại học Thái Nguyên (ICTU), trong khuôn khổ Đồ án Thực tập Cơ sở 2026.
+SmartBus là đồ án xây dựng ứng dụng web số hóa quy trình tra cứu, đặt vé, thanh toán và soát vé xe buýt; đồng thời hỗ trợ quản lý tuyến, lịch chạy, đội xe, nhân sự và doanh thu. Đồ án vận dụng kiến thức phân tích yêu cầu, thiết kế cơ sở dữ liệu, phát triển phần mềm và kiểm thử vào một bài toán vận tải công cộng. Giao diện sử dụng tiếng Việt, đơn vị tiền tệ VND và múi giờ `Asia/Ho_Chi_Minh`.
 
 ![Giao diện SmartBus](frontend/docs/previews/smartbus-hero-1440.png)
 
 ## Mục lục
 
-- [Phạm vi sản phẩm](#phạm-vi-sản-phẩm)
+- [Thông tin đồ án](#thông-tin-đồ-án)
+- [Tầm nhìn, mục tiêu và phạm vi đồ án](#tầm-nhìn-mục-tiêu-và-phạm-vi-đồ-án)
+- [Vai trò và phân quyền](#vai-trò-và-phân-quyền)
 - [Kiến trúc và công nghệ](#kiến-trúc-và-công-nghệ)
-- [Khởi chạy](#khởi-chạy)
+- [Luồng nghiệp vụ chính](#luồng-nghiệp-vụ-chính)
+- [Cơ sở dữ liệu và migration](#cơ-sở-dữ-liệu-và-migration)
+- [Hướng dẫn cài đặt và chạy](#hướng-dẫn-cài-đặt-và-chạy)
 - [Cấu hình](#cấu-hình)
 - [Kiểm thử](#kiểm-thử)
 - [Triển khai và vận hành](#triển-khai-và-vận-hành)
+- [Kết quả, hạn chế và hướng phát triển](#kết-quả-hạn-chế-và-hướng-phát-triển)
 - [Cấu trúc mã nguồn](#cấu-trúc-mã-nguồn)
 - [Tài liệu](#tài-liệu)
-- [Đóng góp và bảo mật](#đóng-góp-và-bảo-mật)
+- [Đội ngũ phát triển](#đội-ngũ-phát-triển)
+- [Quy trình làm việc nhóm và bảo mật](#quy-trình-làm-việc-nhóm-và-bảo-mật)
 
-## Phạm vi sản phẩm
+## Thông tin đồ án
+
+| Nội dung       | Thông tin                                                                      |
+| -------------- | ------------------------------------------------------------------------------ |
+| Tên đề tài     | Xây dựng hệ thống bán vé và quản lý vận hành xe buýt thông minh                |
+| Học phần       | Đồ án Thực tập Cơ sở                                                           |
+| Năm thực hiện  | 2026                                                                           |
+| Nhóm thực hiện | Nhóm 5 — N5 Innovators                                                         |
+| Đơn vị đào tạo | Trường Đại học Công nghệ Thông tin & Truyền thông — Đại học Thái Nguyên (ICTU) |
+
+## Tầm nhìn, mục tiêu và phạm vi đồ án
+
+### Bài toán và tầm nhìn
+
+Việc bán vé, kiểm soát chỗ, phân công chuyến và tổng hợp doanh thu cần dữ liệu thống nhất giữa hành khách, tài xế và bộ phận điều hành. Đồ án lựa chọn bài toán này để phân tích yêu cầu, thiết kế cơ sở dữ liệu, xây dựng ứng dụng web và kiểm chứng các quy tắc nghiệp vụ.
+
+**Tầm nhìn:** xây dựng hệ thống số hóa bán vé xe buýt, giúp hành khách tra cứu, đặt vé và theo dõi hành trình; đồng thời hỗ trợ nhà xe điều hành chuyến, kiểm soát doanh thu và nâng cao chất lượng phục vụ.
+
+### Năm mục tiêu của đề tài
+
+| Mục tiêu                             | Nội dung triển khai                                                           |
+| ------------------------------------ | ----------------------------------------------------------------------------- |
+| G1 — Số hóa bán vé và thanh toán     | Tra cứu, sơ đồ ghế, giữ chỗ, thanh toán trực tuyến và phát hành vé QR         |
+| G2 — Hỗ trợ quản lý vận hành         | Quản lý tuyến/trạm/lịch/đội xe, phân công tài xế/phụ xe và soát vé            |
+| G3 — Nâng cao trải nghiệm hành khách | Theo dõi vị trí xe, thông báo trạm, cập nhật sự cố và thay đổi chuyến         |
+| G4 — Quản lý tài chính và ưu đãi     | Báo cáo doanh thu, vé lượt/vé tháng, hồ sơ ưu tiên và chương trình khuyến mãi |
+| G5 — Phân tích dữ liệu vận tải       | Mật độ hành khách theo giờ/trạm, đề xuất tần suất và dự báo nhu cầu tham khảo |
+
+### Phạm vi 24 user story
+
+| Nhóm nghiệp vụ                 | User story | Nội dung                                                    |
+| ------------------------------ | ---------- | ----------------------------------------------------------- |
+| Quản lý đặt vé và vé điện tử   | US 01–05   | Tra cứu, chọn ghế, giữ chỗ 10 phút, QR, hủy/đổi vé          |
+| Thanh toán và tích hợp         | US 06–08   | Cổng thanh toán, hóa đơn qua email và hoàn tiền             |
+| Định vị và theo dõi hành trình | US 09–11   | GPS, thông báo trạm, báo sự cố/trễ chuyến                   |
+| Quản lý vận hành               | US 12–15   | Tuyến/trạm/giá, lịch theo tần suất, điều xe/tổ lái, soát QR |
+| Vé tháng và khuyến mãi         | US 16–18   | Đăng ký/gia hạn vé tháng, duyệt ưu đãi và voucher           |
+| Báo cáo và thống kê            | US 19–21   | Doanh thu, lấp đầy từng chuyến, xuất Excel/PDF              |
+| Quản trị và hỗ trợ             | US 22–24   | Tài khoản/phân quyền, nhật ký và phản ánh hành khách        |
+
+### Các phân hệ hiện có
 
 | Phân hệ                | Chức năng chính                                                                                                          |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------ |
@@ -38,7 +84,7 @@ SmartBus số hóa quy trình tra cứu, đặt vé, thanh toán và soát vé x
 
 Các phân hệ tương ứng với **24 user story và 5 product goal**. Việc có chức năng và kiểm thử tự động chưa thay thế nghiệm thu tích hợp bên ngoài hoặc đo hiệu quả kinh doanh trên dữ liệu vận hành thực.
 
-### Vai trò sử dụng
+## Vai trò và phân quyền
 
 | Vai trò         | Mã          | Phạm vi chính                                      |
 | --------------- | ----------- | -------------------------------------------------- |
@@ -76,7 +122,72 @@ flowchart LR
 
 Các thao tác đặt vé sử dụng transaction và khóa hàng PostgreSQL. Redis bổ sung khóa/cache cho các luồng có cấu hình sử dụng. Schema được quản lý bằng migration SQL; backend sử dụng trực tiếp `pg`.
 
-## Khởi chạy
+## Luồng nghiệp vụ chính
+
+### Đặt vé, thanh toán và nhận QR
+
+```mermaid
+sequenceDiagram
+    actor P as Hành khách
+    participant UI as Frontend
+    participant API as Express API
+    participant DB as PostgreSQL
+    participant G as Cổng thanh toán
+    P->>UI: Chọn chuyến và ghế
+    UI->>API: POST /holds
+    API->>DB: Khóa ghế, giữ chỗ 10 phút
+    API-->>UI: holdId, expiresAt
+    UI->>API: POST /bookings
+    API-->>UI: bookingId
+    UI->>API: POST /payments
+    API->>G: Khởi tạo giao dịch
+    API-->>UI: redirectUrl
+    G->>API: Callback / IPN
+    API->>DB: Kiểm tra giao dịch, cập nhật vé
+    UI->>API: Đọc trạng thái vé
+    API-->>UI: QR khi đủ điều kiện
+```
+
+Giá và thời hạn giữ chỗ do backend xác định; tải lại trang không gia hạn. Callback phải khớp chữ ký, số tiền và giao dịch. Tham số trên URL trả về không tự xác nhận thanh toán. Yêu cầu lặp và giao dịch đến muộn được xử lý để tránh phát hành trùng vé.
+
+### Xác minh, hủy/đổi và soát vé
+
+- Hành khách đăng ký bằng email, nhận liên kết xác minh và hoàn tất xác minh trước các thao tác yêu cầu quyền này. Khôi phục mật khẩu dùng liên kết có hạn, dùng một lần; đổi mật khẩu làm mất hiệu lực phiên cũ.
+- Yêu cầu hủy/đổi được xét theo điều kiện vé và thời gian trước khởi hành. Backend quản lý việc đổi chỗ, trạng thái vé và hoàn tiền; thông tin ngân hàng nhận hoàn có thể được cung cấp trong yêu cầu hủy.
+- Người soát cần đúng quyền và phân công chuyến. Vé chưa thanh toán, bị hủy hoặc QR không còn hợp lệ bị từ chối; quét lặp không tạo thêm lần lên xe.
+- Chuyến chờ chạy hoặc đang chạy được hoàn tất khi đã qua giờ đến dự kiến. Những chuyến chưa tới giờ kết thúc được giữ nguyên.
+
+### Vị trí và thông báo
+
+Giao diện nhận vị trí/ETA qua HTTP polling, hiển thị thời điểm cập nhật và tình trạng dữ liệu. Backend nhận cập nhật GPS từ người hoặc nguồn có quyền; dữ liệu thiếu/cũ không được coi là tín hiệu GPS trực tiếp hợp lệ. WebSocket chỉ hoạt động trên hạ tầng hỗ trợ kết nối thường trực.
+
+## Cơ sở dữ liệu và migration
+
+Nguồn schema áp dụng là **[supabase/migrations/](supabase/migrations/)**:
+
+| Nhóm               | Bảng tiêu biểu                                                                                                   |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| Tài khoản          | `roles`, `users`, `staff_profiles`                                                                               |
+| Vận hành           | `routes`, `bus_stops`, `route_stops`, `buses`, `seats`, `fares`, `trips`, `trip_seats`                           |
+| Vé / thanh toán    | `ui_holds`, `ui_bookings`, `tickets`, `payment_transactions`, `ticket_requests`, `vouchers`                      |
+| Vị trí / tương tác | `trip_locations`, `trip_subscriptions`, `incidents`, `feedbacks`, `support_requests`, `eligibility_applications` |
+| Audit / gửi vé     | `audit_events`, `ticket_email_deliveries` và các bảng validation/notification trong migration Sprint 3           |
+
+Các migration bổ sung quản lý `monthly_passes`, `pass_orders`, `pass_checkins`, `fare_policies`, `refund_jobs`, `electronic_invoices`, đơn ZaloPay và các trường khôi phục mật khẩu/thông tin ngân hàng.
+
+Migration runner:
+
+- Ưu tiên `DIRECT_URL`, từ chối cổng Transaction pooler `6543`.
+- Đọc SQL theo thứ tự tên, áp dụng trong transaction với advisory lock.
+- Lưu checksum tại `smartbus_private.migrations`; từ chối file đã áp dụng bị sửa.
+- Đồng bộ `supabase_migrations.schema_migrations` nếu bảng lịch sử này tồn tại.
+- Chạy lại được với migration không thay đổi; không tự xóa bảng/dữ liệu để hòa giải schema.
+
+Đổi schema bằng **migration mới**, kiểm thử trước khi áp dụng database dùng chung. Nguồn áp dụng chuẩn là thư mục `supabase/migrations`; không dùng bản SQL tham chiếu để thay runner. Truy cập ứng dụng đi qua Express/`pg`; custom JWT không phải Supabase Auth JWT. Migration bật RLS/hạn chế truy cập trực tiếp cho `anon`/`authenticated` của Data API.
+
+[Sơ đồ ERD](https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu/blob/745108a0217267ee29cb65e88d94437d853f5f45/docs/ERD_SMART_BUS_TICKETING_SYSTEM.md) mô tả mô hình nền; migration bổ sung là nguồn đối chiếu cho bảng mới.
+
+## Hướng dẫn cài đặt và chạy
 
 ### Yêu cầu
 
@@ -237,6 +348,28 @@ docker compose up --build -d
 
 Cần hoàn tất nghiệm thu merchant/callback/hoàn tiền, hợp đồng API hóa đơn, nhận email thực, camera/GPS, scheduler, backup/khôi phục và kiểm thử tải. Rà soát TLS của các script quản trị/migration trước khi sử dụng trên dữ liệu thật. Các đề xuất tần suất và dự báo cần được đánh giá bằng dữ liệu vận hành cùng chỉ số sai số đã thống nhất.
 
+## Kết quả, hạn chế và hướng phát triển
+
+### Kết quả đạt được trong phạm vi đồ án
+
+Đồ án đã xây dựng các phân hệ tương ứng với 24 user story, kết nối giao diện với Express/PostgreSQL và có kiểm thử nghiệp vụ xuyên suốt. Các kết quả kiểm thử được tổng hợp ở mục [Kiểm thử](#kiểm-thử). Dữ liệu và chức năng phân tích hỗ trợ cả năm mục tiêu đã đề ra; chưa có số liệu vận hành để khẳng định các mục tiêu kinh doanh đã đạt.
+
+### Hạn chế
+
+- Merchant, callback, hoàn tiền và nhà cung cấp hóa đơn cần nghiệm thu thực tế. Chứng từ mô phỏng hoặc file PDF tự xuất không thay thế hóa đơn thuế từ nhà cung cấp.
+- GPS, camera và thông báo cần kiểm tra trên thiết bị/mạng thực. Chức năng soát vé hiện là ứng dụng web responsive, chưa có ứng dụng native Android/iOS riêng.
+- PGlite và provider giả lập chưa thay thế bài kiểm tra tải, nhiều kết nối PostgreSQL server và vận hành liên tục.
+- Dự báo hiện là thống kê tham khảo; chưa có dữ liệu lịch sử đủ lớn để đánh giá sai số và hiệu quả tối ưu tần suất.
+- Cần tiếp tục rà soát TLS của công cụ migration/quản trị, cấu hình scheduler và quy trình backup/khôi phục trước khi vận hành trên dữ liệu thật.
+
+### Hướng phát triển
+
+1. Nghiệm thu dịch vụ thanh toán, hóa đơn và hoàn tiền với nhà cung cấp cụ thể.
+2. Thử GPS/camera trên điện thoại, đo độ trễ cập nhật vị trí và thông báo trạm.
+3. Kiểm thử tải/xung đột nhiều kết nối, đối soát dữ liệu và kiểm tra phục hồi sau sự cố.
+4. Đánh giá mô hình dự báo trên dữ liệu thực, xác định chỉ số sai số và hiệu quả điều chỉnh chuyến.
+5. Tiếp tục tách nghiệp vụ backend thành module và chuẩn hóa tài liệu, quy trình phát triển của nhóm.
+
 ## Cấu trúc mã nguồn
 
 ```text
@@ -274,7 +407,29 @@ Các liên kết dưới đây trỏ tới phiên bản tài liệu đã lưu c�
 
 Điểm vào API được định nghĩa tại [backend/src/app.ts](backend/src/app.ts); điều hướng giao diện chính tại [frontend/src/routes/AppRouter.tsx](frontend/src/routes/AppRouter.tsx).
 
-## Đóng góp và bảo mật
+Tài liệu phục vụ học phần tại commit tham chiếu:
+
+- [Báo cáo Sprint 1 — Word](https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu/blob/745108a0217267ee29cb65e88d94437d853f5f45/docs/Bao_Cao_Sprint_1_Smart_Bus_Ticketing_System.docx).
+- [Slide thuyết trình Sprint 1 — PowerPoint](https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu/blob/745108a0217267ee29cb65e88d94437d853f5f45/docs/Slide_Thuyet_Trinh_Sprint_1_Smart_Bus.pptx).
+
+Kịch bản demo được giữ như tài liệu lịch sử. Hai script khởi động/dừng buổi demo đã được gỡ sau khi báo cáo kết thúc.
+
+## Đội ngũ phát triển
+
+| STT | Họ và tên              | Vai trò                  | Phân hệ phụ trách chính                           |
+| :-: | ---------------------- | ------------------------ | ------------------------------------------------- |
+|  1  | **Trần Đặng Công Tâm** | Scrum Master kiêm Leader | Quản lý dự án, Sprint, Cloud/Docker, review PR    |
+|  2  | **Nguyễn Hoàng Đức**   | Frontend Developer       | Layout Auth, AuthContext, đăng nhập, RBAC         |
+|  3  | **Hà Quang Vinh**      | Frontend Developer       | Quản trị tuyến, sắp xếp trạm kéo thả              |
+|  4  | **Triệu Văn Thiệp**    | Frontend Developer       | Trang chủ, tra cứu tuyến, kết quả tìm kiếm        |
+|  5  | **La Công Tuấn**       | Backend Developer        | Kiến trúc API, đặt vé, sơ đồ ghế, QR              |
+|  6  | **Tào Hoàng Minh Vũ**  | Backend Developer        | PostgreSQL, migration Supabase, UTF-8             |
+|  7  | **Nguyễn Minh Đức**    | Backend Developer        | API tìm chuyến, tối ưu truy vấn                   |
+|  8  | **Mạch Thị Ngọc Ánh**  | Quality Assurance (QA)   | Test case, chất lượng phần mềm, soát vé QR        |
+|  9  | **Đinh Hữu Phúc**      | Quality Assurance (QA)   | Kiểm thử chức năng, API và UI                     |
+| 10  | **Hoàng Quốc Toản**    | Quality Assurance (QA)   | Hiệu năng, bảo mật, nghiệm thu Definition of Done |
+
+## Quy trình làm việc nhóm và bảo mật
 
 1. Tạo nhánh từ phiên bản `main` mới nhất, mô tả rõ phạm vi thay đổi.
 2. Bổ sung migration mới cho thay đổi dữ liệu; không chỉnh migration đã áp dụng.
@@ -283,4 +438,8 @@ Các liên kết dưới đây trỏ tới phiên bản tài liệu đã lưu c�
 
 Dùng Issues cho lỗi chức năng và đề xuất cải tiến. Với vấn đề bảo mật, liên hệ riêng người quản lý repository; không đăng credential, token, connection string hoặc dữ liệu cá nhân vào issue công khai.
 
-Repository hiện chưa công bố tệp `LICENSE`. Thông tin nhóm phát triển: **N5 Innovators — ICTU, 2026**.
+Repository hiện chưa công bố tệp `LICENSE`.
+
+**Đồ án Thực tập Cơ sở 2026 · Nhóm 5 — N5 Innovators**
+
+Trường Đại học Công nghệ Thông tin & Truyền thông — Đại học Thái Nguyên (ICTU).
