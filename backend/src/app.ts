@@ -40,6 +40,7 @@ app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 app.use('/api', auditRequests);
 // Static actions must precede the UI router's /operations/:key resource routes.
 app.use('/api/smartbus/v1/operations', tripCleanupRoutes);
+app.use('/api/smartbus/v1/wallet', walletRoutes);
 app.use('/api/smartbus/v1', uiRoutes);
 app.get('/api/health', async (_req, res) => {
   const database = describeDatabaseTarget();

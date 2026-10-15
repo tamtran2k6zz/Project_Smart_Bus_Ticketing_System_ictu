@@ -204,17 +204,13 @@ export function TicketDetail() {
     enabled: !!query.data,
   });
   const [modal, setModal] = useState<'cancel' | 'exchange' | ''>(''),
-    [target, setTarget] = useState(''),
-    [bankName, setBankName] = useState(''),
-    [bankAccountNumber, setBankAccountNumber] = useState(''),
-    [accountHolderName, setAccountHolderName] = useState('');
+    [target, setTarget] = useState('');
   const action = useAction(async () => {
     await ticketsApi.request(
       ticketId,
       user.id,
       modal as 'cancel' | 'exchange',
-      target || undefined,
-      modal === 'cancel' ? { bankName, bankAccountNumber, accountHolderName } : undefined
+      target || undefined
     );
     setModal('');
   }, 'Đã gửi yêu cầu, vui lòng chờ điều hành xử lý.');
@@ -376,8 +372,8 @@ export function TicketDetail() {
       >
         <p className="muted">
           Gửi yêu cầu trước khởi hành ít nhất 30 phút. Khi được duyệt, vé bị hủy và ghế được trả về
-          chuyến; hệ thống gửi yêu cầu hoàn tiền và cập nhật kết quả từ cổng thanh toán. Đổi vé áp
-          dụng cho chuyến cùng tuyến, cùng giá còn đủ ghế. QR tạm ngừng sử dụng trong lúc chờ duyệt.
+          chuyến; tiền đã thanh toán được hoàn vào ví SmartBus. Đổi vé áp dụng cho chuyến cùng
+          tuyến, cùng giá còn đủ ghế. QR tạm ngừng sử dụng trong lúc chờ duyệt.
         </p>
         {modal === 'cancel' && b && (
           <div className="stack" style={{ gap: 12, margin: '16px 0' }}>
@@ -394,30 +390,11 @@ export function TicketDetail() {
                 {appConfig.demo ? ' − phí hủy' : ''}
               </span>
             </div>
-            <p className="muted" style={{ margin: 0 }}>
-              Nhập thông tin tài khoản ngân hàng để nhận tiền hoàn (đặc biệt khi thanh toán chuyển khoản thủ công / tiền mặt hoặc khi cần chuyển khoản hoàn tiền):
+            <p className="muted">
+              Sau khi được duyệt, tiền hoàn sẽ về ví SmartBus. Bạn có thể dùng cho vé tháng hoặc
+              nhập tài khoản ngân hàng tại trang ví để yêu cầu rút tiền.
             </p>
-            <Field label="Tên ngân hàng">
-              <input
-                placeholder="VD: Vietcombank, Techcombank, MB Bank..."
-                value={bankName}
-                onChange={e => setBankName(e.target.value)}
-              />
-            </Field>
-            <Field label="Số tài khoản ngân hàng">
-              <input
-                placeholder="Nhập số tài khoản nhận hoàn tiền"
-                value={bankAccountNumber}
-                onChange={e => setBankAccountNumber(e.target.value)}
-              />
-            </Field>
-            <Field label="Tên chủ tài khoản">
-              <input
-                placeholder="NGUYỄN VĂN A"
-                value={accountHolderName}
-                onChange={e => setAccountHolderName(e.target.value)}
-              />
-            </Field>
+            <Link to="/account/wallet">Xem ví SmartBus →</Link>{' '}
           </div>
         )}
         {modal === 'exchange' && (

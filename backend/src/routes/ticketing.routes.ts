@@ -1,5 +1,7 @@
 import { randomUUID } from 'crypto';
 import { confirmPassPayment, failPassPayment } from '../services/monthly-pass.service';
+import { confirmWalletTopup, failWalletTopup } from '../services/wallet.service';
+import { processWalletRenewals } from '../services/wallet-pass.service';
 import { verifiedZalopayCallback } from '../services/zalopay.service';
 import { enqueueRefund, processRefundJobs } from '../services/refund-queue.service';
 import { Request, Response, Router } from 'express';
@@ -70,6 +72,8 @@ export async function confirmPayment(
   gatewayTransactionId: string,
   amount: number
 ): Promise<'CONFIRMED' | 'LATE' | 'REFUNDED' | 'INVALID'> {
+  const walletResult = await confirmWalletTopup(orderId, method, gatewayTransactionId, amount);
+  if (walletResult !== null) return walletResult ? 'CONFIRMED' : 'INVALID';
   const passResult = await confirmPassPayment(orderId, method, gatewayTransactionId, amount);
   if (passResult !== null) return passResult ? 'CONFIRMED' : 'INVALID';
   const outcome = await transaction<'CONFIRMED' | 'LATE' | 'REFUNDED' | 'INVALID'>(async client => {
@@ -178,6 +182,7 @@ export async function recordFailedPayment(
   orderId: string,
   method: OnlinePaymentMethod
 ): Promise<void> {
+  await failWalletTopup(orderId, method);
   await failPassPayment(orderId, method);
   const releasedSeat = await transaction(async client => {
     const {
@@ -265,10 +270,11 @@ async function handleVnpayCallback(req: Request, res: Response, redirect: boolea
     logger.info('vnpay_callback_applied', { entrypoint, order_id: orderId, outcome: result });
 
     if (redirect) {
+      const [topup] = await query<any[]>('SELECT id FROM wallet_topups WHERE id=$1', [orderId]);
       const [passOrder] = await query<any[]>('SELECT id FROM pass_orders WHERE id=$1', [orderId]);
-      if (passOrder) {
+      if (passOrder || topup) {
         const target = new URL(getGatewayCallbacks().paymentResultUrl);
-        target.pathname = '/account/passes';
+        target.pathname = topup ? '/account/wallet' : '/account/passes';
         target.search = '';
         res.redirect(target.toString());
       } else
@@ -972,7 +978,15 @@ async function releaseExpiredHandler(req: Request, res: Response): Promise<void>
     const ticketEmailsSent = await processPendingTicketEmails(1);
     const refundsCompleted = await processRefundJobs(10);
     const oldTripsCleaned = await cleanupOldTrips();
-    res.json({ success: true, affectedRows, ticketEmailsSent, refundsCompleted, oldTripsCleaned });
+    const walletPassesRenewed = await processWalletRenewals();
+    res.json({
+      success: true,
+      affectedRows,
+      ticketEmailsSent,
+      refundsCompleted,
+      oldTripsCleaned,
+      walletPassesRenewed,
+    });
   } catch (error) {
     logger.error('expiry_cleanup_failed', {
       table: 'tickets/trip_seats/payment_transactions',

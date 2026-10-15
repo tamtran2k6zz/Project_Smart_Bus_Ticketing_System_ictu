@@ -2,6 +2,7 @@
   "installCommand": "npm install && npm --prefix backend install && npm --prefix frontend install",
   "buildCommand": "npm --prefix backend run build && npm --prefix frontend run build",
   "outputDirectory": "frontend/dist",
+  "crons": [{ "path": "/api/v1/ticketing/release-expired", "schedule": "0 0 * * *" }],
   "functions": {
     "api/index.js": {
       "maxDuration": 30
