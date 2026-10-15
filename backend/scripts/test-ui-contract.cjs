@@ -691,6 +691,16 @@ module.exports = async ({
   );
   const canceled = await call('get', prefix + '/bookings/' + nextBooking.id, null, passenger);
   assert.equal(canceled.refund, 'refunded');
+  const walletRefund = await db.query(
+    "SELECT amount FROM wallet_transactions WHERE type='REFUND' AND reference_id=$1",
+    [nextPayment.id]
+  );
+  assert.equal(
+    walletRefund.rows.length,
+    1,
+    'approved cancellation must credit the passenger wallet'
+  );
+  assert.equal(Number(walletRefund.rows[0].amount), nextBooking.total);
   assert.equal(canceled.status, 'canceled');
   assert.equal(
     (

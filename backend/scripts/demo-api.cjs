@@ -233,7 +233,7 @@ async function main() {
   async function order(id) {
     const rows = (
       await pool.query(
-        'SELECT order_id AS id,amount,payment_method,status FROM payment_transactions WHERE order_id=$1 UNION SELECT id,amount,payment_method,status FROM pass_orders WHERE id=$1',
+        'SELECT order_id AS id,amount,payment_method,status FROM payment_transactions WHERE order_id=$1 UNION SELECT id,amount,payment_method,status FROM pass_orders WHERE id=$1 UNION SELECT id,amount,method AS payment_method,status FROM wallet_topups WHERE id=$1',
         [id]
       )
     ).rows;
@@ -363,13 +363,17 @@ async function main() {
         }
       }
       const [pass] = (await pool.query('SELECT id FROM pass_orders WHERE id=$1', [record.id])).rows;
+      const [topup] = (await pool.query('SELECT id FROM wallet_topups WHERE id=$1', [record.id]))
+        .rows;
       const [booking] = (
         await pool.query('SELECT id FROM ui_bookings WHERE ticket_id=$1', [record.id])
       ).rows;
       res.json({
-        redirect: pass
-          ? frontend + '/account/passes'
-          : frontend + '/payment/result?bookingId=' + booking?.id,
+        redirect: topup
+          ? frontend + '/account/wallet'
+          : pass
+            ? frontend + '/account/passes'
+            : frontend + '/payment/result?bookingId=' + booking?.id,
       });
     } catch (error) {
       res.status(500).json({ message: error.message });

@@ -1,5 +1,7 @@
 import { TicketQr } from '@/features/tickets/components/Tickets';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { walletApi } from '@/features/wallet/wallet.api';
 import { useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -30,10 +32,23 @@ export function Passes() {
   const query = useQuery({ queryKey: ['passes', user.id], queryFn: () => passesApi.list(user.id) });
   const catalog = useQuery({ queryKey: ['catalog'], queryFn: operationsApi.catalog });
   const [gateway, setGateway] = useState('MoMo');
+  const intent = useRef({ routeId: '', key: '' });
   const [route, setRoute] = useState(''),
     [confirm, setConfirm] = useState<{ routeId: string; id?: string } | null>(null);
   const buy = useAction(async () => {
     if (!confirm) throw new Error('Chọn tuyến.');
+    if (gateway === 'Ví SmartBus') {
+      if (intent.current.routeId !== confirm.routeId)
+        intent.current = { routeId: confirm.routeId, key: crypto.randomUUID() };
+      await walletApi.buyPass(
+        confirm.routeId,
+        query.data?.policy?.monthlyPrice || 0,
+        intent.current.key
+      );
+      intent.current.routeId = '';
+      setConfirm(null);
+      return;
+    }
     const result = await passesApi.buy(user.id, confirm.routeId, confirm.id, gateway);
     if (!appConfig.demo && result.redirectUrl) {
       const url = new URL(result.redirectUrl);
@@ -62,7 +77,7 @@ export function Passes() {
         description={
           appConfig.demo
             ? 'Quản lý tuyến quen thuộc và thời hạn sử dụng. Giá dưới đây là chính sách demo.'
-            : 'Mua/gia hạn vé tháng theo tuyến; chỉ kích hoạt sau khi cổng thanh toán xác nhận.'
+            : 'Mua/gia hạn vé tháng theo tuyến bằng ví SmartBus hoặc cổng thanh toán.'
         }
       />
       <div className="grid">
@@ -102,6 +117,11 @@ export function Passes() {
               Đăng ký {appConfig.demo ? 'demo' : ''}
             </Button>
             <ActionMessage action={buy} />
+            {!appConfig.demo && (
+              <p>
+                <Link to="/account/wallet">Quản lý số dư ví & tự động gia hạn →</Link>
+              </p>
+            )}
           </Card>
           {query.data?.orders?.map(o => (
             <Card key={o.id}>
@@ -193,14 +213,18 @@ export function Passes() {
         <p className="muted">
           {appConfig.demo
             ? 'Demo không thu tiền thật.'
-            : 'Bạn sẽ chuyển tới cổng thanh toán. Vé chỉ kích hoạt sau xác nhận hợp lệ.'}{' '}
+            : gateway === 'Ví SmartBus'
+              ? 'Hệ thống trừ số dư ví và kích hoạt vé ngay khi đủ tiền.'
+              : 'Bạn sẽ chuyển tới cổng thanh toán. Vé chỉ kích hoạt sau xác nhận hợp lệ.'}{' '}
           Thời hạn gia hạn được cộng từ ngày hết hạn nếu vé còn hiệu lực.
         </p>
         <Field label="Phương thức thanh toán">
           <select value={gateway} onChange={e => setGateway(e.target.value)}>
-            {['MoMo', 'VNPay', 'ZaloPay', 'Card'].map(g => (
-              <option key={g}>{g}</option>
-            ))}
+            {['MoMo', 'VNPay', 'ZaloPay', 'Card', ...(!appConfig.demo ? ['Ví SmartBus'] : [])].map(
+              g => (
+                <option key={g}>{g}</option>
+              )
+            )}
           </select>
         </Field>
         <ActionMessage action={buy} />
