@@ -1,6 +1,11 @@
+import { applyTicketPayment } from '../services/ticket-payment.service';
 import { randomUUID } from 'crypto';
 import { confirmPassPayment, failPassPayment } from '../services/monthly-pass.service';
-import { confirmWalletTopup, failWalletTopup } from '../services/wallet.service';
+import {
+  confirmWalletTopup,
+  failWalletTopup,
+  creditRefundToWallet,
+} from '../services/wallet.service';
 import { processWalletRenewals } from '../services/wallet-pass.service';
 import { verifiedZalopayCallback } from '../services/zalopay.service';
 import { enqueueRefund, processRefundJobs } from '../services/refund-queue.service';
@@ -16,11 +21,7 @@ import { getGatewayCallbacks, isProduction, readEnv } from '../config/env';
 import { PaymentGatewayService, OnlinePaymentMethod } from '../services/payment-gateway.service';
 import { BookingError, reserveSeatForPayment, cleanupOldTrips } from '../services/booking';
 import { PaymentRefundError, PaymentRefundService } from '../services/payment-refund.service';
-import {
-  queueTicketEmail,
-  deliverTicketEmail,
-  processPendingTicketEmails,
-} from '../services/ticket-email.service';
+import { deliverTicketEmail, processPendingTicketEmails } from '../services/ticket-email.service';
 
 const router = Router();
 const logger = appLogger.child('ticketing');
@@ -77,64 +78,7 @@ export async function confirmPayment(
   const passResult = await confirmPassPayment(orderId, method, gatewayTransactionId, amount);
   if (passResult !== null) return passResult ? 'CONFIRMED' : 'INVALID';
   const outcome = await transaction<'CONFIRMED' | 'LATE' | 'REFUNDED' | 'INVALID'>(async client => {
-    const {
-      rows: [payment],
-    } = await client.query(
-      `SELECT p.ticket_id,p.amount,p.status,p.payment_method,p.redis_lock_id,
-              t.status AS ticket_status,t.trip_id,t.seat_number,t.user_id,t.ticket_code,
-              t.reservation_expires_at,t.quantity
-       FROM payment_transactions p JOIN tickets t ON t.id=p.ticket_id
-       WHERE p.order_id=$1 FOR UPDATE OF p,t`,
-      [orderId]
-    );
-    if (!payment || payment.payment_method !== method || Number(payment.amount) !== amount)
-      return 'INVALID';
-    if (payment.status === 'REFUNDED') return 'REFUNDED';
-    if (payment.status === 'SUCCESS') {
-      return ['BOOKED', 'CHECKED_IN'].includes(payment.ticket_status) ? 'CONFIRMED' : 'LATE';
-    }
-    if (!['PENDING', 'FAILED'].includes(payment.status)) return 'INVALID';
-
-    const { rows: seats } = await client.query(
-      `SELECT status FROM trip_seats WHERE trip_id=$1 AND ticket_id=$2 FOR UPDATE`,
-      [payment.trip_id, payment.ticket_id]
-    );
-
-    // The UI can reserve multiple seats on one ticket. Never reclaim a seat
-    // that has since been released or assigned to another customer's booking.
-    const seatsUnavailable =
-      seats.length !== Number(payment.quantity) ||
-      seats.some(seat => !['LOCKED', 'BOOKED', 'CHECKED_IN'].includes(seat.status));
-
-    const expired =
-      seatsUnavailable ||
-      payment.ticket_status === 'CANCELLED' ||
-      (payment.reservation_expires_at &&
-        new Date(payment.reservation_expires_at).getTime() <= Date.now());
-
-    await client.query(
-      `UPDATE payment_transactions SET status='SUCCESS',gateway_transaction_id=$1,paid_at=NOW()
-       WHERE order_id=$2`,
-      [gatewayTransactionId, orderId]
-    );
-    if (expired) return 'LATE';
-
-    await client.query(
-      `UPDATE tickets SET status='BOOKED',reservation_expires_at=NULL
-       WHERE id=$1 AND status IN ('RESERVED','CANCELLED')`,
-      [payment.ticket_id]
-    );
-    await client.query(
-      `UPDATE trip_seats SET status='BOOKED',ticket_id=$1,locked_at=NULL,lock_expires_at=NULL,
-       locked_by_user_id=NULL,redis_lock_id=NULL WHERE ticket_id=$1 AND trip_id=$2`,
-      [payment.ticket_id, payment.trip_id]
-    );
-    await client.query('UPDATE trips SET booked_seats=booked_seats+$2 WHERE id=$1', [
-      payment.trip_id,
-      payment.quantity,
-    ]);
-    await queueTicketEmail(client, payment.ticket_id);
-    return 'CONFIRMED';
+    return applyTicketPayment(client, orderId, method, gatewayTransactionId, amount);
   });
   if (outcome === 'CONFIRMED') {
     // Email failure must never turn a confirmed payment into a failed callback.
@@ -872,7 +816,20 @@ router.post(
             'UPDATE payment_transactions SET refund_request_id=$1 WHERE order_id=$2',
             [result.refund_request_id, payment.order_id]
           );
-          if (payment.payment_method !== 'QR') await enqueueRefund(client, row.id);
+          if (payment.payment_method === 'BANK_TRANSFER') {
+            await creditRefundToWallet(
+              client,
+              row.user_id,
+              Number(payment.amount),
+              row.id,
+              `Hoàn tiền vé xe #${row.id}`
+            );
+            await client.query(
+              "UPDATE payment_transactions SET status='REFUNDED' WHERE ticket_id=$1",
+              [row.id]
+            );
+            result.payment_status = 'REFUNDED';
+          } else if (payment.payment_method !== 'QR') await enqueueRefund(client, row.id);
         }
         if (!result.newlyCancelled) return result;
         if (payment?.payment_status === 'PENDING') {

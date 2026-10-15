@@ -16,6 +16,7 @@ import notificationsRoutes from './routes/notifications.routes';
 import ticketDetailsRoutes from './routes/ticket-details.routes';
 import uiRoutes from './routes/ui.routes';
 import walletRoutes from './routes/wallet.routes';
+import bankTransferRoutes from './routes/bank-transfer.routes';
 import { auditRequests } from './services/audit.service';
 import { query } from './config/database';
 import { getJwtSecret } from './config/auth';
@@ -41,6 +42,7 @@ app.use('/api', auditRequests);
 // Static actions must precede the UI router's /operations/:key resource routes.
 app.use('/api/smartbus/v1/operations', tripCleanupRoutes);
 app.use('/api/smartbus/v1/wallet', walletRoutes);
+app.use('/api/smartbus/v1/bank-transfers', bankTransferRoutes);
 app.use('/api/smartbus/v1', uiRoutes);
 app.get('/api/health', async (_req, res) => {
   const database = describeDatabaseTarget();
