@@ -6,11 +6,43 @@ import { PaymentGatewayService, OnlinePaymentMethod } from './payment-gateway.se
 import { assertTripAccess } from './trip-access.service';
 import { userFarePolicy } from './fare-policy.service';
 import { prepareSeats } from './booking';
+
 const fail = (message: string, status = 400): never => {
   throw Object.assign(new Error(message), { status });
 };
+
 const sign = (value: string) => createHmac('sha256', getJwtSecret()).update(value).digest('hex');
-function passDto(p: any) {
+
+export interface MonthlyPassRecord {
+  id: string;
+  user_id: string;
+  route_id: string;
+  expires_at: string | Date;
+  qr_secret: string;
+  status: string;
+  starts_at: string | Date;
+  price: number | string;
+}
+
+export interface PassOrderRecord {
+  id: string;
+  user_id: string;
+  route_id: string;
+  amount: number | string;
+  status: string;
+  payment_url?: string;
+  created_at: string | Date;
+}
+
+export interface EligibilityRecord {
+  id: string;
+  user_id: string;
+  category: string;
+  document?: string;
+  status: string;
+}
+
+function passDto(p: MonthlyPassRecord) {
   const data = {
     kind: 'monthly-pass',
     id: p.id,
@@ -27,7 +59,8 @@ function passDto(p: any) {
     token: JSON.stringify({ ...data, sig: sign(JSON.stringify(data)) }),
   };
 }
-const orderDto = (o: any) => ({
+
+const orderDto = (o: PassOrderRecord) => ({
   id: o.id,
   orderId: o.id,
   userId: o.user_id,
@@ -37,23 +70,24 @@ const orderDto = (o: any) => ({
   redirectUrl: o.payment_url,
   createdAt: o.created_at,
 });
+
 export async function listPasses(userId: string) {
   const policy = await userFarePolicy(userId);
   return {
     passes: (
-      await query<any[]>('SELECT * FROM monthly_passes WHERE user_id=$1 ORDER BY expires_at DESC', [
+      await query<MonthlyPassRecord[]>('SELECT * FROM monthly_passes WHERE user_id=$1 ORDER BY expires_at DESC', [
         userId,
       ])
     ).map(passDto),
     policy,
     orders: (
-      await query<any[]>(
+      await query<PassOrderRecord[]>(
         "SELECT * FROM pass_orders WHERE user_id=$1 AND status='PENDING' ORDER BY created_at DESC",
         [userId]
       )
     ).map(orderDto),
     eligibility: (
-      await query<any[]>('SELECT * FROM eligibility_applications WHERE user_id=$1', [userId])
+      await query<EligibilityRecord[]>('SELECT * FROM eligibility_applications WHERE user_id=$1', [userId])
     ).map(e => ({
       id: e.id,
       userId: e.user_id,

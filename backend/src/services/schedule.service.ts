@@ -1,9 +1,26 @@
 import { randomUUID } from 'crypto';
 import { transaction } from '../config/database';
+
 const fail = (message: string, status = 400): never => {
   throw Object.assign(new Error(message), { status });
 };
-export function scheduleSlots(config: any) {
+
+export interface ScheduleConfig {
+  from: string;
+  to: string;
+  startTime: string;
+  endTime: string;
+  headway: number;
+  duration: number;
+  weekdays: number[];
+  name: string;
+  vehicleIds: string[];
+  routeId: string;
+  driverIds?: string[];
+  conductorIds?: string[];
+}
+
+export function scheduleSlots(config: ScheduleConfig) {
   const { from, to, startTime, endTime, headway, duration, weekdays } = config;
   if (
     !/^\d{4}-\d{2}-\d{2}$/.test(from) ||
@@ -19,7 +36,7 @@ export function scheduleSlots(config: any) {
     duration > 1440 ||
     !Array.isArray(weekdays) ||
     !weekdays.length ||
-    weekdays.some((d: any) => !Number.isInteger(d) || d < 0 || d > 6)
+    weekdays.some((d: number) => !Number.isInteger(d) || d < 0 || d > 6)
   )
     fail('Khoảng ngày, giờ, tần suất hoặc ngày trong tuần không hợp lệ.');
   const minutes = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
@@ -56,14 +73,15 @@ export function scheduleSlots(config: any) {
   if (!slots.length) fail('Không có chuyến tương lai trong lịch.');
   return slots;
 }
-export async function createSchedule(actor: string, data: any) {
+
+export async function createSchedule(actor: string, data: ScheduleConfig) {
   const slots = scheduleSlots(data);
   if (
     typeof data.name !== 'string' ||
     data.name.trim().length < 2 ||
     !Array.isArray(data.vehicleIds) ||
     !data.vehicleIds.length ||
-    data.vehicleIds.some((x: any) => typeof x !== 'string') ||
+    data.vehicleIds.some((x: string) => typeof x !== 'string') ||
     new Set(data.vehicleIds).size !== data.vehicleIds.length
   )
     fail('Nhập tên lịch và chọn đội xe hợp lệ.');
