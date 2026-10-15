@@ -5,7 +5,7 @@ const fail = (message: string, status = 400): never => {
   throw Object.assign(new Error(message), { status });
 };
 
-export interface ScheduleConfig {
+export interface ScheduleTiming {
   from: string;
   to: string;
   startTime: string;
@@ -13,6 +13,9 @@ export interface ScheduleConfig {
   headway: number;
   duration: number;
   weekdays: number[];
+}
+
+export interface ScheduleConfig extends ScheduleTiming {
   name: string;
   vehicleIds: string[];
   routeId: string;
@@ -20,7 +23,7 @@ export interface ScheduleConfig {
   conductorIds?: string[];
 }
 
-export function scheduleSlots(config: ScheduleConfig) {
+export function scheduleSlots(config: ScheduleTiming) {
   const { from, to, startTime, endTime, headway, duration, weekdays } = config;
   if (
     !/^\d{4}-\d{2}-\d{2}$/.test(from) ||

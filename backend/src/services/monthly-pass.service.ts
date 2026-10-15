@@ -114,9 +114,10 @@ export async function listPasses(userId: string) {
   const policy = await userFarePolicy(userId);
   return {
     passes: (
-      await query<MonthlyPassRecord[]>('SELECT * FROM monthly_passes WHERE user_id=$1 ORDER BY expires_at DESC', [
-        userId,
-      ])
+      await query<MonthlyPassRecord[]>(
+        'SELECT * FROM monthly_passes WHERE user_id=$1 ORDER BY expires_at DESC',
+        [userId]
+      )
     ).map(passDto),
     policy,
     orders: (
@@ -126,7 +127,9 @@ export async function listPasses(userId: string) {
       )
     ).map(orderDto),
     eligibility: (
-      await query<EligibilityRecord[]>('SELECT * FROM eligibility_applications WHERE user_id=$1', [userId])
+      await query<EligibilityRecord[]>('SELECT * FROM eligibility_applications WHERE user_id=$1', [
+        userId,
+      ])
     ).map(e => ({
       id: e.id,
       userId: e.user_id,
