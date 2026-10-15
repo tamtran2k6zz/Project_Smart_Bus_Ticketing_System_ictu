@@ -1,6 +1,6 @@
-import { scheduleSlots } from './schedule.service';
+import { scheduleSlots, type ScheduleTiming } from './schedule.service';
 jest.mock('../config/database', () => ({ transaction: jest.fn() }));
-const config = {
+const config: ScheduleTiming = {
   from: '2099-01-01',
   to: '2099-01-01',
   startTime: '06:00',

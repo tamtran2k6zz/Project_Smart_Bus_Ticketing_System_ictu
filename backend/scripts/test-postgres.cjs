@@ -1245,7 +1245,7 @@ async function main() {
           "SELECT count(*)::int AS n FROM pg_tables WHERE schemaname='public' AND rowsecurity"
         )
       ).rows[0].n,
-      41
+      42
     );
     await require('./test-ui-contract.cjs')({
       app,
@@ -1280,6 +1280,7 @@ async function main() {
     });
     await require('./test-password-reset.cjs')({ db, call });
     await require('./test-wallet-flows.cjs')({ db, call, route, admin, momoCallback });
+    await require('./test-bank-transfer.cjs')({ db, call, route, admin });
     await call('delete', `/api/routes/${route}`, null, admin);
     await call('delete', `/api/routes/${routeWithStops}`, null, admin);
     assert.equal((await call('get', '/api/routes')).data.length, 0);
