@@ -1,4 +1,5 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
+import { PoolClient } from 'pg';
 import { query, transaction } from '../config/database';
 import { getJwtSecret } from '../config/auth';
 import { assertEmailVerified } from './email-verification.service';
@@ -71,6 +72,44 @@ const orderDto = (o: PassOrderRecord) => ({
   createdAt: o.created_at,
 });
 
+// Shared activation for verified gateway payments and atomic wallet payments.
+export async function activatePass(
+  client: PoolClient,
+  userId: string,
+  routeId: string,
+  amount: number
+) {
+  const {
+    rows: [existing],
+  } = await client.query(
+    'SELECT * FROM monthly_passes WHERE user_id=$1 AND route_id=$2 FOR UPDATE',
+    [userId, routeId]
+  );
+  const now = new Date();
+  const active =
+    existing?.status === 'active' && new Date(existing.expires_at).getTime() > now.getTime();
+  const starts = active ? existing.starts_at : now;
+  const expires = new Date(
+    (active ? new Date(existing.expires_at).getTime() : now.getTime()) + 30 * 86400000
+  );
+  const {
+    rows: [pass],
+  } = await client.query(
+    `INSERT INTO monthly_passes(id,user_id,route_id,starts_at,expires_at,price,qr_secret)
+     VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(user_id,route_id) DO UPDATE SET starts_at=$4,expires_at=$5,price=$6,status='active' RETURNING *`,
+    [
+      existing?.id || randomUUID(),
+      userId,
+      routeId,
+      starts,
+      expires,
+      amount,
+      existing?.qr_secret || randomUUID(),
+    ]
+  );
+  return pass;
+}
+
 export async function listPasses(userId: string) {
   const policy = await userFarePolicy(userId);
   return {
@@ -97,6 +136,7 @@ export async function listPasses(userId: string) {
     })),
   };
 }
+
 export async function buyPass(
   userId: string,
   routeId: string,
@@ -153,6 +193,7 @@ export async function buyPass(
   }
   return orderDto(order);
 }
+
 export async function confirmPassPayment(
   orderId: string,
   method: string,
@@ -172,39 +213,7 @@ export async function confirmPassPayment(
     if (order.payment_method !== method || Number(order.amount) !== amount) return false;
     if (order.status === 'SUCCESS') return order.gateway_transaction_id === transactionId;
     if (order.status === 'REFUNDED') return false;
-    const {
-      rows: [existing],
-    } = await client.query(
-      'SELECT * FROM monthly_passes WHERE user_id=$1 AND route_id=$2 FOR UPDATE',
-      [order.user_id, order.route_id]
-    );
-    const now = new Date();
-    const starts =
-      existing?.status === 'active' && new Date(existing.expires_at).getTime() > now.getTime()
-        ? existing.starts_at
-        : now;
-    const expires = new Date(
-      Math.max(
-        now.getTime(),
-        existing?.status === 'active' ? new Date(existing.expires_at).getTime() : 0
-      ) +
-        30 * 86400000
-    );
-    const {
-      rows: [pass],
-    } = await client.query(
-      `INSERT INTO monthly_passes(id,user_id,route_id,starts_at,expires_at,price,qr_secret)
-      VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(user_id,route_id) DO UPDATE SET starts_at=$4,expires_at=$5,price=$6,status='active' RETURNING *`,
-      [
-        existing?.id || randomUUID(),
-        order.user_id,
-        order.route_id,
-        starts,
-        expires,
-        order.amount,
-        existing?.qr_secret || randomUUID(),
-      ]
-    );
+    const pass = await activatePass(client, order.user_id, order.route_id, Number(order.amount));
     await client.query(
       "UPDATE pass_orders SET status='SUCCESS',paid_at=NOW(),gateway_transaction_id=$1,pass_id=$2 WHERE id=$3",
       [transactionId, pass.id, order.id]
@@ -212,12 +221,14 @@ export async function confirmPassPayment(
     return true;
   });
 }
+
 export async function failPassPayment(orderId: string, method: string) {
   await query(
     "UPDATE pass_orders SET status='FAILED' WHERE id=$1 AND payment_method=$2 AND status='PENDING'",
     [orderId, method]
   );
 }
+
 export async function validatePass(code: string, tripId: string, actor: string, role: string) {
   await assertTripAccess(tripId, actor, role);
   let payload: any;
@@ -254,7 +265,10 @@ export async function validatePass(code: string, tripId: string, actor: string, 
       Date.parse(data.expiresAt) !== new Date(pass.expires_at).getTime()
     )
       fail('Vé tháng đã thay đổi hoặc không hợp lệ.', 409);
-    if (Date.parse(pass.starts_at) > Date.now() || Date.parse(pass.expires_at) <= Date.now())
+    if (
+      Date.parse(pass.starts_at) > Date.now() ||
+      new Date(pass.expires_at).getTime() <= Date.now()
+    )
       fail('Vé tháng chưa có hiệu lực hoặc đã hết hạn.', 409);
     if (
       trip.route_id !== pass.route_id ||
