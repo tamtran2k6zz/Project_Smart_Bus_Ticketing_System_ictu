@@ -370,6 +370,10 @@ Cần hoàn tất nghiệm thu merchant/callback/hoàn tiền, hợp đồng API
 4. Đánh giá mô hình dự báo trên dữ liệu thực, xác định chỉ số sai số và hiệu quả điều chỉnh chuyến.
 5. Tiếp tục tách nghiệp vụ backend thành module và chuẩn hóa tài liệu, quy trình phát triển của nhóm.
 
+### Cải tiến kỹ thuật gần đây (Tháng 10/2026)
+- **Type Safety & Strict Interfaces**: Chuẩn hóa toàn bộ các dịch vụ cốt lõi (như `monthly-pass.service.ts`, `schedule.service.ts`) bằng các interface TypeScript tường minh (`MonthlyPassRecord`, `PassOrderRecord`, `ScheduleConfig`), loại bỏ các kiểu `any` lỏng lẻo.
+- **Bảo mật & Đồng thời**: Tăng cường bảo mật xác thực QR vé tháng với HMAC SHA-256 và `timingSafeEqual`, kết hợp giao dịch PostgreSQL với row-level locking (`FOR UPDATE`) chống tranh chấp ghế hiệu quả.
+
 ## Cấu trúc mã nguồn
 
 ```text
