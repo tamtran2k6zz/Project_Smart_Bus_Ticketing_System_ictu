@@ -38,6 +38,7 @@ export function DataManager({
   load,
   save,
   remove,
+  readOnly = false,
 }: {
   title: string;
   description: string;
@@ -48,6 +49,7 @@ export function DataManager({
   load: () => Promise<Record<string, unknown>[]>;
   save: (data: Record<string, unknown>) => Promise<unknown>;
   remove: (id: string) => Promise<unknown>;
+  readOnly?: boolean;
 }) {
   const query = useQuery({ queryKey: [queryKey], queryFn: load });
   const [search, setSearch] = useState(''),
@@ -95,10 +97,12 @@ export function DataManager({
         title={title}
         description={description}
         action={
-          <Button onClick={() => edit({})}>
-            <Plus size={17} />
-            Thêm mới
-          </Button>
+          !readOnly && (
+            <Button onClick={() => edit({})}>
+              <Plus size={17} />
+              Thêm mới
+            </Button>
+          )
         }
       />
       <ActionMessage action={saveAction} />
@@ -122,7 +126,7 @@ export function DataManager({
                   {columns.map(c => (
                     <th key={c.key}>{c.label}</th>
                   ))}
-                  <th>Thao tác</th>
+                  {!readOnly && <th>Thao tác</th>}
                 </tr>
               </thead>
               <tbody>
@@ -141,27 +145,29 @@ export function DataManager({
                         )}
                       </td>
                     ))}
-                    <td>
-                      <div className="row">
-                        <Button
-                          variant="ghost"
-                          aria-label={'Sửa ' + String(row.name || row.code || row.id)}
-                          onClick={() => edit(row)}
-                        >
-                          <Pencil size={15} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          aria-label={'Xóa ' + String(row.name || row.code || row.id)}
-                          onClick={() => {
-                            deleteAction.clear();
-                            setDeleting(String(row.id));
-                          }}
-                        >
-                          <Trash2 size={15} />
-                        </Button>
-                      </div>
-                    </td>
+                    {!readOnly && (
+                      <td>
+                        <div className="row">
+                          <Button
+                            variant="ghost"
+                            aria-label={'Sửa ' + String(row.name || row.code || row.id)}
+                            onClick={() => edit(row)}
+                          >
+                            <Pencil size={15} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            aria-label={'Xóa ' + String(row.name || row.code || row.id)}
+                            onClick={() => {
+                              deleteAction.clear();
+                              setDeleting(String(row.id));
+                            }}
+                          >
+                            <Trash2 size={15} />
+                          </Button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

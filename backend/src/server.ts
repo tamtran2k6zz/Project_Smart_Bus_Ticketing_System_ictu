@@ -1,4 +1,5 @@
 import app from './app';
+import { processWalletRenewals } from './services/wallet-pass.service';
 import { processRefundJobs } from './services/refund-queue.service';
 import pool from './config/database';
 import { connectRedis, closeRedis, redisStatus } from './config/redis';
@@ -27,6 +28,7 @@ async function cleanupExpiredReservations(): Promise<void> {
     const count = await releaseExpiredReservations();
     const oldTripsCleaned = await cleanupOldTrips();
     await processRefundJobs(10);
+    await processWalletRenewals();
     if (count || oldTripsCleaned) {
       logger.info('expired_reservations_released', {
         released: count,

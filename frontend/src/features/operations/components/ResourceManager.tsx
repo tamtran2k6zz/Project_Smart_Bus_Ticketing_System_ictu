@@ -1,5 +1,6 @@
 import { FarePolicies } from '@/features/passes/components/FarePolicies';
 import { SchedulePlanner } from './SchedulePlanner';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAction } from '@/hooks/useAction';
 import {
@@ -13,8 +14,15 @@ import { operationsApi, type Resource } from '../services/operations.api';
 import { resourceSchemas } from '../schemas/resources';
 import { adminApi } from '@/features/administration/services/admin.api';
 import { dateTime, money } from '@/utils/format';
+const tripStatusLabels: Record<string, string> = {
+  scheduled: 'Chờ khởi hành',
+  running: 'Đang chạy',
+  completed: 'Hoàn thành',
+};
 export function ResourceManager({ resource }: { resource: Resource }) {
   const user = useSession(s => s.user)!;
+  const [archiveMode, setArchived] = useState(false);
+  const archived = archiveMode && ['trips', 'assignments'].includes(resource);
   const catalog = useQuery({ queryKey: ['catalog'], queryFn: operationsApi.catalog });
   const staff = useQuery({
     queryKey: ['operations', 'staff', user.id],
@@ -30,11 +38,15 @@ export function ResourceManager({ resource }: { resource: Resource }) {
   const vehicleOptions =
     catalog.data?.vehicles.map(v => ({ value: v.id, label: v.plate + ' · ' + v.name })) || [];
   const tripOptions =
-    catalog.data?.trips.map(t => ({
-      value: t.id,
-      label:
-        dateTime(t.departure) + ' · ' + catalog.data?.routes.find(r => r.id === t.routeId)?.name,
-    })) || [];
+    catalog.data?.trips
+      .filter(
+        t => !t.archivedAt && t.status === 'scheduled' && Date.parse(t.departure) > Date.now()
+      )
+      .map(t => ({
+        value: t.id,
+        label:
+          dateTime(t.departure) + ' · ' + catalog.data?.routes.find(r => r.id === t.routeId)?.name,
+      })) || [];
   const fields: Record<Resource, DataField[]> = {
     routes: [
       { name: 'code', label: 'Mã tuyến (ít nhất 2 ký tự)' },
@@ -148,6 +160,11 @@ export function ResourceManager({ resource }: { resource: Resource }) {
       { key: 'routeId', label: 'Tuyến', format: v => name('routes', v) || String(v) },
       { key: 'departure', label: 'Khởi hành', format: v => dateTime(String(v)) },
       { key: 'vehicleId', label: 'Xe', format: v => name('vehicles', v) || String(v) },
+      {
+        key: 'status',
+        label: 'Trạng thái',
+        format: v => tripStatusLabels[String(v)] || String(v),
+      },
       { key: 'price', label: 'Giá', format: v => money(Number(v)) },
       { key: 'seatMode', label: 'Chọn ghế' },
     ],
@@ -184,16 +201,17 @@ export function ResourceManager({ resource }: { resource: Resource }) {
           <Card>
             <div className="between">
               <div>
-                <strong>Giải phóng chuyến xe cũ quá hạn</strong>
+                <strong>Giải phóng và lưu trữ chuyến hoàn thành</strong>
                 <p className="muted" style={{ margin: 0 }}>
-                  Hoàn tất các chuyến chờ chạy hoặc đang chạy đã qua giờ đến dự kiến.
+                  Hoàn tất chuyến quá giờ đến và đưa tất cả chuyến đã hoàn thành ra khỏi danh sách
+                  vận hành. Giữ nguyên lịch sử vé, xe và doanh thu.
                 </p>
               </div>
               <Button
                 disabled={cleanupAction.isPending}
                 onClick={() => cleanupAction.mutate(undefined)}
               >
-                {cleanupAction.isPending ? 'Đang xử lý...' : 'Giải phóng chuyến xe quá hạn'}
+                {cleanupAction.isPending ? 'Đang xử lý...' : 'Giải phóng chuyến hoàn thành'}
               </Button>
             </div>
             <ActionMessage action={cleanupAction} />
@@ -201,15 +219,32 @@ export function ResourceManager({ resource }: { resource: Resource }) {
         </div>
       )}
       {resource === 'routes' && <FarePolicies />}
+      {['trips', 'assignments'].includes(resource) && (
+        <div className="row" style={{ marginBottom: 16 }}>
+          <Button variant={archived ? 'secondary' : 'primary'} onClick={() => setArchived(false)}>
+            Đang vận hành
+          </Button>
+          <Button variant={archived ? 'primary' : 'secondary'} onClick={() => setArchived(true)}>
+            Đã lưu trữ
+          </Button>
+        </div>
+      )}
       <DataManager
-        key={resource}
-        title={titles[resource]}
-        description="Thay đổi danh mục được phản ánh vào tra cứu và các màn hình liên quan."
+        key={resource + String(archived)}
+        title={titles[resource] + (archived ? ' · Đã lưu trữ' : '')}
+        description={
+          archived
+            ? 'Chuyến đã giải phóng được giữ để tra cứu lịch sử, không còn trong lịch vận hành.'
+            : 'Thay đổi danh mục được phản ánh vào tra cứu và các màn hình liên quan.'
+        }
+        readOnly={archived}
         fields={fields[resource]}
         columns={columns[resource]}
         schema={resourceSchemas[resource]}
-        queryKey={'resource-' + resource}
-        load={async () => (await operationsApi.list(resource, user.id)).map(row => ({ ...row }))}
+        queryKey={'resource-' + resource + '-' + archived}
+        load={async () =>
+          (await operationsApi.list(resource, user.id, archived)).map(row => ({ ...row }))
+        }
         save={data => operationsApi.save(resource, user.id, data)}
         remove={id => operationsApi.remove(resource, user.id, id)}
       />

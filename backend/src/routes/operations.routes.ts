@@ -22,6 +22,7 @@ router.get(
        FROM trips t
        JOIN routes r ON t.route_id = r.id
        LEFT JOIN buses b ON t.bus_id = b.id
+       WHERE t.archived_at IS NULL
        ORDER BY t.departure_time ASC`
       );
 

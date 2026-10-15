@@ -15,7 +15,7 @@ router.post(
       res.json({
         success: true,
         oldTripsCleaned,
-        message: `Đã hoàn tất ${oldTripsCleaned} chuyến xe đã qua giờ đến dự kiến.`,
+        message: `Đã giải phóng và lưu trữ ${oldTripsCleaned} chuyến hoàn thành. Lịch sử vé và doanh thu được giữ nguyên.`,
       });
     } catch (error: any) {
       appLogger.error('cleanup_old_trips_failed', { error });

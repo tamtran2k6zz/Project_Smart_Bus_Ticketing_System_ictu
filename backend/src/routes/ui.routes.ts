@@ -173,6 +173,7 @@ async function catalog() {
           : t.status === 'IN_TRANSIT'
             ? 'running'
             : 'completed',
+      archivedAt: t.archived_at ? iso(t.archived_at) : undefined,
       price: Number(t.base_price),
       capacity: t.capacity,
       available: Math.max(0, t.capacity - Number(t.occupied)),
@@ -917,12 +918,13 @@ router.get(
   api(async req => {
     roles(req, ['ADMIN', 'MANAGER', 'DRIVER']);
     const c = await catalog();
-    if (req.user!.role !== 'DRIVER') return c.trips;
+    const operatingTrips = c.trips.filter(t => !t.archivedAt);
+    if (req.user!.role !== 'DRIVER') return operatingTrips;
     const assigned = await query<any[]>(
       'SELECT id FROM trips WHERE driver_id=$1 OR conductor_id=$1',
       [req.user!.id]
     );
-    return c.trips.filter(t => assigned.some(a => a.id === t.id));
+    return operatingTrips.filter(t => assigned.some(a => a.id === t.id));
   })
 );
 router.get(
@@ -1456,14 +1458,16 @@ router.delete(
   })
 );
 const staffDto = (s: any) => ({ id: s.id, userId: s.user_id, name: s.name, phone: s.phone });
-async function resources(key: string) {
+async function resources(key: string, archived = false) {
   const c = await catalog();
-  if (['routes', 'stops', 'vehicles', 'trips'].includes(key)) return (c as any)[key];
+  if (key === 'trips') return c.trips.filter(t => Boolean(t.archivedAt) === archived);
+  if (['routes', 'stops', 'vehicles'].includes(key)) return (c as any)[key];
   if (key === 'staff') return (await query<any[]>('SELECT * FROM staff_profiles')).map(staffDto);
   if (key === 'assignments')
     return (
       await query<any[]>(
-        'SELECT t.id,t.id AS "tripId",t.bus_id AS "vehicleId",s.id AS "staffId" FROM trips t JOIN staff_profiles s ON s.user_id=t.driver_id'
+        'SELECT t.id,t.id AS "tripId",t.bus_id AS "vehicleId",s.id AS "staffId",t.archived_at AS "archivedAt" FROM trips t JOIN staff_profiles s ON s.user_id=t.driver_id WHERE (t.archived_at IS NOT NULL)=$1',
+        [archived]
       )
     ).map(a => a);
   return fail('Danh mục không tồn tại.', 404);
@@ -1472,7 +1476,7 @@ router.get(
   '/operations/:key',
   api(async req => {
     roles(req);
-    return resources(req.params.key);
+    return resources(req.params.key, req.query.archived === 'true');
   })
 );
 router.all(
@@ -1659,14 +1663,14 @@ router.all(
           if (!route) fail('Tuyến không hoạt động.');
           const arrival = new Date(Date.parse(d.departure) + d.duration * 60000).toISOString();
           const { rows: overlap } = await client.query(
-            "SELECT id FROM trips WHERE id<>$1 AND bus_id=$2 AND status<>'CANCELLED' AND departure_time<$4::timestamptz AND arrival_time>$3::timestamptz",
+            "SELECT id FROM trips WHERE id<>$1 AND bus_id=$2 AND status<>'CANCELLED' AND archived_at IS NULL AND departure_time<$4::timestamptz AND arrival_time>$3::timestamptz",
             [tripId, d.vehicleId, d.departure, arrival]
           );
           if (overlap.length) fail('Xe trùng lịch chạy.', 409);
           if (previous?.driver_id) {
             await client.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [previous.driver_id]);
             const { rows: driverOverlap } = await client.query(
-              "SELECT id FROM trips WHERE id<>$1 AND driver_id=$2 AND status<>'CANCELLED' AND departure_time<$4::timestamptz AND arrival_time>$3::timestamptz",
+              "SELECT id FROM trips WHERE id<>$1 AND driver_id=$2 AND status<>'CANCELLED' AND archived_at IS NULL AND departure_time<$4::timestamptz AND arrival_time>$3::timestamptz",
               [tripId, previous.driver_id, d.departure, arrival]
             );
             if (driverOverlap.length) fail('Tài xế trùng lịch chạy.', 409);
@@ -1694,7 +1698,7 @@ router.all(
           );
           if (!staff) fail('Tài xế không hoạt động.');
           const { rows: overlap } = await client.query(
-            "SELECT id FROM trips WHERE id<>$1 AND (bus_id=$2 OR driver_id=$3) AND status<>'CANCELLED' AND departure_time<$5::timestamptz AND arrival_time>$4::timestamptz",
+            "SELECT id FROM trips WHERE id<>$1 AND (bus_id=$2 OR driver_id=$3) AND status<>'CANCELLED' AND archived_at IS NULL AND departure_time<$5::timestamptz AND arrival_time>$4::timestamptz",
             [tripId, d.vehicleId, staff.user_id, previous.departure_time, previous.arrival_time]
           );
           if (overlap.length) fail('Xe hoặc tài xế trùng lịch.', 409);

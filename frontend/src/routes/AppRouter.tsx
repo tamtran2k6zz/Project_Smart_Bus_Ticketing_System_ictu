@@ -20,6 +20,7 @@ const PaymentPage = lazy(() => import('@/pages/PaymentPage'));
 const TicketsPage = lazy(() => import('@/pages/TicketsPage'));
 const TrackingPage = lazy(() => import('@/pages/TrackingPage'));
 const AccountPage = lazy(() => import('@/pages/AccountPage'));
+const WalletPage = lazy(() => import('@/pages/WalletPage'));
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
 const AdminResourcePage = lazy(() => import('@/pages/AdminResourcePage'));
 const AdminPage = lazy(() => import('@/pages/AdminPage'));
@@ -81,6 +82,7 @@ export default function AppRouter() {
               <Route path="/checkout/:bookingId" element={<PaymentPage />} />
               <Route path="/payment/result" element={<PaymentPage result />} />
               <Route path={paths.tickets} element={<TicketsPage />} />
+              <Route path="/account/wallet" element={<WalletPage />} />
               <Route path="/account/tickets/:ticketId" element={<TicketsPage detail />} />
               {(['passes', 'notifications', 'support', 'profile'] as const).map(section => (
                 <Route

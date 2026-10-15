@@ -207,14 +207,15 @@ export async function holdSeat(tripId: string, seatNumber: string, userId: strin
 }
 
 /**
- * Hoàn tất chuyến chờ chạy/đang chạy đã qua giờ đến dự kiến.
+ * Hoàn tất chuyến quá giờ đến và lưu trữ tất cả chuyến hoàn thành.
  */
 export async function cleanupOldTrips(): Promise<number> {
   const updated = await query<Array<{ id: string }>>(
     `UPDATE trips
-     SET status = 'COMPLETED'
-     WHERE status IN ('SCHEDULED', 'IN_TRANSIT')
-       AND arrival_time <= NOW()
+     SET status = 'COMPLETED', archived_at = NOW()
+     WHERE archived_at IS NULL
+       AND (status = 'COMPLETED'
+         OR (status IN ('SCHEDULED', 'IN_TRANSIT') AND arrival_time <= NOW()))
      RETURNING id`,
     []
   );
