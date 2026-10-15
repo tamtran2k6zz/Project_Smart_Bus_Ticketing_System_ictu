@@ -19,6 +19,7 @@ function assertAssignmentAvailable(db: Database, assignment: Assignment, trip: T
       if (other.id === assignment.id) return false;
       if (other.tripId === trip.id) return true;
       const otherTrip = getTrip(db, other.tripId);
+      if (otherTrip.archivedAt) return false;
       const overlaps =
         Date.parse(otherTrip.departure) < Date.parse(trip.departure) + trip.duration * 60000 &&
         Date.parse(trip.departure) < Date.parse(otherTrip.departure) + otherTrip.duration * 60000;
@@ -41,11 +42,20 @@ export const operationsApi = {
       vehicles: db.vehicles,
       trips: db.trips.map(t => ({ ...t, available: tripAvailability(db, t) })),
     })),
-  list: (key: Resource, userId: string) =>
-    service<(Route | Stop | Vehicle | Staff | Trip | Assignment)[]>('/operations/' + key, db => {
-      if (!can(requireUser(db, userId), 'operations')) throw new Error('Không có quyền vận hành.');
-      return db[key];
-    }),
+  list: (key: Resource, userId: string, archived = false) =>
+    service<(Route | Stop | Vehicle | Staff | Trip | Assignment)[]>(
+      '/operations/' + key + (archived ? '?archived=true' : ''),
+      db => {
+        if (!can(requireUser(db, userId), 'operations'))
+          throw new Error('Không có quyền vận hành.');
+        if (key === 'trips') return db.trips.filter(t => Boolean(t.archivedAt) === archived);
+        if (key === 'assignments')
+          return db.assignments.filter(
+            a => Boolean(db.trips.find(t => t.id === a.tripId)?.archivedAt) === archived
+          );
+        return db[key];
+      }
+    ),
   save: (key: Resource, userId: string, data: Record<string, unknown>) =>
     service(
       '/operations/' + key + (data.id ? '/' + data.id : ''),
@@ -90,6 +100,8 @@ export const operationsApi = {
             throw new Error('Chọn điểm đi/đến từ danh mục trạm.');
         }
         if (key === 'trips') {
+          if (previous && (previous as unknown as Trip).archivedAt)
+            throw new Error('Chuyến đã lưu trữ chỉ được xem lịch sử.');
           const t = parsed as unknown as Trip;
           const route = db.routes.find(r => r.id === t.routeId && r.active);
           const vehicle = db.vehicles.find(v => v.id === t.vehicleId && v.active);
@@ -139,6 +151,7 @@ export const operationsApi = {
         if (key === 'assignments') {
           const a = parsed as unknown as Assignment;
           const trip = getTrip(db, a.tripId);
+          if (trip.archivedAt) throw new Error('Chuyến đã lưu trữ không thể phân công lại.');
           if (
             !db.vehicles.some(v => v.id === a.vehicleId && v.active) ||
             !db.staff.some(s => s.id === a.staffId)
@@ -224,8 +237,9 @@ export const operationsApi = {
       const user = requireUser(db, userId);
       if (!can(user, 'check-in')) throw new Error('Không có quyền.');
       const staffIds = db.staff.filter(s => s.userId === userId).map(s => s.id);
+      const operatingTrips = db.trips.filter(t => !t.archivedAt);
       return user.role === 'DRIVER'
-        ? db.trips.filter(t =>
+        ? operatingTrips.filter(t =>
             db.assignments.some(
               a =>
                 a.tripId === t.id &&
@@ -233,7 +247,7 @@ export const operationsApi = {
                   (!!a.conductorId && staffIds.includes(a.conductorId)))
             )
           )
-        : db.trips;
+        : operatingTrips;
     }),
   incidents: (tripId?: string) =>
     service<Incident[]>('/incidents' + (tripId ? '?tripId=' + tripId : ''), db =>
@@ -297,17 +311,20 @@ export const operationsApi = {
         const cutoff = Date.now();
         db.trips.forEach(t => {
           if (
-            ['scheduled', 'running'].includes(t.status) &&
-            Date.parse(t.departure) + t.duration * 60_000 <= cutoff
+            !t.archivedAt &&
+            (t.status === 'completed' ||
+              (['scheduled', 'running'].includes(t.status) &&
+                Date.parse(t.departure) + t.duration * 60_000 <= cutoff))
           ) {
             t.status = 'completed';
+            t.archivedAt = new Date(cutoff).toISOString();
             count++;
           }
         });
         return {
           success: true,
           oldTripsCleaned: count,
-          message: `Đã hoàn tất ${count} chuyến xe đã qua giờ đến dự kiến.`,
+          message: `Đã giải phóng và lưu trữ ${count} chuyến hoàn thành. Lịch sử vé và doanh thu được giữ nguyên.`,
         };
       },
       'POST'

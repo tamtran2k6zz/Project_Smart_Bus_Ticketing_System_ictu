@@ -72,14 +72,14 @@ Việc bán vé, kiểm soát chỗ, phân công chuyến và tổng hợp doanh
 
 ### Các phân hệ hiện có
 
-| Phân hệ                | Chức năng chính                                                                                                                     |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Đặt vé và vé điện tử   | Tìm chuyến theo hành trình/thời gian, chọn ghế, giữ chỗ 10 phút, phát hành QR, gửi yêu cầu hủy/đổi vé                               |
-| Thanh toán và chứng từ | Adapter MoMo, VNPay, ZaloPay; ví điện tử người dùng, hoàn tiền tức thì, hóa đơn và email vé                                         |
-| Điều hành              | Quản lý tuyến/trạm/giá, đội xe, lịch theo tần suất, phân công tài xế/phụ xe, đổi giờ và hoàn tất chuyến quá giờ đến                 |
-| Hành trình và soát vé  | Nhận GPS, hiển thị độ mới của dữ liệu/ETA, đăng ký thông báo trạm, báo sự cố/trễ chuyến, quét QR và danh sách hành khách            |
-| Vé tháng và ưu đãi     | Mua/gia hạn vé tháng, duyệt đối tượng ưu tiên, chính sách giá và quản lý voucher                                                    |
-| Báo cáo và phân tích   | Doanh thu theo thời gian/tuyến/xe, tỷ lệ lấp đầy từng chuyến, xuất Excel/PDF, mật độ khách và dự báo nhu cầu tham khảo              |
+| Phân hệ                | Chức năng chính                                                                                                                          |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Đặt vé và vé điện tử   | Tìm chuyến theo hành trình/thời gian, chọn ghế, giữ chỗ 10 phút, phát hành QR, gửi yêu cầu hủy/đổi vé                                    |
+| Thanh toán và chứng từ | Adapter MoMo, VNPay, ZaloPay; ví điện tử người dùng, hoàn tiền tức thì, hóa đơn và email vé                                              |
+| Điều hành              | Quản lý tuyến/trạm/giá, đội xe, lịch theo tần suất, phân công tài xế/phụ xe, đổi giờ và hoàn tất chuyến quá giờ đến                      |
+| Hành trình và soát vé  | Nhận GPS, hiển thị độ mới của dữ liệu/ETA, đăng ký thông báo trạm, báo sự cố/trễ chuyến, quét QR và danh sách hành khách                 |
+| Vé tháng và ưu đãi     | Mua/gia hạn vé tháng, duyệt đối tượng ưu tiên, chính sách giá và quản lý voucher                                                         |
+| Báo cáo và phân tích   | Doanh thu theo thời gian/tuyến/xe, tỷ lệ lấp đầy từng chuyến, xuất Excel/PDF, mật độ khách và dự báo nhu cầu tham khảo                   |
 | Quản trị và hỗ trợ     | Phân quyền tài khoản, quản lý yêu cầu hủy/đổi vé, duyệt rút tiền về ngân hàng, nhật ký truy cập/thao tác, phản ánh và khôi phục mật khẩu |
 
 Các phân hệ tương ứng với **24 user story và 5 product goal**. Việc có chức năng và kiểm thử tự động chưa thay thế nghiệm thu tích hợp bên ngoài hoặc đo hiệu quả kinh doanh trên dữ liệu vận hành thực.
@@ -162,6 +162,8 @@ Giá và thời hạn giữ chỗ do backend xác định; tải lại trang kh�
 Giao diện nhận vị trí/ETA qua HTTP polling, hiển thị thời điểm cập nhật và tình trạng dữ liệu. Backend nhận cập nhật GPS từ người hoặc nguồn có quyền; dữ liệu thiếu/cũ không được coi là tín hiệu GPS trực tiếp hợp lệ. WebSocket chỉ hoạt động trên hạ tầng hỗ trợ kết nối thường trực.
 
 ## Cơ sở dữ liệu và migration
+
+Chức năng **Giải phóng chuyến hoàn thành** đưa tất cả chuyến đã hoàn thành sang lưu trữ và ra khỏi danh sách vận hành, đồng thời giữ lịch sử vé, xe/tổ lái và doanh thu. Xem [quy tắc và migration lưu trữ chuyến](docs/TRIP_ARCHIVE.md).
 
 Nguồn schema áp dụng là **[supabase/migrations/](supabase/migrations/)**:
 

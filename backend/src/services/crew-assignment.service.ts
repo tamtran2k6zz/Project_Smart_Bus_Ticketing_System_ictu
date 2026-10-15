@@ -27,7 +27,7 @@ export async function assignCrew(data: any) {
     const driver = staff.find(s => s.id === data.staffId)!.user_id,
       conductor = data.conductorId ? staff.find(s => s.id === data.conductorId)!.user_id : null;
     const { rows: busy } = await client.query(
-      `SELECT id FROM trips WHERE id<>$1 AND status<>'CANCELLED' AND departure_time<$5 AND arrival_time>$4 AND (bus_id=$2 OR driver_id=ANY($3::text[]) OR conductor_id=ANY($3::text[]))`,
+      `SELECT id FROM trips WHERE id<>$1 AND status<>'CANCELLED' AND archived_at IS NULL AND departure_time<$5 AND arrival_time>$4 AND (bus_id=$2 OR driver_id=ANY($3::text[]) OR conductor_id=ANY($3::text[]))`,
       [trip.id, bus.id, staff.map(s => s.user_id), trip.departure_time, trip.arrival_time]
     );
     if (busy.length) fail('Xe hoặc tổ lái trùng lịch.', 409);
@@ -58,9 +58,10 @@ export async function assignCrew(data: any) {
   );
   return result;
 }
-export async function listCrew() {
-  return query<
-    any[]
-  >(`SELECT t.id,t.id AS "tripId",t.bus_id AS "vehicleId",s.id AS "staffId",COALESCE(c.id,'') AS "conductorId"
-    FROM trips t JOIN staff_profiles s ON s.user_id=t.driver_id LEFT JOIN staff_profiles c ON c.user_id=t.conductor_id`);
+export async function listCrew(archived = false) {
+  return query<any[]>(
+    `SELECT t.id,t.id AS "tripId",t.bus_id AS "vehicleId",s.id AS "staffId",COALESCE(c.id,'') AS "conductorId"
+    FROM trips t JOIN staff_profiles s ON s.user_id=t.driver_id LEFT JOIN staff_profiles c ON c.user_id=t.conductor_id WHERE (t.archived_at IS NOT NULL)=$1`,
+    [archived]
+  );
 }
