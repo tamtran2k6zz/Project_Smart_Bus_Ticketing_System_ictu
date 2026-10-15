@@ -116,7 +116,7 @@ router.delete(
 );
 router.get(
   '/operations/assignments',
-  api(managers, async () => listCrew())
+  api(managers, async req => listCrew(req.query.archived === 'true'))
 );
 router.post(
   '/operations/assignments',

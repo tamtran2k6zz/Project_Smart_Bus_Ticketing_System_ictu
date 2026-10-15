@@ -91,7 +91,7 @@ export async function createSchedule(actor: string, data: any) {
         departure = slots[i],
         arrival = new Date(Date.parse(departure) + data.duration * 60000).toISOString();
       const { rows: busy } = await client.query(
-        "SELECT id FROM trips WHERE bus_id=$1 AND status<>'CANCELLED' AND departure_time<$3 AND arrival_time>$2",
+        "SELECT id FROM trips WHERE bus_id=$1 AND status<>'CANCELLED' AND archived_at IS NULL AND departure_time<$3 AND arrival_time>$2",
         [bus.id, departure, arrival]
       );
       if (busy.length)

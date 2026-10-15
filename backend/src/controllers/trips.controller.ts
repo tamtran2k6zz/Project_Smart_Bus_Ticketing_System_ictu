@@ -112,7 +112,7 @@ export const getTrips = async (req: Request, res: Response): Promise<void> => {
       COALESCE(b.total_seats, 40) AS total_seats, (SELECT COUNT(*) FROM tickets tk WHERE tk.trip_id = t.id AND (${occupiedTicketCondition})) AS booked_seats,
       (COALESCE(b.total_seats, 40) - (SELECT COUNT(*) FROM tickets tk WHERE tk.trip_id = t.id AND (${occupiedTicketCondition}))) AS available_seats,
       t.status, t.created_at, r.code AS route_code, r.name AS route_name, COALESCE(t.base_price, 10000) AS base_price, u.full_name AS driver_name
-      FROM trips t JOIN routes r ON t.route_id = r.id LEFT JOIN buses b ON t.bus_id = b.id LEFT JOIN users u ON t.driver_id = u.id WHERE 1=1`;
+      FROM trips t JOIN routes r ON t.route_id = r.id LEFT JOIN buses b ON t.bus_id = b.id LEFT JOIN users u ON t.driver_id = u.id WHERE t.archived_at IS ${req.query.archived === 'true' ? 'NOT NULL' : 'NULL'}`;
     const params: any[] = [];
     if (route_id) {
       sql += ` AND t.route_id = $${params.length + 1}`;

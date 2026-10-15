@@ -6,6 +6,7 @@ export interface Trip {
   seatMode: boolean;
   vehicleId: string;
   status: 'scheduled' | 'running' | 'completed';
+  archivedAt?: string;
   price: number;
   capacity: number;
   available: number;

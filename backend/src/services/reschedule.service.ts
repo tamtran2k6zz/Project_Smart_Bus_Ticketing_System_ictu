@@ -25,7 +25,7 @@ export async function rescheduleTrip(tripId: string, departure: string, arrival:
       crew,
     ]);
     const { rows: conflicts } = await client.query(
-      `SELECT id FROM trips WHERE id<>$1 AND status<>'CANCELLED' AND departure_time<$5 AND arrival_time>$4 AND (bus_id=$2 OR driver_id=ANY($3::text[]) OR conductor_id=ANY($3::text[]))`,
+      `SELECT id FROM trips WHERE id<>$1 AND status<>'CANCELLED' AND archived_at IS NULL AND departure_time<$5 AND arrival_time>$4 AND (bus_id=$2 OR driver_id=ANY($3::text[]) OR conductor_id=ANY($3::text[]))`,
       [tripId, trip.bus_id, crew, start, end]
     );
     if (conflicts.length)

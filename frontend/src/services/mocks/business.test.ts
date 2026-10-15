@@ -32,6 +32,24 @@ async function paid(seat = '01') {
   return result;
 }
 describe('demo business transactions', () => {
+  it('archives every completed trip, keeps its data and excludes it from operating assignments', async () => {
+    await transact(db => {
+      const trip = db.trips.find(t => t.id === tripId)!;
+      trip.status = 'completed';
+    });
+    const before = loadDatabase().trips.find(t => t.id === tripId)!;
+    await operationsApi.cleanupOldTrips('u4');
+    expect((await operationsApi.list('trips', 'u4')).some(t => t.id === tripId)).toBe(false);
+    const archived = (await operationsApi.list('trips', 'u4', true)).find(t => t.id === tripId);
+    expect(archived).toMatchObject({
+      id: tripId,
+      vehicleId: before.vehicleId,
+      departure: before.departure,
+      status: 'completed',
+    });
+    expect(loadDatabase().trips.find(t => t.id === tripId)?.archivedAt).toBeTruthy();
+    expect((await operationsApi.cleanupOldTrips('u4')).oldTripsCleaned).toBe(0);
+  });
   it('switches pending payment without extending the hold or confirming an obsolete attempt', async () => {
     const { h, b, p } = await book();
     expect((await paymentApi.start(b.id, 'u0', 'MoMo')).id).toBe(p.id);
