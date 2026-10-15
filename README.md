@@ -120,7 +120,7 @@ flowchart LR
 | Kiểm thử                       | Jest, Vitest, Testing Library, Playwright, PGlite                                         |
 | Triển khai                     | Vercel, Docker Compose, Nginx, GitHub Actions                                             |
 
-Các thao tác đặt vé sử dụng transaction và khóa hàng PostgreSQL. Redis bổ sung khóa/cache cho các luồng có cấu hình sử dụng. Schema được quản lý bằng migration SQL; backend sử dụng trực tiếp `pg` với hệ thống interface TypeScript tường minh cho các domain entity và chuẩn hóa xử lý lỗi.
+Các thao tác đặt vé sử dụng transaction và khóa hàng PostgreSQL. Redis bổ sung khóa/cache cho các luồng có cấu hình sử dụng. Schema được quản lý bằng migration SQL; backend sử dụng trực tiếp `pg` với hệ thống interface TypeScript tường minh (strict domain interfaces), bảo mật HMAC/timingSafeEqual và chuẩn hóa xử lý lỗi đồng bộ.
 
 ## Luồng nghiệp vụ chính
 
