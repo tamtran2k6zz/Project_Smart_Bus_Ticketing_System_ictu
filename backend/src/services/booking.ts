@@ -75,7 +75,7 @@ export async function prepareSeats(client: PoolClient, tripId: string) {
     [tripId]
   );
   await client.query(
-    `UPDATE trip_seats SET status='AVAILABLE',locked_at=NULL,locked_by_user_id=NULL,
+    `UPDATE trip_seats SET status='AVAILABLE',ticket_id=NULL,locked_at=NULL,locked_by_user_id=NULL,
      lock_expires_at=NULL,redis_lock_id=NULL
      WHERE trip_id=$1 AND status='LOCKED' AND lock_expires_at <= NOW()`,
     [tripId]
@@ -130,7 +130,7 @@ export async function reserveSeatForPayment(
   tripId: string,
   seatNumber: string,
   userId: string,
-  paymentMethod: 'VNPAY' | 'MOMO' | 'QR' | 'ZALOPAY',
+  paymentMethod: 'VNPAY' | 'MOMO' | 'QR' | 'ZALOPAY' | 'BANK_TRANSFER',
   redisLockId: string,
   sharedClient?: PoolClient
 ) {

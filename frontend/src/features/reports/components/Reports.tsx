@@ -1,5 +1,6 @@
 import { TransportStrategy } from './TransportStrategy';
 import { WithdrawalReview } from '@/features/wallet/WithdrawalReview';
+import { BankTransferReview } from '@/features/payments/components/BankTransferReview';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Download } from 'lucide-react';
@@ -73,6 +74,7 @@ export function Reports() {
         }
       />
       <WithdrawalReview />
+      <BankTransferReview />
       <Card>
         <form
           className="formGrid"

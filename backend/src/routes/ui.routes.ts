@@ -14,6 +14,7 @@ import authRoutes from './auth.routes';
 import { cancelTicket } from '../services/cancellation.service';
 import { prepareSeats, reserveSeatForPayment } from '../services/booking';
 import { PaymentGatewayService } from '../services/payment-gateway.service';
+import { createBankTransfer, transferForBooking } from '../services/bank-transfer.service';
 import { buildQrPayload, validateTicketQr } from '../services/ticket.service';
 import { assertTripAccess } from '../services/trip-access.service';
 import { updateTripLocation } from '../services/location-update.service';
@@ -256,7 +257,9 @@ const paymentDto = (b: any) =>
             ? 'MoMo'
             : b.payment_method === 'ZALOPAY'
               ? 'ZaloPay'
-              : 'VNPay',
+              : b.payment_method === 'BANK_TRANSFER'
+                ? 'BankTransfer'
+                : 'VNPay',
         amount: Number(b.amount),
         status:
           b.payment_status === 'SUCCESS'
@@ -270,6 +273,12 @@ const paymentDto = (b: any) =>
         redirectUrl: b.payment_url ?? undefined,
       }
     : null;
+async function paymentWithBankTransfer(b: any, userId: string) {
+  const payment = paymentDto(b);
+  return payment && b.payment_method === 'BANK_TRANSFER'
+    ? { ...payment, bankTransfer: await transferForBooking(userId, b.id) }
+    : payment;
+}
 
 router.get('/auth/session', authenticateJWT, getMe);
 router.use(
@@ -543,22 +552,26 @@ router.get(
 );
 router.get(
   '/bookings/:id/payment',
-  api(async req => paymentDto(await ownBooking(req.params.id, req.user!.id)))
+  api(async req =>
+    paymentWithBankTransfer(await ownBooking(req.params.id, req.user!.id), req.user!.id)
+  )
 );
 router.post(
   '/payments',
   api(async req => {
     await assertEmailVerified(req.user!.id);
     const method =
-      req.body.gateway === 'MoMo'
-        ? 'MOMO'
-        : req.body.gateway === 'ZaloPay'
-          ? 'ZALOPAY'
-          : ['VNPay', 'Card'].includes(req.body.gateway)
-            ? 'VNPAY'
-            : fail('Cổng thanh toán chưa được hỗ trợ.');
+      req.body.gateway === 'BankTransfer'
+        ? 'BANK_TRANSFER'
+        : req.body.gateway === 'MoMo'
+          ? 'MOMO'
+          : req.body.gateway === 'ZaloPay'
+            ? 'ZALOPAY'
+            : ['VNPay', 'Card'].includes(req.body.gateway)
+              ? 'VNPAY'
+              : fail('Cổng thanh toán chưa được hỗ trợ.');
     const b = await ownBooking(req.body.bookingId, req.user!.id);
-    if (bookingDto(b).status === 'paid') return paymentDto(b);
+    if (bookingDto(b).status === 'paid') return paymentWithBankTransfer(b, req.user!.id);
     const ticketId = await transaction(async client => {
       const {
         rows: [locked],
@@ -582,8 +595,24 @@ router.post(
       const h = await getHold(b.hold_id, req.user!.id, client);
       if (h.status !== 'active') fail('Giữ chỗ hết hạn.', 409);
       if (locked.ticket_id) {
-        if (existingPayment.payment_method === method && existingPayment.payment_url)
+        if (
+          existingPayment.payment_method === method &&
+          (existingPayment.payment_url || method === 'BANK_TRANSFER')
+        )
           return locked.ticket_id;
+        if (existingPayment.payment_method === 'BANK_TRANSFER') {
+          const {
+            rows: [transfer],
+          } = await client.query(
+            'SELECT status FROM bank_transfer_payments WHERE ticket_id=$1 FOR UPDATE',
+            [locked.ticket_id]
+          );
+          if (transfer?.status === 'SUBMITTED')
+            fail(
+              'Bạn đã báo chuyển khoản. Vui lòng chờ tài chính đối soát trước khi đổi phương thức.',
+              409
+            );
+        }
         // Keep each gateway order immutable. A late success for the cancelled ticket
         // follows the existing late-payment refund flow instead of issuing a second ticket.
         // Without a saved URL, the provider may have accepted an earlier timed-out request;
@@ -636,12 +665,14 @@ router.post(
         [ticket.id, h.expiresAt, h.tripId, h.seatIds]
       );
       await client.query('UPDATE ui_bookings SET ticket_id=$1 WHERE id=$2', [ticket.id, b.id]);
+      if (method === 'BANK_TRANSFER') await createBankTransfer(client, ticket.id, b.id);
       return ticket.id;
     });
     let updated = await ownBooking(b.id, req.user!.id);
     if (updated.ticket_id !== ticketId)
       fail('Phương thức thanh toán đã thay đổi. Vui lòng thử lại.', 409);
-    if (bookingDto(updated).status === 'paid') return paymentDto(updated);
+    if (bookingDto(updated).status === 'paid' || method === 'BANK_TRANSFER')
+      return paymentWithBankTransfer(updated, req.user!.id);
     if (!updated.payment_url) {
       let url: string;
       try {

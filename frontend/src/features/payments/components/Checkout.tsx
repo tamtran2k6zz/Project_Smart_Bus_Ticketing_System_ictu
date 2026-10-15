@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { CreditCard, ShieldCheck } from 'lucide-react';
+import { CreditCard, QrCode, ShieldCheck } from 'lucide-react';
+import { BankTransferPanel } from './BankTransferPanel';
 import { useSession } from '@/store/session.store';
 import { useAction } from '@/hooks/useAction';
 import { bookingApi } from '@/features/booking/services/booking.api';
@@ -22,6 +23,7 @@ import {
 import { money } from '@/utils/format';
 import { appConfig } from '@/configs/app.config';
 import type { Gateway, Payment } from '../types';
+import s from './Checkout.module.css';
 export function Checkout() {
   const { bookingId = '' } = useParams(),
     navigate = useNavigate(),
@@ -54,6 +56,10 @@ export function Checkout() {
         navigate('/payment/result?bookingId=' + bookingId);
         return;
       }
+      if (p.gateway === 'BankTransfer' && !appConfig.demo) {
+        if (!p.bankTransfer) throw new Error('Chưa tạo được mã chuyển khoản. Vui lòng thử lại.');
+        return;
+      }
       if (!appConfig.demo && !p.redirectUrl)
         throw new Error('Chưa có liên kết thanh toán. Hãy thử lại hoặc chọn phương thức khác.');
       if (p.redirectUrl && !appConfig.demo) {
@@ -68,7 +74,9 @@ export function Checkout() {
     },
     appConfig.demo
       ? 'Giao dịch demo đang chờ xác nhận. Chọn kết quả mô phỏng bên dưới.'
-      : 'Đã khởi tạo thanh toán. Vui lòng hoàn tất tại cổng thanh toán.'
+      : gateway === 'BankTransfer'
+        ? 'Đã tạo mã QR chuyển khoản. Tài chính xác nhận báo có trước khi cấp vé.'
+        : 'Đã khởi tạo thanh toán. Vui lòng hoàn tất tại cổng thanh toán.'
   );
   const confirm = useAction(async (status: Payment['status']) => {
     if (!payment.data) throw new Error('Khởi tạo giao dịch trước.');
@@ -76,9 +84,15 @@ export function Checkout() {
     navigate('/payment/result?bookingId=' + bookingId);
   });
   const b = query.data,
+    awaitingReview = payment.data?.bankTransfer?.status === 'SUBMITTED',
     canPay =
       b && ['pending', 'failed'].includes(b.status) && !expired && hold.data?.status === 'active',
-    busy = start.isPending || confirm.isPending || payment.isPending || payment.isError,
+    busy =
+      start.isPending ||
+      confirm.isPending ||
+      payment.isPending ||
+      payment.isError ||
+      awaitingReview,
     sameGateway =
       savedGateway === gateway ||
       (!appConfig.demo && savedGateway === 'VNPay' && gateway === 'Card');
@@ -87,11 +101,11 @@ export function Checkout() {
       <PageTitle
         eyebrow="ĐẶT VÉ · BƯỚC 2 / 2"
         title="Kiểm tra & thanh toán"
-        description="QR được phát hành sau khi dịch vụ xác nhận thanh toán."
+        description="Vé QR được phát hành sau khi dịch vụ xác nhận thanh toán."
       />
       <AsyncState query={query}>
         {b && (
-          <div className="grid">
+          <div className={s.layout}>
             <div className="stack">
               {hold.data && b.status !== 'paid' && (
                 <HoldTimer
@@ -102,11 +116,8 @@ export function Checkout() {
               )}
               <Card>
                 <h3>Chọn phương thức</h3>
-                <div className="grid">
-                  {(appConfig.demo
-                    ? (['MoMo', 'VNPay', 'ZaloPay', 'Card'] as Gateway[])
-                    : (['MoMo', 'VNPay', 'ZaloPay', 'Card'] as Gateway[])
-                  ).map(value => (
+                <div className={s.methods}>
+                  {(['MoMo', 'VNPay', 'ZaloPay', 'BankTransfer'] as Gateway[]).map(value => (
                     <label
                       key={value}
                       className="row"
@@ -124,17 +135,27 @@ export function Checkout() {
                         onChange={() => setGateway(value)}
                         disabled={!canPay || busy}
                       />
-                      <CreditCard size={19} />
-                      {value === 'Card' ? 'Thẻ ngân hàng' : value}
+                      {value === 'BankTransfer' ? <QrCode size={19} /> : <CreditCard size={19} />}
+                      {value === 'BankTransfer' ? 'Mã QR / Chuyển khoản Techcombank' : value}
                     </label>
                   ))}
                 </div>
                 {payment.data?.status === 'pending' && canPay && (
                   <p className="muted">
-                    Giao dịch {savedGateway} đang chờ thanh toán. Bạn có thể tiếp tục hoặc chọn
-                    phương thức khác trong thời gian giữ chỗ.
+                    {awaitingReview
+                      ? 'Bạn đã báo chuyển khoản. Vui lòng chờ tài chính đối soát, không thanh toán lại.'
+                      : `Giao dịch ${savedGateway === 'BankTransfer' ? 'Techcombank' : savedGateway} đang chờ thanh toán. Bạn có thể tiếp tục hoặc chọn phương thức khác trong thời gian giữ chỗ.`}
                   </p>
                 )}
+                {payment.data?.bankTransfer &&
+                  gateway === 'BankTransfer' &&
+                  b.status !== 'paid' && (
+                    <BankTransferPanel
+                      id={payment.data.id}
+                      transfer={payment.data.bankTransfer}
+                      canTransfer={!!canPay}
+                    />
+                  )}
                 <ActionMessage action={start} />
                 <ActionMessage action={confirm} />
                 <Message error>
@@ -207,7 +228,7 @@ export function Checkout() {
               <PriceBreakdown booking={b} />
               <p className="muted row">
                 <ShieldCheck size={17} />
-                Không lưu thông tin thẻ tại frontend
+                Chỉ phát hành vé sau khi xác nhận đã nhận tiền
               </p>
               <LinkButton secondary to={'/trips/' + b.tripId}>
                 Quay lại chuyến
@@ -292,7 +313,7 @@ export function PaymentResult() {
                   : b.status === 'pending'
                     ? appConfig.demo
                       ? 'Giao dịch đang chờ xác nhận demo tại checkout.'
-                      : 'Giao dịch đang chờ cổng thanh toán xác nhận. Vé sẽ được cấp khi thanh toán thành công.'
+                      : 'Giao dịch đang chờ xác nhận đã nhận tiền. Vé sẽ được cấp khi thanh toán thành công.'
                     : 'Chưa phát hành QR. Kiểm tra trạng thái giao dịch hoặc liên hệ nhà xe để được hỗ trợ.'}
             </p>
             <div className="row">

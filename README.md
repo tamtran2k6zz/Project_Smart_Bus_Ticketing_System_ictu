@@ -150,6 +150,8 @@ sequenceDiagram
 
 Giá và thời hạn giữ chỗ do backend xác định; tải lại trang không gia hạn. Callback phải khớp chữ ký, số tiền và giao dịch. Tham số trên URL trả về không tự xác nhận thanh toán. Yêu cầu lặp và giao dịch đến muộn được xử lý để tránh phát hành trùng vé.
 
+Với **Mã QR / Chuyển khoản Techcombank**, khách nhận QR chứa số tiền và nội dung riêng cho đơn, sau đó báo đã chuyển khoản. Tài chính/admin đối chiếu báo có rồi mới phát hành vé; khoản đến muộn hoặc lệch số tiền được ghi nhận vào ví. Xem [quy trình đối soát và migration triển khai](docs/TECHCOMBANK_TRANSFER.md).
+
 ### Xác minh, hủy/đổi và soát vé
 
 - Hành khách đăng ký bằng email, nhận liên kết xác minh và hoàn tất xác minh trước các thao tác yêu cầu quyền này. Khôi phục mật khẩu dùng liên kết có hạn, dùng một lần; đổi mật khẩu làm mất hiệu lực phiên cũ.
