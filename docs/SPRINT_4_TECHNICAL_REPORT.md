@@ -48,7 +48,9 @@ Có runner Lighthouse mobile 13.5.0 với phiên bản cố định, lưu HTML/J
 
 [JSON kết quả ba lượt](sprint4/results/2026-10-16-lighthouse.json) là nguồn số liệu, ghi baseline commit và workingTree=modified. Điểm trước tối ưu là 49/61; baseline static server chưa gzip nên khác biệt bao gồm cả cấu hình phục vụ nội dung. LCP cả hai trang vẫn trên 2 giây; load event sớm của SPA không chứng minh nội dung chính đã hiển thị trong 2 giây. Mục trang chủ tiếp tục mở trong [bug log](sprint4/BUG_LOG.md), chưa nghiệm thu frontend.
 
-Đã bật gzip và cache asset có hash trong Nginx; static server đo dùng cùng chính sách nén. Button dùng CSS active thay cho khởi tạo Anime.js ở từng nút; layout từng role tải động. Font chỉ giữ Latin/tiếng Việt, dùng optional display để tránh đổi font muộn; lượt truy cập đầu có thể hiển thị font hệ thống. Hiệu ứng cuộn chỉ chạy trên desktop. Build tự sinh WebP 480/960/1440 px từ ảnh hero gốc bằng Sharp; trình duyệt chọn theo srcset/sizes, ảnh trang trí trang đăng nhập tải lazy. Không giảm CPU/network throttling của Lighthouse để nâng điểm.
+Đã bật gzip và cache asset có hash trong Nginx; static server đo dùng cùng chính sách nén. Button dùng CSS active thay cho khởi tạo Anime.js ở từng nút; layout từng role tải động. Font chỉ giữ Latin/tiếng Việt. Hiệu ứng cuộn chỉ chạy trên desktop. Build tự sinh WebP 480/960/1440 px từ ảnh hero gốc bằng Sharp; trình duyệt chọn theo srcset/sizes, ảnh trang trí trang đăng nhập tải lazy. Không giảm CPU/network throttling của Lighthouse để nâng điểm.
+
+**Đính chính font sau lượt đo trên:** `font-display: optional` đã gây lỗi trộn Arial Black/Times New Roman khi file font đến muộn. Đã đổi về `swap`; E2E trì hoãn font 1,2 giây xác nhận tiêu đề chỉ dùng Be Vietnam Pro ExtraBold sau tải, không còn font hệ thống. Các điểm Lighthouse 78/90 phía trên là bằng chứng lịch sử trước sửa font; cần đo lại để đánh giá hiệu năng của bản dùng `swap`.
 
 Cảnh báo bundle >500kB chưa tự chứng minh Lighthouse thất bại; ExcelJS/PDF tải động theo chức năng. Cần đo thêm các màn hình đăng nhập, thanh toán, soát vé và Staging. Frontend Docker chuyển cùng Node 22 với CI và dùng npm ci để tái lập dependency.
 

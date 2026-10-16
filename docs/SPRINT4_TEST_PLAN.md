@@ -53,7 +53,9 @@ npm --prefix frontend run test:performance
 
 Runner dùng Lighthouse phiên bản cố định trong devDependencies, tạo HTTP server chỉ đọc trên loopback để phục vụ production build. Mặc định đo mobile ba lượt cho `/` và `/login`, giữ HTML/JSON từng lượt và median. `SPRINT4_WEB_URL` chỉ chấp nhận localhost nếu cần đo một server cục bộ khác. Có thể đặt `SPRINT4_LIGHTHOUSE_RUNS=1` để chẩn đoán nhanh; không trộn với kết quả median ba lượt khi nghiệm thu.
 
-Static server dùng gzip level 6 và cache immutable cho assets có hash, tương ứng `frontend/nginx.conf`. Lượt baseline trước tối ưu chưa nén; ghi rõ thay đổi máy chủ khi so sánh. Build tạo ảnh hero responsive bằng Sharp; `npm run dev` vẫn phục vụ ảnh gốc. Font optional ưu tiên nội dung đọc được ngay bằng font hệ thống nếu font thương hiệu chưa sẵn sàng.
+Static server dùng gzip level 6 và cache immutable cho assets có hash, tương ứng `frontend/nginx.conf`. Lượt baseline trước tối ưu chưa nén; ghi rõ thay đổi máy chủ khi so sánh. Build tạo ảnh hero responsive bằng Sharp; `npm run dev` vẫn phục vụ ảnh gốc. Font dùng `swap` để chuyển sang Be Vietnam Pro sau khi tải xong cả bộ Latin/tiếng Việt; không dùng `optional` vì có thể giữ lẫn font hệ thống suốt lượt xem khi tải chậm.
+
+E2E `font-rendering.spec.ts` trì hoãn file font 1,2 giây và dùng Chromium kiểm tra font thực sự vẽ glyph ở tiêu đề, thay vì chỉ kiểm tra tên font trong computed CSS. Chạy bằng `npm --prefix frontend run test:e2e -- font-rendering.spec.ts` trong môi trường demo cục bộ.
 
 Gate hiện kiểm tra performance score >85 và **observed page load** <2 giây. LCP được báo cáo riêng. Cần thống nhất “tải trang” là observed load hay LCP trước ký DoD; không đổi cách tính để làm kết quả xanh. Static server không đại diện CDN/network của deployment và không dùng dữ liệu giả để chứng minh màn hình API.
 
