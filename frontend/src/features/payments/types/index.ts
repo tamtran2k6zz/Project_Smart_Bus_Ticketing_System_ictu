@@ -1,4 +1,4 @@
-export type Gateway = 'MoMo' | 'VNPay' | 'ZaloPay' | 'Card' | 'BankTransfer';
+export type Gateway = 'MoMo' | 'VNPay' | 'ZaloPay' | 'Card' | 'BankTransfer' | 'Wallet';
 export interface BankTransfer {
   reference: string;
   bankName: string;

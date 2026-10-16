@@ -816,7 +816,7 @@ router.post(
             'UPDATE payment_transactions SET refund_request_id=$1 WHERE order_id=$2',
             [result.refund_request_id, payment.order_id]
           );
-          if (payment.payment_method === 'BANK_TRANSFER') {
+          if (['BANK_TRANSFER', 'WALLET'].includes(payment.payment_method)) {
             await creditRefundToWallet(
               client,
               row.user_id,

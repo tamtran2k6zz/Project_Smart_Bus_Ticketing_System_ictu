@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { CreditCard, QrCode, ShieldCheck } from 'lucide-react';
+import { CreditCard, QrCode, ShieldCheck, Wallet as WalletIcon } from 'lucide-react';
 import { BankTransferPanel } from './BankTransferPanel';
 import { useSession } from '@/store/session.store';
 import { useAction } from '@/hooks/useAction';
 import { bookingApi } from '@/features/booking/services/booking.api';
 import { paymentApi } from '../services/payment.api';
+import { walletApi } from '@/features/wallet/wallet.api';
 import { HoldTimer } from '@/features/booking/components/BookingFlow';
 import { JourneySummary } from '@/features/booking/components/JourneySummary';
 import { PriceBreakdown } from '@/features/booking/components/PriceBreakdown';
@@ -41,6 +42,12 @@ export function Checkout() {
     refetchInterval: 4000,
   });
   const savedGateway = payment.data?.gateway;
+  const wallet = useQuery({
+    queryKey: ['wallet', user.id],
+    queryFn: walletApi.overview,
+    enabled: !appConfig.demo && gateway === 'Wallet',
+    refetchInterval: gateway === 'Wallet' ? 10000 : false,
+  });
   useEffect(() => {
     if (savedGateway) setGateway(savedGateway);
   }, [payment.data?.id, savedGateway]);
@@ -51,7 +58,13 @@ export function Checkout() {
   });
   const start = useAction(
     async () => {
-      const p = await paymentApi.start(bookingId, user.id, gateway);
+      let p: Payment;
+      try {
+        p = await paymentApi.start(bookingId, user.id, gateway);
+      } catch (error) {
+        if (gateway === 'Wallet') await wallet.refetch();
+        throw error;
+      }
       if (p.status !== 'pending') {
         navigate('/payment/result?bookingId=' + bookingId);
         return;
@@ -74,9 +87,11 @@ export function Checkout() {
     },
     appConfig.demo
       ? 'Giao dịch demo đang chờ xác nhận. Chọn kết quả mô phỏng bên dưới.'
-      : gateway === 'BankTransfer'
-        ? 'Đã tạo mã QR chuyển khoản. Tài chính xác nhận báo có trước khi cấp vé.'
-        : 'Đã khởi tạo thanh toán. Vui lòng hoàn tất tại cổng thanh toán.'
+      : gateway === 'Wallet'
+        ? 'Đã thanh toán bằng ví cá nhân.'
+        : gateway === 'BankTransfer'
+          ? 'Đã tạo mã QR chuyển khoản. Tài chính xác nhận báo có trước khi cấp vé.'
+          : 'Đã khởi tạo thanh toán. Vui lòng hoàn tất tại cổng thanh toán.'
   );
   const confirm = useAction(async (status: Payment['status']) => {
     if (!payment.data) throw new Error('Khởi tạo giao dịch trước.');
@@ -84,6 +99,10 @@ export function Checkout() {
     navigate('/payment/result?bookingId=' + bookingId);
   });
   const b = query.data,
+    walletReady =
+      wallet.isSuccess &&
+      wallet.data.wallet.status === 'ACTIVE' &&
+      wallet.data.wallet.balance >= (b?.total || 0),
     awaitingReview = payment.data?.bankTransfer?.status === 'SUBMITTED',
     canPay =
       b && ['pending', 'failed'].includes(b.status) && !expired && hold.data?.status === 'active',
@@ -117,7 +136,15 @@ export function Checkout() {
               <Card>
                 <h3>Chọn phương thức</h3>
                 <div className={s.methods}>
-                  {(['MoMo', 'VNPay', 'ZaloPay', 'BankTransfer'] as Gateway[]).map(value => (
+                  {(
+                    [
+                      'MoMo',
+                      'VNPay',
+                      'ZaloPay',
+                      'BankTransfer',
+                      ...(!appConfig.demo ? ['Wallet'] : []),
+                    ] as Gateway[]
+                  ).map(value => (
                     <label
                       key={value}
                       className="row"
@@ -135,11 +162,64 @@ export function Checkout() {
                         onChange={() => setGateway(value)}
                         disabled={!canPay || busy}
                       />
-                      {value === 'BankTransfer' ? <QrCode size={19} /> : <CreditCard size={19} />}
-                      {value === 'BankTransfer' ? 'Mã QR / Chuyển khoản Techcombank' : value}
+                      {value === 'Wallet' ? (
+                        <WalletIcon size={19} />
+                      ) : value === 'BankTransfer' ? (
+                        <QrCode size={19} />
+                      ) : (
+                        <CreditCard size={19} />
+                      )}
+                      {value === 'Wallet'
+                        ? 'Ví cá nhân'
+                        : value === 'BankTransfer'
+                          ? 'Mã QR / Chuyển khoản Techcombank'
+                          : value}
                     </label>
                   ))}
                 </div>
+                {gateway === 'Wallet' && (
+                  <div className="stack" style={{ marginTop: 16 }}>
+                    {wallet.isPending && <p role="status">Đang tải số dư ví…</p>}
+                    {wallet.isError && (
+                      <Message error>Không đọc được số dư ví. Vui lòng thử lại.</Message>
+                    )}
+                    {wallet.data && (
+                      <>
+                        <div className="between">
+                          <span>Số dư khả dụng</span>
+                          <strong>{money(wallet.data.wallet.balance)}</strong>
+                        </div>
+                        {b.status === 'paid' ? (
+                          <p className="muted">Đơn này đã được thanh toán.</p>
+                        ) : wallet.data.wallet.status !== 'ACTIVE' ? (
+                          <Message error>Ví đang bị khóa. Vui lòng liên hệ hỗ trợ.</Message>
+                        ) : wallet.data.wallet.balance < b.total ? (
+                          <Message error>
+                            Số dư không đủ. Cần nạp thêm{' '}
+                            {money(b.total - wallet.data.wallet.balance)}.
+                          </Message>
+                        ) : (
+                          <p className="muted">
+                            Sau thanh toán, ví còn {money(wallet.data.wallet.balance - b.total)}. Vé
+                            được phát hành khi hệ thống xác nhận trừ tiền.
+                          </p>
+                        )}
+                      </>
+                    )}
+                    <div className="row">
+                      <LinkButton secondary to="/account/wallet">
+                        Nạp tiền / Xem ví
+                      </LinkButton>
+                      <Button
+                        variant="ghost"
+                        disabled={wallet.isFetching || start.isPending}
+                        onClick={() => void wallet.refetch()}
+                      >
+                        Cập nhật số dư
+                      </Button>
+                    </div>
+                  </div>
+                )}
                 {payment.data?.status === 'pending' && canPay && (
                   <p className="muted">
                     {awaitingReview
@@ -169,12 +249,17 @@ export function Checkout() {
                 {b.status === 'paid' ? (
                   <LinkButton to={'/payment/result?bookingId=' + b.id}>Xem kết quả</LinkButton>
                 ) : (
-                  <Button disabled={!canPay || busy} onClick={() => start.mutate(undefined)}>
-                    {payment.data?.status === 'pending'
-                      ? sameGateway
-                        ? 'Tiếp tục thanh toán'
-                        : 'Đổi phương thức & thanh toán'
-                      : 'Khởi tạo ' + (appConfig.demo ? 'giao dịch demo' : 'thanh toán')}
+                  <Button
+                    disabled={!canPay || busy || (gateway === 'Wallet' && !walletReady)}
+                    onClick={() => start.mutate(undefined)}
+                  >
+                    {gateway === 'Wallet'
+                      ? 'Thanh toán bằng ví'
+                      : payment.data?.status === 'pending'
+                        ? sameGateway
+                          ? 'Tiếp tục thanh toán'
+                          : 'Đổi phương thức & thanh toán'
+                        : 'Khởi tạo ' + (appConfig.demo ? 'giao dịch demo' : 'thanh toán')}
                     {' · '}
                     {money(b.total)}
                   </Button>

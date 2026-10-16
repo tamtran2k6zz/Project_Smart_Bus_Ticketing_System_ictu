@@ -12,10 +12,12 @@ const api = vi.hoisted(() => ({
   start: vi.fn(),
   confirmDemo: vi.fn(),
   submit: vi.fn(),
+  overview: vi.fn(),
 }));
 vi.mock('@/features/booking/services/booking.api', () => ({ bookingApi: api }));
 vi.mock('../services/payment.api', () => ({ paymentApi: api }));
 vi.mock('../services/bank-transfer.api', () => ({ bankTransferApi: api }));
+vi.mock('@/features/wallet/wallet.api', () => ({ walletApi: api }));
 vi.mock('@/features/booking/components/JourneySummary', () => ({ JourneySummary: () => null }));
 vi.mock('@/configs/app.config', () => ({ appConfig: { demo: false } }));
 const user = {
@@ -64,6 +66,55 @@ beforeEach(() => {
   });
   api.latest.mockResolvedValue({ id: 'p1', gateway: 'MoMo', status: 'pending', amount: 20000 });
   api.start.mockRejectedValue(new Error('Cổng thanh toán đang bận.'));
+  api.overview.mockResolvedValue({ wallet: { balance: 0, status: 'ACTIVE' } });
+});
+it('shows the personal wallet balance and pays without an external redirect', async () => {
+  api.overview.mockResolvedValue({ wallet: { balance: 50000, status: 'ACTIVE' } });
+  api.start.mockImplementationOnce(async () => {
+    const booking = await api.booking();
+    api.booking.mockResolvedValue({ ...booking, status: 'paid' });
+    return {
+      id: 'wallet-payment',
+      bookingId: 'b1',
+      gateway: 'Wallet',
+      status: 'paid',
+      amount: 20000,
+    };
+  });
+  open();
+  await screen.findByText('Chỗ đang được giữ cho bạn');
+  fireEvent.click(screen.getByRole('radio', { name: 'Ví cá nhân' }));
+  await screen.findByText('Số dư khả dụng');
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: /Thanh toán bằng ví/ })).toBeEnabled()
+  );
+  fireEvent.click(screen.getByRole('button', { name: /Thanh toán bằng ví/ }));
+  await waitFor(() => expect(api.start).toHaveBeenCalledWith('b1', 'u1', 'Wallet'));
+  await screen.findByRole('heading', { name: 'Thanh toán đã được xác nhận' });
+  expect(api.confirmDemo).not.toHaveBeenCalled();
+});
+it.each([0, 10000])('blocks wallet checkout with insufficient funds (%s)', async balance => {
+  api.overview.mockResolvedValue({ wallet: { balance, status: 'ACTIVE' } });
+  open();
+  await screen.findByText('Chỗ đang được giữ cho bạn');
+  fireEvent.click(screen.getByRole('radio', { name: 'Ví cá nhân' }));
+  await screen.findByText(/Số dư không đủ/);
+  expect(screen.getByRole('button', { name: /Thanh toán bằng ví/ })).toBeDisabled();
+  expect(screen.getByRole('link', { name: 'Nạp tiền / Xem ví' })).toHaveAttribute(
+    'href',
+    '/account/wallet'
+  );
+  expect(api.start).not.toHaveBeenCalled();
+});
+it('blocks a locked wallet but lets the passenger choose another payment method', async () => {
+  api.overview.mockResolvedValue({ wallet: { balance: 100000, status: 'LOCKED' } });
+  open();
+  await screen.findByText('Chỗ đang được giữ cho bạn');
+  fireEvent.click(screen.getByRole('radio', { name: 'Ví cá nhân' }));
+  await screen.findByText('Ví đang bị khóa. Vui lòng liên hệ hỗ trợ.');
+  expect(screen.getByRole('button', { name: /Thanh toán bằng ví/ })).toBeDisabled();
+  fireEvent.click(screen.getByRole('radio', { name: 'VNPay' }));
+  expect(screen.getByRole('button', { name: /thanh toán.*20/ })).toBeEnabled();
 });
 
 it('explains an unverified return without treating its URL as payment confirmation', async () => {
