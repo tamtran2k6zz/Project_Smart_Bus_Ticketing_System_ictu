@@ -239,11 +239,10 @@
 }
 .mapBusWrapper {
   position: absolute;
-  left: 27%;
-  top: 61%;
+  left: 6px;
+  top: 6px;
   width: 44px;
   height: 44px;
-  transform: translate(-10%, -10%);
   display: flex;
   align-items: center;
   justify-content: center;
