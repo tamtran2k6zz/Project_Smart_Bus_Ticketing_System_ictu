@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -25,6 +25,8 @@ import {
 } from '@/components/ui/Ui';
 import { money, remainingSeconds } from '@/utils/format';
 import type { Hold } from '../types';
+import type { User } from '@/features/auth/types';
+import { ApiError } from '@/services/http';
 import s from './Booking.module.css';
 const schema = z.object({
   name: z.string().trim().min(2, 'Nhập họ tên'),
@@ -67,18 +69,29 @@ export function HoldTimer({
   );
 }
 export function BookingFlow() {
+  const user = useSession(s => s.user);
+  // Reset form/action state as well as the draft when an account changes in place.
+  return user ? <PassengerBookingFlow key={user.id} user={user} /> : null;
+}
+function PassengerBookingFlow({ user }: { user: User }) {
   const { tripId = '' } = useParams(),
     navigate = useNavigate();
-  const user = useSession(s => s.user)!;
-  const draft = useBookingDraft();
+  const draft = useBookingDraft(user.id);
+  const setDraft = draft.set;
+  const client = useQueryClient();
   const [params] = useSearchParams();
   const [expired, setExpired] = useState(false);
+  const [bookingNotice, setBookingNotice] = useState('');
   useEffect(() => {
     if (draft.tripId !== tripId) {
-      draft.set({ tripId, seatIds: [], quantity: 1, holdId: '' });
+      setDraft({ tripId, seatIds: [], quantity: 1, holdId: '' });
     }
-  }, [tripId, draft]);
-  const query = useQuery({ queryKey: ['trip', tripId], queryFn: () => bookingApi.trip(tripId) });
+  }, [tripId, draft.tripId, setDraft, user.id]);
+  const query = useQuery({
+    queryKey: ['trip', tripId],
+    queryFn: () => bookingApi.trip(tripId),
+    refetchInterval: 5000,
+  });
   const catalog = useQuery({ queryKey: ['catalog'], queryFn: operationsApi.catalog });
   const route = catalog.data?.routes.find(r => r.id === query.data?.routeId);
   const selectedJourney =
@@ -100,8 +113,40 @@ export function BookingFlow() {
     queryFn: () => bookingApi.hold(holdId, user.id),
     enabled: !!holdId,
     refetchInterval: 5000,
+    retry: false,
   });
-  const active = hold.data?.status === 'active' && !expired;
+  const missingHold = hold.error instanceof ApiError && [404, 410].includes(hold.error.status || 0);
+  const active = hold.data?.status === 'active' && !expired && !missingHold;
+  useEffect(() => {
+    if (!holdId || !missingHold) return;
+    setDraft({ holdId: '', seatIds: [], quantity: 1 });
+    setExpired(false);
+    setBookingNotice('Lượt giữ chỗ cũ không còn khả dụng. Vui lòng chọn ghế và đặt chỗ lại.');
+    void client.invalidateQueries({ queryKey: ['seats', tripId, user.id] });
+    void client.invalidateQueries({ queryKey: ['trip', tripId] });
+  }, [holdId, missingHold, setDraft, user.id, tripId, client]);
+  useEffect(() => {
+    if (active || (holdId && hold.isFetching) || !seats.data || draft.tripId !== tripId) return;
+    const selectable = new Set(
+      seats.data
+        .filter(seat => seat.status === 'available' || (seat.status === 'held' && seat.mine))
+        .map(seat => seat.id)
+    );
+    const selected = draft.seatIds.filter(id => selectable.has(id));
+    if (selected.length === draft.seatIds.length) return;
+    setDraft({ seatIds: selected });
+    setBookingNotice('Một số ghế vừa được khách khác giữ hoặc đặt. Vui lòng chọn ghế còn trống.');
+  }, [
+    active,
+    holdId,
+    hold.isFetching,
+    seats.data,
+    draft.tripId,
+    draft.seatIds,
+    tripId,
+    user.id,
+    setDraft,
+  ]);
   const journeyChanged = !!(
     active &&
     route &&
@@ -111,19 +156,28 @@ export function BookingFlow() {
         selectedJourney.alightingStopId)
   );
   const holdAction = useAction(async () => {
-    const h = await bookingApi.createHold(
-      tripId,
-      user.id,
-      query.data?.seatMode ? draft.seatIds : [],
-      query.data?.seatMode ? draft.seatIds.length : draft.quantity,
-      { from: params.get('from') || '', to: params.get('to') || '' }
-    );
-    draft.set({ holdId: h.id, quantity: h.quantity });
+    let h: Hold;
+    try {
+      h = await bookingApi.createHold(
+        tripId,
+        user.id,
+        query.data?.seatMode ? draft.seatIds : [],
+        query.data?.seatMode ? draft.seatIds.length : draft.quantity,
+        { from: params.get('from') || '', to: params.get('to') || '' }
+      );
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        await Promise.all([seats.refetch(), query.refetch()]);
+      }
+      throw error;
+    }
+    setDraft({ tripId: h.tripId, holdId: h.id, seatIds: h.seatIds, quantity: h.quantity });
     setExpired(false);
+    setBookingNotice('');
   }, 'Đã giữ chỗ. Hoàn tất thông tin để tiếp tục.');
   const release = useAction(async () => {
     await bookingApi.release(holdId, user.id);
-    draft.set({ holdId: '' });
+    setDraft({ holdId: '' });
     setExpired(false);
   });
   const form = useForm<z.infer<typeof schema>>({
@@ -208,7 +262,7 @@ export function BookingFlow() {
                             (seat.mine ? s.mine : '')
                           }
                           onClick={() => {
-                            draft.set({
+                            setDraft({
                               seatIds: draft.seatIds.includes(seat.id)
                                 ? draft.seatIds.filter(id => id !== seat.id)
                                 : [...draft.seatIds, seat.id].slice(0, 6),
@@ -236,7 +290,7 @@ export function BookingFlow() {
                     <select
                       value={draft.quantity}
                       disabled={!!active}
-                      onChange={e => draft.set({ quantity: Number(e.target.value) })}
+                      onChange={e => setDraft({ quantity: Number(e.target.value) })}
                     >
                       {[1, 2, 3, 4, 5, 6].map(n => (
                         <option key={n} value={n}>
@@ -258,6 +312,7 @@ export function BookingFlow() {
               </div>
               <ActionMessage action={holdAction} />
               <ActionMessage action={release} />
+              {bookingNotice && <Message>{bookingNotice}</Message>}
               {!active ? (
                 <Button
                   disabled={
@@ -332,14 +387,17 @@ export function BookingFlow() {
                       {vouchers.data && vouchers.data.length > 0 && (
                         <select
                           className="filter-select"
-                          onChange={(e) => form.setValue('voucher', e.target.value)}
-                          value={vouchers.data.some(v => v.code === voucherInput) ? voucherInput : ''}
+                          onChange={e => form.setValue('voucher', e.target.value)}
+                          value={
+                            vouchers.data.some(v => v.code === voucherInput) ? voucherInput : ''
+                          }
                           style={{ width: '100%' }}
                         >
                           <option value="">-- Chọn voucher có sẵn trong hệ thống --</option>
-                          {vouchers.data.map((v) => (
+                          {vouchers.data.map(v => (
                             <option key={v.id} value={v.code}>
-                              🎟️ {v.code} (-{v.percent}%) {v.description ? `- ${v.description}` : ''}
+                              🎟️ {v.code} (-{v.percent}%){' '}
+                              {v.description ? `- ${v.description}` : ''}
                             </option>
                           ))}
                         </select>
@@ -381,7 +439,9 @@ export function BookingFlow() {
                     </div>
                   )}
                   <ActionMessage action={book} />
-                  <Message error>{hold.error ? String(hold.error.message) : ''}</Message>
+                  <Message error>
+                    {hold.error && !missingHold ? String(hold.error.message) : ''}
+                  </Message>
                   <Button
                     disabled={
                       !active ||

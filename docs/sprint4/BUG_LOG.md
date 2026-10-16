@@ -9,6 +9,7 @@ Cập nhật 16/10/2026. Bản sửa làm việc trên Develop từ baseline ae0
 | S4-003 | Major | Geofence báo trạm dùng bán kính 300 m thay vì 500 m theo kế hoạch | Đã sửa, chờ nghiệm thu thiết bị. Unit test tại 400/499/500/501 m và notification call pass. |
 | S4-004 | Minor | Báo cáo cũ có số liệu 500 RPS/CPU chưa kèm bằng chứng và mô tả kiến trúc không khớp | Đã sửa báo cáo theo số đo và mã thật. Không ghi toàn bộ DoD PASS. |
 | S4-005 | Major | `font-display: optional` làm tiêu đề trộn Arial Black/Times New Roman khi tải font chậm | Đã sửa sang `swap`. E2E trì hoãn font 1,2 giây: trước sửa fail, sau sửa chỉ dùng Be Vietnam Pro ExtraBold. Cần đo lại Lighthouse sau thay đổi chính sách font. |
+| S4-006 | Major | B/C kế thừa mã giữ chỗ và ghế đã chọn của A khi đổi đăng nhập, nhận 404; ghế vừa bị giữ có thể kẹt trong lựa chọn | Đã sửa store/khóa lưu riêng từng tài khoản, phục hồi hold không tồn tại và cập nhật ghế đang chọn. E2E A/B/C và các ca mất mạng/500/phản hồi muộn qua; xem [chi tiết](../BOOKING_DRAFT_ISOLATION_2026-10-16.md). |
 
 Các việc nghiệm thu còn lại: soak 30–60 phút với dataset lớn, API OpenAPI/Swagger, ERD cardinality, provider sandbox/SMTP/FCM, camera/GPS thiết bị, ma trận 24 US trên môi trường được duyệt, báo cáo PDF/slide/video/dry run và chữ ký người phụ trách. Các mục này chưa được đóng bằng CI cục bộ.
 

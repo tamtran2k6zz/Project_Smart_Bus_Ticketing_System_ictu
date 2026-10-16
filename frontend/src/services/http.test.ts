@@ -4,7 +4,7 @@ const mocked = vi.hoisted(() => ({
   intercept: undefined as unknown as (config: { headers: Record<string, string> }) => {
     headers: Record<string, string>;
   },
-  onResponse: vi.fn(),
+  onError: undefined as unknown as (error: unknown) => Promise<never>,
 }));
 vi.mock('axios', () => ({
   default: {
@@ -16,12 +16,26 @@ vi.mock('axios', () => ({
             mocked.intercept = fn;
           },
         },
-        response: { use: mocked.onResponse },
+        response: {
+          use: (_success: unknown, reject: typeof mocked.onError) => {
+            mocked.onError = reject;
+          },
+        },
       },
     }),
   },
 }));
 import { request } from './http';
+it('preserves HTTP status so missing holds can be distinguished from network outages', async () => {
+  const reject = mocked.onError;
+  await expect(
+    reject({ response: { status: 404, data: { message: 'Không tìm thấy giữ chỗ.' } } })
+  ).rejects.toMatchObject({ message: 'Không tìm thấy giữ chỗ.', status: 404 });
+  await expect(reject({ code: 'ECONNABORTED' })).rejects.toMatchObject({
+    message: 'Kết nối hết thời gian chờ. Vui lòng thử lại.',
+    status: undefined,
+  });
+});
 beforeEach(() => {
   sessionStorage.clear();
   mocked.request.mockReset();

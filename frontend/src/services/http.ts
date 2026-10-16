@@ -3,6 +3,13 @@ import { appConfig } from '@/configs/app.config';
 import { rolePermissions } from '@/configs/permissions';
 import type { Role } from '@/features/auth/types';
 const tokenKey = 'smartbus.accessToken.v1';
+export class ApiError extends Error {
+  readonly status?: number;
+  constructor(message: string, status?: number) {
+    super(message);
+    this.status = status;
+  }
+}
 export function clearAccessToken() {
   sessionStorage.removeItem(tokenKey);
 }
@@ -27,12 +34,13 @@ http.interceptors.response.use(
     if (error.response?.status === 401) clearAccessToken();
     const message = error.response?.data?.message;
     return Promise.reject(
-      new Error(
+      new ApiError(
         typeof message === 'string'
           ? message
           : error.code === 'ECONNABORTED'
             ? 'Kết nối hết thời gian chờ. Vui lòng thử lại.'
-            : 'Không kết nối được dịch vụ. Kiểm tra mạng và địa chỉ API.'
+            : 'Không kết nối được dịch vụ. Kiểm tra mạng và địa chỉ API.',
+        error.response?.status
       )
     );
   }
