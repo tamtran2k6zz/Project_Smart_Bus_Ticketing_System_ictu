@@ -1,9 +1,9 @@
-/* Latin + Vietnamese only. Optional display keeps first-visit text readable without late font swaps. */
+/* Latin + Vietnamese only. Swap display restores the brand font even after a slow first download. */
 
 @font-face {
   font-family: 'Be Vietnam Pro';
   font-style: normal;
-  font-display: optional;
+  font-display: swap;
   font-weight: 400;
   src:
     url(@fontsource/be-vietnam-pro/files/be-vietnam-pro-latin-400-normal.woff2) format('woff2'),
@@ -16,7 +16,7 @@
 @font-face {
   font-family: 'Be Vietnam Pro';
   font-style: normal;
-  font-display: optional;
+  font-display: swap;
   font-weight: 400;
   src:
     url(@fontsource/be-vietnam-pro/files/be-vietnam-pro-vietnamese-400-normal.woff2) format('woff2'),
@@ -29,7 +29,7 @@
 @font-face {
   font-family: 'Be Vietnam Pro';
   font-style: normal;
-  font-display: optional;
+  font-display: swap;
   font-weight: 500;
   src:
     url(@fontsource/be-vietnam-pro/files/be-vietnam-pro-latin-500-normal.woff2) format('woff2'),
@@ -42,7 +42,7 @@
 @font-face {
   font-family: 'Be Vietnam Pro';
   font-style: normal;
-  font-display: optional;
+  font-display: swap;
   font-weight: 500;
   src:
     url(@fontsource/be-vietnam-pro/files/be-vietnam-pro-vietnamese-500-normal.woff2) format('woff2'),
@@ -55,7 +55,7 @@
 @font-face {
   font-family: 'Be Vietnam Pro';
   font-style: normal;
-  font-display: optional;
+  font-display: swap;
   font-weight: 600;
   src:
     url(@fontsource/be-vietnam-pro/files/be-vietnam-pro-latin-600-normal.woff2) format('woff2'),
@@ -68,7 +68,7 @@
 @font-face {
   font-family: 'Be Vietnam Pro';
   font-style: normal;
-  font-display: optional;
+  font-display: swap;
   font-weight: 600;
   src:
     url(@fontsource/be-vietnam-pro/files/be-vietnam-pro-vietnamese-600-normal.woff2) format('woff2'),
@@ -81,7 +81,7 @@
 @font-face {
   font-family: 'Be Vietnam Pro';
   font-style: normal;
-  font-display: optional;
+  font-display: swap;
   font-weight: 700;
   src:
     url(@fontsource/be-vietnam-pro/files/be-vietnam-pro-latin-700-normal.woff2) format('woff2'),
@@ -94,7 +94,7 @@
 @font-face {
   font-family: 'Be Vietnam Pro';
   font-style: normal;
-  font-display: optional;
+  font-display: swap;
   font-weight: 700;
   src:
     url(@fontsource/be-vietnam-pro/files/be-vietnam-pro-vietnamese-700-normal.woff2) format('woff2'),
@@ -107,7 +107,7 @@
 @font-face {
   font-family: 'Be Vietnam Pro';
   font-style: normal;
-  font-display: optional;
+  font-display: swap;
   font-weight: 800;
   src:
     url(@fontsource/be-vietnam-pro/files/be-vietnam-pro-latin-800-normal.woff2) format('woff2'),
@@ -120,7 +120,7 @@
 @font-face {
   font-family: 'Be Vietnam Pro';
   font-style: normal;
-  font-display: optional;
+  font-display: swap;
   font-weight: 800;
   src:
     url(@fontsource/be-vietnam-pro/files/be-vietnam-pro-vietnamese-800-normal.woff2) format('woff2'),
