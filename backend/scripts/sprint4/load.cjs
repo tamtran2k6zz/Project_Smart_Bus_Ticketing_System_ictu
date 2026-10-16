@@ -248,6 +248,93 @@ async function main() {
         await redis.del(key); // Only the unique, generated test-trip key.
       }
     }
+    // Real multi-connection test: two bookings race to spend the same finite wallet balance.
+    const walletUser = data.users[0];
+    const wallet = (
+      await db.query(
+        'INSERT INTO user_wallets(user_id,full_name,balance) VALUES($1,$2,20000) RETURNING id',
+        [walletUser.id, 'Local wallet checkout fixture']
+      )
+    ).rows[0];
+    await db.query(
+      "INSERT INTO wallet_transactions(wallet_id,type,amount,balance_before,balance_after,reference_id,description) VALUES($1,'TOPUP',20000,0,20000,$2,'Local test opening balance')",
+      [wallet.id, data.trip]
+    );
+    const walletHeaders = {
+      Authorization: 'Bearer ' + walletUser.token,
+      'Content-Type': 'application/json',
+    };
+    const walletBookings = [];
+    for (const seat of ['A03', 'A04']) {
+      const hold = await call('/api/smartbus/v1/holds', {
+        method: 'POST',
+        headers: walletHeaders,
+        body: JSON.stringify({ tripId: data.trip, seatIds: [seat], quantity: 1 }),
+      });
+      assert.equal(hold.status, 200);
+      const booking = await call('/api/smartbus/v1/bookings', {
+        method: 'POST',
+        headers: walletHeaders,
+        body: JSON.stringify({ holdId: hold.body.id, name: 'Wallet fixture', phone: '0905551234' }),
+      });
+      assert.equal(booking.status, 200);
+      walletBookings.push(booking.body.id);
+    }
+    const payWallet = bookingId =>
+      call('/api/smartbus/v1/payments', {
+        method: 'POST',
+        headers: walletHeaders,
+        body: JSON.stringify({ bookingId, gateway: 'Wallet', amount: 1 }),
+      });
+    const walletRace = await Promise.all(walletBookings.map(payWallet));
+    const paid = walletRace.filter(
+      r => r.status === 200 && r.body.status === 'paid' && r.body.gateway === 'Wallet'
+    );
+    const winnerIndex = walletRace.findIndex(r => r.status === 200);
+    const replays =
+      winnerIndex >= 0
+        ? await Promise.all([
+            payWallet(walletBookings[winnerIndex]),
+            payWallet(walletBookings[winnerIndex]),
+          ])
+        : [];
+    const remaining = Number(
+      (await db.query('SELECT balance FROM user_wallets WHERE id=$1', [wallet.id])).rows[0].balance
+    );
+    const debits = Number(
+      (
+        await db.query(
+          "SELECT count(*) FROM wallet_transactions WHERE wallet_id=$1 AND type='PAYMENT'",
+          [wallet.id]
+        )
+      ).rows[0].count
+    );
+    const bookedSeats = Number(
+      (
+        await db.query(
+          "SELECT count(*) FROM trip_seats WHERE trip_id=$1 AND seat_number IN ('A03','A04') AND status='BOOKED'",
+          [data.trip]
+        )
+      ).rows[0].count
+    );
+    result.checks.walletCheckout = {
+      passed:
+        paid.length === 1 &&
+        walletRace.filter(r => r.status === 409).length === 1 &&
+        remaining === 5000 &&
+        debits === 1 &&
+        bookedSeats === 1 &&
+        replays.length === 2 &&
+        replays.every(r => r.status === 200 && r.body.id === paid[0].body.id),
+      simultaneousBookings: 2,
+      initialBalance: 20000,
+      pricePerBooking: 15000,
+      successes: paid.length,
+      conflicts: walletRace.filter(r => r.status === 409).length,
+      finalBalance: remaining,
+      debitEntries: debits,
+      bookedSeats,
+    };
     await searchPhase('soak', 20, config.soakSeconds);
     result.environment.redisInfo = (await redis.info('clients'))
       .split('\r\n')

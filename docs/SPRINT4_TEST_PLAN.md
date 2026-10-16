@@ -40,6 +40,8 @@ Có thể đổi thời lượng qua `SPRINT4_SEARCH_SECONDS` / `SPRINT4_SOAK_SE
 
 Tiêu chí dữ liệu: đúng một người giữ ghế thành công, 49 phản hồi 409, đúng một hold/reservation trong DB, đúng chủ sở hữu, Redis key có TTL và thuộc người thắng đối với luồng Redis. HTTP 409 có chủ đích không tính là lỗi hệ thống. Tra cứu phải trả chuyến thử hợp lệ, không chỉ HTTP 200. Bài đo giữ ghế không thu tiền hay tự phát hành vé.
 
+Runner cũng kiểm tra thanh toán ví: tạo số dư fixture 20.000đ trong DB tạm và hai đơn 15.000đ cùng ví, gửi thanh toán đồng thời. Chỉ một đơn được trả tiền, ví còn 5.000đ, có đúng một bút toán trừ và một ghế đã đặt; gửi lại đơn thắng không trừ thêm. Đây là tiền thử được tạo trong database cô lập, không gọi cổng nạp tiền hay ngân hàng thật.
+
 200 virtual users là số vòng người dùng đồng thời theo mô hình closed-loop, không phải cam kết 200 request/giây. Ghi cả cấu hình máy, volume dữ liệu và các tác vụ khác đang chạy khi so sánh kết quả.
 
 ## Lighthouse

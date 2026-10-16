@@ -155,7 +155,7 @@ export default function Wallet() {
                   <h3>Ví của bạn hoạt động thế nào?</h3>
                   <p className="muted">
                     Khi yêu cầu hủy vé được duyệt, tiền đã thanh toán được hoàn về ví. Bạn có thể
-                    dùng tiền này cho vé tháng hoặc gửi yêu cầu rút.
+                    dùng số dư để thanh toán vé chuyến, mua/gia hạn vé tháng hoặc gửi yêu cầu rút.
                   </p>
                   <div className={s.hint}>
                     Rút tiền do bộ phận tài chính chuyển khoản thủ công. Chỉ hiển thị “Đã chuyển

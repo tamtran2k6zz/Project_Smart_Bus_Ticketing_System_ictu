@@ -15,6 +15,13 @@ import { cancelTicket } from '../services/cancellation.service';
 import { prepareSeats, reserveSeatForPayment } from '../services/booking';
 import { PaymentGatewayService } from '../services/payment-gateway.service';
 import { createBankTransfer, transferForBooking } from '../services/bank-transfer.service';
+import {
+  lockWallet,
+  assertWalletActive,
+  changeBalance,
+  WalletError,
+} from '../services/wallet.service';
+import { applyTicketPayment } from '../services/ticket-payment.service';
 import { buildQrPayload, validateTicketQr } from '../services/ticket.service';
 import { assertTripAccess } from '../services/trip-access.service';
 import { updateTripLocation } from '../services/location-update.service';
@@ -43,10 +50,11 @@ const api =
       if (!res.headersSent) res.json(result);
     } catch (error: any) {
       logger.error('request_failed', { path: req.path, error });
+      const status = error instanceof WalletError ? error.statusCode : error.status;
       if (!res.headersSent)
-        res.status(error.status || (['23505', '23503'].includes(error.code) ? 409 : 500)).json({
+        res.status(status || (['23505', '23503'].includes(error.code) ? 409 : 500)).json({
           success: false,
-          message: error.status
+          message: status
             ? error.message
             : ['23505', '23503'].includes(error.code)
               ? 'Dữ liệu đang được sử dụng hoặc yêu cầu đã tồn tại.'
@@ -268,9 +276,11 @@ const paymentDto = (b: any) =>
             ? 'MoMo'
             : b.payment_method === 'ZALOPAY'
               ? 'ZaloPay'
-              : b.payment_method === 'BANK_TRANSFER'
-                ? 'BankTransfer'
-                : 'VNPay',
+              : b.payment_method === 'WALLET'
+                ? 'Wallet'
+                : b.payment_method === 'BANK_TRANSFER'
+                  ? 'BankTransfer'
+                  : 'VNPay',
         amount: Number(b.amount),
         status:
           b.payment_status === 'SUCCESS'
@@ -572,15 +582,17 @@ router.post(
   api(async req => {
     await assertEmailVerified(req.user!.id);
     const method =
-      req.body.gateway === 'BankTransfer'
-        ? 'BANK_TRANSFER'
-        : req.body.gateway === 'MoMo'
-          ? 'MOMO'
-          : req.body.gateway === 'ZaloPay'
-            ? 'ZALOPAY'
-            : ['VNPay', 'Card'].includes(req.body.gateway)
-              ? 'VNPAY'
-              : fail('Cổng thanh toán chưa được hỗ trợ.');
+      req.body.gateway === 'Wallet'
+        ? 'WALLET'
+        : req.body.gateway === 'BankTransfer'
+          ? 'BANK_TRANSFER'
+          : req.body.gateway === 'MoMo'
+            ? 'MOMO'
+            : req.body.gateway === 'ZaloPay'
+              ? 'ZALOPAY'
+              : ['VNPay', 'Card'].includes(req.body.gateway)
+                ? 'VNPAY'
+                : fail('Cổng thanh toán chưa được hỗ trợ.');
     const b = await ownBooking(req.body.bookingId, req.user!.id);
     if (bookingDto(b).status === 'paid') return paymentWithBankTransfer(b, req.user!.id);
     const ticketId = await transaction(async client => {
@@ -605,6 +617,15 @@ router.post(
       }
       const h = await getHold(b.hold_id, req.user!.id, client);
       if (h.status !== 'active') fail('Giữ chỗ hết hạn.', 409);
+      // Lock the wallet before the trip/seat rows, matching refund lock order.
+      const wallet = method === 'WALLET' ? await lockWallet(client, req.user!.id) : null;
+      if (wallet) {
+        assertWalletActive(wallet);
+        if (!Number.isSafeInteger(Number(b.total)) || Number(b.total) <= 0)
+          fail('Số tiền đặt vé không hợp lệ.', 409);
+        if (Number(wallet.balance) < Number(b.total))
+          fail('Số dư ví không đủ. Vui lòng nạp thêm tiền.', 409);
+      }
       if (locked.ticket_id) {
         if (
           existingPayment.payment_method === method &&
@@ -677,12 +698,32 @@ router.post(
       );
       await client.query('UPDATE ui_bookings SET ticket_id=$1 WHERE id=$2', [ticket.id, b.id]);
       if (method === 'BANK_TRANSFER') await createBankTransfer(client, ticket.id, b.id);
+      if (wallet) {
+        const debited = await changeBalance(
+          client,
+          wallet,
+          -Number(b.total),
+          'PAYMENT',
+          ticket.id,
+          'Thanh toán vé xe · ' + b.id
+        );
+        if (!debited) fail('Giao dịch ví đã được ghi nhận. Vui lòng kiểm tra lại đặt vé.', 409);
+        const outcome = await applyTicketPayment(
+          client,
+          ticket.id,
+          'WALLET',
+          ticket.id,
+          Number(b.total)
+        );
+        if (outcome !== 'CONFIRMED')
+          fail('Giữ chỗ đã thay đổi hoặc hết hạn. Ví chưa bị trừ tiền.', 409);
+      }
       return ticket.id;
     });
     let updated = await ownBooking(b.id, req.user!.id);
     if (updated.ticket_id !== ticketId)
       fail('Phương thức thanh toán đã thay đổi. Vui lòng thử lại.', 409);
-    if (bookingDto(updated).status === 'paid' || method === 'BANK_TRANSFER')
+    if (bookingDto(updated).status === 'paid' || method === 'BANK_TRANSFER' || method === 'WALLET')
       return paymentWithBankTransfer(updated, req.user!.id);
     if (!updated.payment_url) {
       let url: string;

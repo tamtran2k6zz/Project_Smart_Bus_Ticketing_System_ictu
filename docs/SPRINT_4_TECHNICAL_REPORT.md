@@ -27,6 +27,8 @@ Lượt đầu cùng harness ghi p95 tra cứu 545,04 ms và pool waiting lên t
 
 **Chưa đạt kết luận mọi API <150ms:** luồng UI giữ ghế khi 50 khách tranh cùng tài nguyên vẫn p95 khoảng 1 giây. Gate của runner hiện chỉ áp p95 150ms cho tra cứu; safety gates của các ca tranh ghế kiểm tra tính đúng đắn. Đây là điểm cần tối ưu/đo tiếp, không bị bỏ khỏi báo cáo.
 
+Lượt retest bổ sung thanh toán ví cùng ngày ghi tra cứu p95 **177,59ms**, nên toàn runner thất bại gate 150ms dù kiểm tra ví và chống đặt trùng qua. Mốc 138,38ms ở trên là kết quả lượt trước, chưa chứng minh hiệu năng ổn định qua mọi lượt. Xem [bằng chứng mới](sprint4/results/2026-10-16-wallet-ticket-load.json) và [luồng thanh toán ví](WALLET_TICKET_CHECKOUT_2026-10-16.md).
+
 CPU peak 98,52% quy đổi theo một core; RSS peak 194,67 MiB; heap peak 80,81 MiB; pool peak 10 kết nối, waiting peak 99; event-loop p95 cao nhất trong các mẫu 28,57 ms. [CSV giám sát từng giây](sprint4/results/2026-10-16-server-metrics.csv) và JSON tóm tắt là nguồn số liệu. Soak 60 giây không đủ chứng minh không có memory leak; cần lượt 30–60 phút và dataset lớn hơn.
 
 200 virtual users là closed-loop concurrency, không phải 200 RPS cố định. Dataset nhỏ không đại diện quy mô nhà xe/Staging. Chỉ tiêu dưới 150ms đang diễn giải bằng p95 cho bài tra cứu; cần PO/QA chốt phương pháp chính thức.
