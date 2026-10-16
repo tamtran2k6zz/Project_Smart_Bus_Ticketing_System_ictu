@@ -19,6 +19,8 @@
     "test:postgres": "node scripts/test-postgres.cjs",
     "test:trip-cleanup": "node scripts/test-trip-cleanup.cjs",
     "test:serverless": "node scripts/test-serverless.cjs",
+    "test:sprint4": "node --test scripts/sprint4/config.test.cjs",
+    "test:load": "node scripts/sprint4/load.cjs",
     "db:create-admin": "node scripts/create-admin.cjs",
     "db:seed-seats": "node scripts/seed_seats.js",
     "db:seed-oct13": "node scripts/seed-trips-oct13.js",

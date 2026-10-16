@@ -1,5 +1,5 @@
 import { Outlet } from 'react-router-dom';
-import bus from '@/assets/images/tambus-hero.webp';
+import bus from '@/assets/images/tambus-hero.webp?responsive';
 import { Header } from './MainLayout';
 import s from './Layout.module.css';
 export default function AuthLayout() {
@@ -17,10 +17,13 @@ export default function AuthLayout() {
           <div className={s.authBusVisual}>
             <img
               className={s.authBus}
-              src={bus}
+              src={bus.src}
+              srcSet={bus.srcSet}
+              sizes="50vw"
               width={1672}
               height={941}
-              fetchPriority="high"
+              loading="lazy"
+              decoding="async"
               alt="Xe buýt TAMBUS xanh lá, bảng điện tử 01 - SMARTBUS"
             />
           </div>

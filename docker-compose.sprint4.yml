@@ -1,0 +1,27 @@
+name: smartbus-sprint4
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: smartbus_sprint4_test
+      POSTGRES_USER: sprint4
+      POSTGRES_PASSWORD: sprint4-local-only
+    ports:
+      - '127.0.0.1:6544:5432'
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U sprint4 -d smartbus_sprint4_test']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '127.0.0.1:6381:6379'
+    command: ['redis-server', '--save', '', '--appendonly', 'no']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 2s
+      timeout: 3s
+      retries: 30

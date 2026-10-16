@@ -24,7 +24,7 @@ export interface CreateNotificationInput {
   data?: Record<string, unknown>;
 }
 
-const APPROACH_RADIUS_METERS = 300;
+const APPROACH_RADIUS_METERS = 500;
 const DEDUP_TTL_SECONDS = 600;
 const ROUTE_STOPS_CACHE_MS = 5 * 60 * 1000;
 

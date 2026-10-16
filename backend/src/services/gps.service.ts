@@ -79,7 +79,8 @@ export function checkGeofencing(
       stop.latitude,
       stop.longitude
     );
-    if (distance <= thresholdMeters) {
+    // Ignore floating-point noise at an exact distance boundary (under one micrometer).
+    if (distance <= thresholdMeters + 1e-6) {
       if (!nearest || distance < nearest.distanceMeters) {
         nearest = { stopId: stop.id, stopName: stop.name, distanceMeters: Math.round(distance) };
       }

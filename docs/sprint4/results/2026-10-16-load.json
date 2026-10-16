@@ -1,0 +1,136 @@
+{
+  "startedAt": "2026-10-16T01:10:37.131Z",
+  "environment": {
+    "kind": "local-isolated-native-postgresql",
+    "node": "v24.14.0",
+    "platform": "win32",
+    "cpus": 12,
+    "ramBytes": 8279207936,
+    "poolMax": 10,
+    "postgres": "PostgreSQL 16.15 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+    "commit": "ae023ec56ba8752281972793b1570ac09bc34e8b",
+    "workingTree": "modified",
+    "dataset": {
+      "passengers": 50,
+      "routes": 1,
+      "buses": 1,
+      "trips": 1,
+      "seats": 40
+    },
+    "redisInfo": [
+      "connected_clients:3",
+      "blocked_clients:0"
+    ]
+  },
+  "settings": {
+    "searchUsers": 200,
+    "raceUsers": 50,
+    "searchSeconds": 30,
+    "soakSeconds": 60,
+    "apiP95Ms": 150
+  },
+  "phases": {
+    "search": {
+      "requests": 73770,
+      "elapsedMs": 30016.4052,
+      "rps": 2457.6560553626855,
+      "statuses": {
+        "200": 73770
+      },
+      "errors": 0,
+      "p50Ms": 74.23730000000069,
+      "p95Ms": 138.3779999999997,
+      "p99Ms": 176.21130000000085,
+      "maxMs": 408.7006000000001
+    },
+    "ui-seat-race": {
+      "requests": 50,
+      "elapsedMs": 1090.8727999999974,
+      "rps": 45.834858106279775,
+      "statuses": {
+        "200": 1,
+        "409": 49
+      },
+      "errors": 0,
+      "p50Ms": 676.4336000000039,
+      "p95Ms": 1019.7315999999992,
+      "p99Ms": 1065.2276999999958,
+      "maxMs": 1065.2276999999958
+    },
+    "redis-seat-race": {
+      "requests": 50,
+      "elapsedMs": 90.12939999999799,
+      "rps": 554.7579369218159,
+      "statuses": {
+        "201": 1,
+        "409": 49
+      },
+      "errors": 0,
+      "p50Ms": 50.801800000001094,
+      "p95Ms": 59.31100000000151,
+      "p99Ms": 89.48659999999654,
+      "maxMs": 89.48659999999654
+    },
+    "soak": {
+      "requests": 149920,
+      "elapsedMs": 60002.530900000005,
+      "rps": 2498.5612731878946,
+      "statuses": {
+        "200": 149920
+      },
+      "errors": 0,
+      "p50Ms": 7.292000000001281,
+      "p95Ms": 11.93119999999908,
+      "p99Ms": 26.36579999999958,
+      "maxMs": 54.149499999999534
+    }
+  },
+  "checks": {
+    "ui-seat-race": {
+      "passed": true,
+      "winners": 1,
+      "conflicts": 49,
+      "holds": 1,
+      "tickets": 0,
+      "ownerMatches": true
+    },
+    "redis-seat-race": {
+      "passed": true,
+      "winners": 1,
+      "conflicts": 49,
+      "holds": 0,
+      "tickets": 1,
+      "ownerMatches": true
+    },
+    "redisLock": {
+      "passed": true
+    },
+    "searchNoErrors": {
+      "passed": true
+    },
+    "soakNoErrors": {
+      "passed": true
+    },
+    "searchLatency": {
+      "passed": true,
+      "p95Ms": 138.3779999999997,
+      "thresholdMs": 150
+    }
+  },
+  "limitations": [
+    "Local measurements with synthetic data; not Staging/production acceptance.",
+    "200 closed-loop virtual users, not a guaranteed 200 RPS arrival rate.",
+    "Short soak only detects observed errors/trends; it cannot prove absence of memory leaks."
+  ],
+  "passed": true,
+  "finishedAt": "2026-10-16T01:12:11.400Z",
+  "resources": {
+    "samples": 91,
+    "peakRssMb": 194.671875,
+    "peakHeapMb": 80.81204986572266,
+    "peakPoolWaiting": 99,
+    "peakPoolTotal": 10,
+    "peakCpuPercentOneCore": 98.52351756364251,
+    "peakEventLoopP95Ms": 28.573695
+  }
+}

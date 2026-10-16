@@ -7,7 +7,8 @@ export function useAnimeScope(root: RefObject<HTMLElement | null>, setup: (scope
   const setupRef = useRef(setup);
   setupRef.current = setup;
   useEffect(() => {
-    if (reduced || !root.current) return;
+    // Mobile content stays visible immediately; scroll effects are a desktop enhancement.
+    if (reduced || !root.current || window.matchMedia('(max-width: 900px)').matches) return;
     const current = createScope({ root });
     scope.current = current;
     current.add(() => setupRef.current(current));

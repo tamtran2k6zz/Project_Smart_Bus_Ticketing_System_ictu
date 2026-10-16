@@ -87,7 +87,18 @@ const userDto = (u: any) => ({
   emailVerified: !!u.email_verified_at,
   permissions: permissions[u.role] ?? [],
 });
-async function catalog() {
+let catalogInFlight: ReturnType<typeof readCatalog> | undefined;
+function catalog() {
+  // Share only concurrent reads of this public snapshot. Completed results are never cached;
+  // later requests still read current prices and availability from PostgreSQL.
+  if (!catalogInFlight) {
+    catalogInFlight = readCatalog().finally(() => {
+      catalogInFlight = undefined;
+    });
+  }
+  return catalogInFlight;
+}
+async function readCatalog() {
   const [rs, stops, vehicles, trips] = await Promise.all([
     query<any[]>(
       `SELECT r.*,COALESCE((SELECT jsonb_agg(s.stop_id ORDER BY s.stop_order) FROM route_stops s WHERE s.route_id=r.id),'[]') AS stop_ids, COALESCE((SELECT jsonb_agg(s.estimated_time_minutes ORDER BY s.stop_order) FROM route_stops s WHERE s.route_id=r.id),'[]') AS stop_minutes FROM routes r WHERE deleted_at IS NULL`

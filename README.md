@@ -326,6 +326,8 @@ Mốc kiểm chứng cục bộ ngày **14/10/2026**:
 
 PGlite và provider giả lập giúp kiểm tra nghiệp vụ, migration, phân quyền và các tình huống lỗi. Kết quả này chưa thay thế kiểm thử tải trên PostgreSQL nhiều kết nối, giao dịch provider thật hoặc thiết bị GPS/camera thực.
 
+Đợt khởi động Sprint 4 ngày **16/10/2026** bổ sung môi trường PostgreSQL/Redis cục bộ tách biệt, bài tải 200 người tra cứu, hai ca 50 người tranh ghế và Lighthouse mobile. Xem [kế hoạch chạy](docs/SPRINT4_TEST_PLAN.md), [báo cáo kết quả và giới hạn](docs/SPRINT_4_TECHNICAL_REPORT.md), [ma trận 24 user story](docs/SPRINT4_ACCEPTANCE_MATRIX.md) và [bug log](docs/sprint4/BUG_LOG.md). Các mục hiệu năng chưa đạt được giữ mở; chưa nghiệm thu toàn bộ Sprint 4.
+
 ## Triển khai và vận hành
 
 ### Vercel

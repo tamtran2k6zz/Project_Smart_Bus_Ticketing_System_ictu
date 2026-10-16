@@ -137,7 +137,7 @@ describe('notifyApproachingPassengers', () => {
 
     await notifyApproachingPassengers('trip-outside', { latitude: 10.9, longitude: 106.8 });
 
-    expect(mockedGeofence).toHaveBeenCalledWith(10.9, 106.8, stopRows, 300);
+    expect(mockedGeofence).toHaveBeenCalledWith(10.9, 106.8, stopRows, 500);
     expect(mockedSetIfAbsent).not.toHaveBeenCalled();
     expect(mockedSendToUser).not.toHaveBeenCalled();
   });
