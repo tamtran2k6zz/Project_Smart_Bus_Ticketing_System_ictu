@@ -32,6 +32,7 @@ jobs:
           npm run test:postgres
           npm run test:trip-cleanup
           npm run test:serverless
+          npm run test:sprint4
 
       # Kiểm tra Frontend
       - name: Frontend - Install, Lint, Test & Build

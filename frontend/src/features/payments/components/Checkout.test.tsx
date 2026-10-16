@@ -107,6 +107,32 @@ it('allows retry when a gateway failed after the pending payment was saved', asy
   expect(button.disabled).toBe(false);
 });
 
+it('recovers the saved payment after a network timeout without treating it as paid', async () => {
+  api.start.mockImplementation(async () => {
+    api.latest.mockResolvedValue({
+      id: 'saved-before-timeout',
+      gateway: 'MoMo',
+      status: 'pending',
+      amount: 20000,
+    });
+    throw new Error('Kết nối hết thời gian chờ. Vui lòng thử lại.');
+  });
+  open();
+  await screen.findByText('Chỗ đang được giữ cho bạn');
+  fireEvent.click(screen.getByRole('button', { name: /thanh toán.*20/ }));
+  await screen.findByText('Kết nối hết thời gian chờ. Vui lòng thử lại.');
+  await client.invalidateQueries();
+  await waitFor(() =>
+    expect(client.getQueryData(['payment', 'b1', 'u1'])).toMatchObject({
+      id: 'saved-before-timeout',
+      status: 'pending',
+    })
+  );
+  expect(api.confirmDemo).not.toHaveBeenCalled();
+  expect(screen.queryByText('Thanh toán đã được xác nhận')).toBeNull();
+  expect(screen.getByRole('button', { name: /Tiếp tục thanh toán/ })).toBeEnabled();
+});
+
 it('restores the existing gateway when the customer returns to checkout', async () => {
   api.latest.mockResolvedValue({ id: 'p1', gateway: 'VNPay', status: 'pending', amount: 20000 });
   open();

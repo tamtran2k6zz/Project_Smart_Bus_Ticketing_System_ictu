@@ -1,6 +1,4 @@
-import { useRef, type ButtonHTMLAttributes } from 'react';
-import { animate } from 'animejs';
-import { useAnimeScope } from '@/hooks/useAnimeScope';
+import type { ButtonHTMLAttributes } from 'react';
 import s from './Ui.module.css';
 export function Button({
   children,
@@ -9,22 +7,8 @@ export function Button({
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
 }) {
-  const root = useRef<HTMLButtonElement>(null);
-  const scope = useAnimeScope(root, self => {
-    self.add('tap', () =>
-      animate(root.current!, { scale: [1, 0.97, 1], duration: 180, ease: 'out(2)' })
-    );
-  });
   return (
-    <button
-      {...props}
-      ref={root}
-      className={s.button + ' ' + s[variant] + ' ' + (props.className || '')}
-      onClick={e => {
-        scope.current?.methods.tap();
-        props.onClick?.(e);
-      }}
-    >
+    <button {...props} className={s.button + ' ' + s[variant] + ' ' + (props.className || '')}>
       {children}
     </button>
   );

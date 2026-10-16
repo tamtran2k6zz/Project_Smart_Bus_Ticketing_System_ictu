@@ -1,84 +1,87 @@
-# BÁO CÁO KỸ THUẬT - SPRINT 4
-> **Đồ án Thực tập Cơ sở 2026 - Hệ thống Đặt vé Xe buýt Thông minh (Smart Bus Ticketing System - ICTU)**  
-> **Nhóm thực hiện:** N5 Innovators  
-> **Ngày báo cáo:** 14/10/2026
+# Báo cáo kỹ thuật Sprint 4
 
----
+**Đồ án Thực tập Cơ sở 2026 · Nhóm 5 — N5 Innovators**
 
-## 1. Giám sát tài nguyên máy chủ trong kiểm thử tải (Load Testing & Resource Monitoring)
+Trường Đại học Công nghệ Thông tin & Truyền thông — Đại học Thái Nguyên (ICTU).
 
-Trong Sprint 4, hệ thống đã được tiến hành kiểm thử tải (Load Testing) bằng công cụ giả lập với lưu lượng đồng thời lớn (Concurrent Requests) nhắm vào các API trọng yếu: Đặt vé trực tuyến (`/api/v1/ticketing/bookings`), Soát vé QR (`/api/v1/ticketing/verify`), và Tải sơ đồ ghế (`/api/v1/ticketing/trips/:id/seats`).
+Ngày cập nhật: 16/10/2026. Trạng thái: **đang kiểm thử, chưa nghiệm thu production**.
 
-### 📊 Kết quả giám sát tài nguyên:
-* **CPU & RAM (Node.js Process):**
-  * **CPU Utilization:** Dao động từ 15% đến 35% trên 2 vCPU khi xử lý 500 RPS (Requests Per Second). Không ghi nhận hiện tượng CPU spike hoặc event loop blocking.
-  * **Memory (RSS / Heap Used):** Heap memory ổn định quanh mức 65MB - 120MB (Garbage Collection hoạt động hiệu quả, không có hiện tượng Memory Leak sau 10.000 requests liên tục).
-* **Kết nối cơ sở dữ liệu (PostgreSQL `pg.Pool`):**
-  * **Pool Configuration:** `max: 10` (hoặc 2 khi chạy serverless/Vercel).
-  * **Hiệu năng Connection Pool:** `idleCount` luôn duy trì từ 2-5 kết nối sẵn sàng; `waitingCount` = 0 trong hầu hết thời điểm nhờ cơ chế tái sử dụng connection pool hiệu quả của `pg`.
-* **Kết nối Cache (Redis Pool):**
-  * Sử dụng Redis 7 Alpine làm tầng đệm lock ghế và cache dữ liệu chuyến xe. Lượng `connected_clients` ổn định dưới 50 kết nối, phản hồi lệnh `PING` dưới 1ms.
+## Môi trường và phương pháp đo
 
----
+Đã chạy PostgreSQL 16 và Redis 7 trong Docker riêng, chỉ bind localhost. API Node.js dùng pool PostgreSQL gốc, max 10; không dùng hàng đợi tuần tự PGlite. Mỗi lượt tạo database tạm riêng, áp migrations thật, tạo 50 tài khoản giả, một tuyến, một xe 40 ghế và một chuyến tương lai. Không gọi merchant/SMTP/FCM thật, không thu/chuyển tiền.
 
-## 2. Gia cố bảo mật (SQL Injection & JWT)
+Baseline mã nguồn trước đợt sửa: ae023ec trên Develop. Bằng chứng JSON ghi workingTree=modified vì lượt đo chạy trên bản sửa chưa commit; không trình bày kết quả này như đo trên commit baseline sạch. Cấu hình máy và timestamps có trong [kết quả tải](sprint4/results/2026-10-16-load.json).
 
-### A. Gia cố chống SQL Injection
-* **Kiểm tra và chuẩn hóa:** Toàn bộ các truy vấn SQL tương tác với PostgreSQL qua `pgPool.query` hoặc hàm helper `query(sql, params)` đều bắt buộc sử dụng **Parameterized Queries** (`$1, $2, ...`).
-* Tuyệt đối không sử dụng nối chuỗi (Template Literals) với dữ liệu do người dùng truyền vào, ngăn chặn hoàn toàn nguy cơ tấn công SQL Injection.
+## Kết quả kiểm thử tải thực đo
 
-### B. Rà soát và bảo mật JWT (JSON Web Token)
-* **Secret Key Validation:** Bắt buộc `JWT_SECRET` phải được cấu hình với độ dài tối thiểu 32 ký tự ngẫu nhiên (kiểm tra tự động tại khởi động ứng dụng trong `backend/src/config/auth.ts`).
-* **Token Expiration & Payload:** Access Token có thời hạn ngắn (15m - 1h); Payload chỉ chứa các định danh tối thiểu (`userId`, `role`, `email`), không lưu trữ mật khẩu hay dữ liệu nhạy cảm.
-* **Revocation Mechanism:** Cơ chế xác thực (`authenticateJWT`) kiểm tra `auth_version` của người dùng trong cơ sở dữ liệu trên mỗi request, cho phép vô hiệu hóa tức thì toàn bộ phiên đăng nhập của người dùng khi đổi mật khẩu hoặc đăng xuất.
+| Kịch bản | Kết quả |
+|---|---|
+| 200 virtual users tra cứu liên tục, 30 giây | 73.770 request HTTP 200, không lỗi, p50 74,24 ms, p95 138,38 ms, p99 176,21 ms |
+| 50 khách tranh ghế qua UI/PostgreSQL | 1 hold thành công, 49 phản hồi 409; đúng chủ ghế; p95 1.019,73 ms |
+| 50 khách tranh ghế qua Redis + PostgreSQL | 1 reservation thành công, 49 phản hồi 409; Redis key đúng chủ và TTL; p95 59,31 ms |
+| Soak 20 virtual users, 60 giây | 149.920 request HTTP 200, không lỗi, p95 11,93 ms |
 
----
+Hai ca tranh ghế không tạo bản ghi hold/reservation trùng. HTTP 409 ở các khách thua tranh chấp là phản hồi nghiệp vụ dự kiến, không tính như lỗi 5xx.
 
-## 3. Sơ đồ Kiến trúc Docker (3-Tier Architecture)
+Lượt đầu cùng harness ghi p95 tra cứu 545,04 ms và pool waiting lên tới 981. Bản sửa gộp **các lần đọc cùng danh mục đang chạy**; khi hoàn tất bỏ promise, yêu cầu tiếp theo đọc lại database. Không cache lâu giá hoặc tồn chỗ và không thay đổi transaction bán vé. Lượt cuối không chạy build/install cùng lúc đạt p95 tra cứu 138,38 ms. Khác biệt tải máy giữa các lượt được ghi nhận; chưa suy ra tỷ lệ cải thiện cho production.
 
-Hệ thống được đóng gói hoàn toàn bằng Docker Compose với mô hình 3 lớp tách biệt rõ ràng:
+**Chưa đạt kết luận mọi API <150ms:** luồng UI giữ ghế khi 50 khách tranh cùng tài nguyên vẫn p95 khoảng 1 giây. Gate của runner hiện chỉ áp p95 150ms cho tra cứu; safety gates của các ca tranh ghế kiểm tra tính đúng đắn. Đây là điểm cần tối ưu/đo tiếp, không bị bỏ khỏi báo cáo.
 
-```mermaid
-graph TD
-    Client[Client Browser / Mobile App] -->|HTTP / HTTPS Port 3000| Frontend[Frontend React SPA / Vite / Nginx]
-    Frontend -->|API Requests Port 5000| Backend[Backend Node.js / Express API Server]
-    Backend -->|PostgreSQL Protocol Port 5432| DB[(PostgreSQL Database / Supabase)]
-    Backend -->|Redis Protocol Port 6379| Redis[(Redis Cache & Session Store)]
-```
+CPU peak 98,52% quy đổi theo một core; RSS peak 194,67 MiB; heap peak 80,81 MiB; pool peak 10 kết nối, waiting peak 99; event-loop p95 cao nhất trong các mẫu 28,57 ms. [CSV giám sát từng giây](sprint4/results/2026-10-16-server-metrics.csv) và JSON tóm tắt là nguồn số liệu. Soak 60 giây không đủ chứng minh không có memory leak; cần lượt 30–60 phút và dataset lớn hơn.
 
-* **Frontend Container (`frontend/`):** React SPA phục vụ giao diện người dùng, quản trị viên, tài xế/phụ xe, được đóng gói qua Nginx.
-* **Backend Container (`backend/`):** Node.js & Express REST API xử lý business logic, đặt vé, mã QR, phân quyền RBAC.
-* **Database Container (`PostgreSQL`):** Lưu trữ toàn bộ dữ liệu người dùng, tuyến, trạm, chuyến xe, vé, giao dịch thanh toán.
-* **Cache Container (`Redis`):** Hỗ trợ row lock, tạm giữ chỗ ghế (hold 10 phút) và cache thông tin phiên làm việc.
+200 virtual users là closed-loop concurrency, không phải 200 RPS cố định. Dataset nhỏ không đại diện quy mô nhà xe/Staging. Chỉ tiêu dưới 150ms đang diễn giải bằng p95 cho bài tra cứu; cần PO/QA chốt phương pháp chính thức.
 
----
+## Geofencing và mất mạng
 
-## 4. ERD Cơ sở dữ liệu (MySQL / PostgreSQL)
+Bán kính báo trạm được sửa về 500m theo kế hoạch. Có test khoảng cách thật tại 400/499/500/501m và test đường gọi notification; xử lý sai số số thực dưới một micrometer ở đúng biên. Camera vật lý, GPS thực và nhận FCM trên thiết bị chưa được nghiệm thu từ các test này.
 
-Sơ đồ thực thể mối quan hệ (ERD) cốt lõi của hệ thống bao gồm các bảng chính:
-1. **`users`**: Lưu trữ thông tin người dùng, vai trò (`Admin`, `Manager`, `Driver`, `Passenger`), mật khẩu hash bcrypt, và `auth_version`.
-2. **`routes`**: Quản lý tuyến xe buýt (`code`, `name`, `base_price`).
-3. **`bus_stops`**: Danh sách các trạm dừng đỗ (`stop_code`, `name`, tọa độ GPS lat/lng).
-4. **`route_stops`**: Chi tiết thứ tự trạm trên từng tuyến xe.
-5. **`trips`**: Lịch trình chuyến xe xuất bến (`route_id`, `bus_plate`, `departure_time`, `arrival_time`, `status`).
-6. **`seats`**: Sơ đồ ghế ngồi theo chuyến xe (`seat_number`, `status`: `AVAILABLE`, `LOCKED`, `BOOKED`).
-7. **`tickets`**: Vé điện tử của hành khách (`ticket_code`, `trip_id`, `seat_number`, `status`, `qr_code`).
-8. **`payment_transactions`**: Giao dịch thanh toán (`amount`, `gateway`, `status`).
+Đã thêm test scanner từ chối xác minh khi offline, phục hồi sau lỗi mạng, và checkout đọc lại đơn PENDING đã lưu sau timeout mà không tự xác nhận đã trả tiền. Các test component không thay thế bài E2E cắt mạng trên thiết bị thật; backend vẫn phải chống replay/idempotency theo các integration checks hiện có.
 
----
+## Hiệu năng frontend
 
-## 5. Swagger API Documentation (OpenAPI 3.0 Summary)
+Có runner Lighthouse mobile 13.5.0 với phiên bản cố định, lưu HTML/JSON từng lượt, mặc định ba lượt cho trang chủ và đăng nhập. Đo production build bằng static server cục bộ, không dùng Vite dev server. Observed load và LCP được báo riêng.
 
-Các nhóm API chính được tài liệu hóa và chuẩn hóa theo chuẩn RESTful:
+| Trang | Điểm từng lượt → trung vị | LCP trung vị | Observed load trung vị | Gate >85 / load <2s |
+|---|---|---|---|---|
+| Trang chủ | 73 / 78 / 79 → **78** | 4.673,35 ms | 118 ms | **Chưa đạt điểm** |
+| Đăng nhập | 90 / 90 / 90 → **90** | 3.287,04 ms | 88 ms | Đạt gate hiện tại |
 
-| Nhóm Endpoint | Method | Đường dẫn API | Mô tả chức năng |
-| :--- | :---: | :--- | :--- |
-| **Authentication** | `POST` | `/api/v1/auth/register` | Đăng ký tài khoản hành khách mới |
-| | `POST` | `/api/v1/auth/login` | Đăng nhập hệ thống (trả về JWT) |
-| **Routes & Stops** | `GET` | `/api/v1/routes` | Lấy danh sách tuyến xe buýt hoạt động |
-| | `GET` | `/api/v1/stops` | Lấy danh sách trạm dừng và tọa độ GPS |
-| **Trips & Seats** | `GET` | `/api/v1/trips` | Tra cứu danh sách chuyến xe sắp xuất bến |
-| | `GET` | `/api/v1/ticketing/trips/:id/seats` | Lấy sơ đồ ghế và trạng thái thời gian thực |
-| **Ticketing & QR** | `POST` | `/api/v1/ticketing/bookings` | Đặt vé, giữ chỗ 10 phút và sinh mã QR |
-| | `POST` | `/api/v1/ticketing/verify` | Soát vé bằng mã QR dành cho Tài xế/Phụ xe |
-| **Admin Management**| `GET` | `/api/v1/tickets/admin/all` | Quản lý và tra cứu toàn bộ vé hệ thống |
+[JSON kết quả ba lượt](sprint4/results/2026-10-16-lighthouse.json) là nguồn số liệu, ghi baseline commit và workingTree=modified. Điểm trước tối ưu là 49/61; baseline static server chưa gzip nên khác biệt bao gồm cả cấu hình phục vụ nội dung. LCP cả hai trang vẫn trên 2 giây; load event sớm của SPA không chứng minh nội dung chính đã hiển thị trong 2 giây. Mục trang chủ tiếp tục mở trong [bug log](sprint4/BUG_LOG.md), chưa nghiệm thu frontend.
+
+Đã bật gzip và cache asset có hash trong Nginx; static server đo dùng cùng chính sách nén. Button dùng CSS active thay cho khởi tạo Anime.js ở từng nút; layout từng role tải động. Font chỉ giữ Latin/tiếng Việt, dùng optional display để tránh đổi font muộn; lượt truy cập đầu có thể hiển thị font hệ thống. Hiệu ứng cuộn chỉ chạy trên desktop. Build tự sinh WebP 480/960/1440 px từ ảnh hero gốc bằng Sharp; trình duyệt chọn theo srcset/sizes, ảnh trang trí trang đăng nhập tải lazy. Không giảm CPU/network throttling của Lighthouse để nâng điểm.
+
+Cảnh báo bundle >500kB chưa tự chứng minh Lighthouse thất bại; ExcelJS/PDF tải động theo chức năng. Cần đo thêm các màn hình đăng nhập, thanh toán, soát vé và Staging. Frontend Docker chuyển cùng Node 22 với CI và dùng npm ci để tái lập dependency.
+
+## Bảo mật và đối soát
+
+Có truy vấn tham số hóa, kiểm tra JWT_SECRET tối thiểu 32 ký tự, kiểm tra vai trò/trạng thái tài khoản hiện tại và auth_version. Password reset tăng auth_version để hủy phiên cũ. Handler logout UI hiện trả thành công và frontend xóa token; chưa tuyên bố logout vô hiệu hóa mọi JWT trên máy chủ. JWT mặc định 86400 giây nếu không đặt JWT_EXPIRES_IN, không mô tả mặc định là 15 phút–1 giờ.
+
+Các integration checks trước đó bao phủ ownership/RBAC, callback ký, số tiền, replay, hoàn ví và ledger. Ma trận nghiệm thu từng role/US và số tiền trên môi trường nghiệm thu còn cần hoàn tất. Techcombank theo quyết định chủ dự án là đối soát thủ công, không yêu cầu webhook.
+
+## Kiến trúc triển khai thực tế
+
+~~~mermaid
+flowchart LR
+  Client[Trình duyệt] --> FE[React SPA / Vercel hoặc Nginx]
+  FE --> API[Express API]
+  API --> PG[(PostgreSQL / Supabase)]
+  API -. Khi cấu hình .-> Redis[(Redis)]
+~~~
+
+Docker Compose ứng dụng hiện dùng database ngoài qua DATABASE_URL, không chứa service PostgreSQL. File docker-compose.sprint4.yml mới cung cấp PostgreSQL/Redis **riêng cho kiểm thử**. Website Vercel đã kiểm tra trước đợt này đang dùng PostgreSQL-only; không suy ra Redis production đã được bật từ việc Redis cục bộ READY.
+
+Express server.ts có WebSocket gateway; Vercel api/index.js chỉ nạp Express app. Giao diện tracking hiện polling. Nghiệm thu WebSocket cần host phù hợp hoặc quyết định phạm vi được duyệt, không lấy health UP làm bằng chứng socket hoạt động.
+
+## ERD, Swagger và hồ sơ còn lại
+
+Runner xuất schema vật lý và Mermaid từ database đã áp migration; bao gồm các bảng mới về ví, chuyển khoản và hóa đơn. Diagram hiện minh họa cạnh FK; cần đối chiếu unique/nullability để hoàn thiện cardinality bản cuối. ERD nền cũ không được coi là schema vật lý hiện tại.
+
+**OpenAPI/Swagger toàn bộ API chưa hoàn thành trong đợt khởi động này.** Bảng endpoint Markdown không được coi là Swagger. Cần hoàn thiện hợp đồng request/response, bảo mật, role, lỗi và ví dụ theo routes thực tế.
+
+Xem [kế hoạch chạy](SPRINT4_TEST_PLAN.md) và [ma trận 24 US](SPRINT4_ACCEPTANCE_MATRIX.md). Hồ sơ cuối còn: báo cáo PDF 5 chương, slide, video dự phòng, dry run 20 phút, bug log/retest và biên bản PO/QA. Chưa tag v1.0.0 hoặc ký 24/24 DoD chỉ dựa trên kết quả cục bộ.
+
+## Hồi quy mã nguồn ngày 16/10/2026
+
+Typecheck, lint và production build backend/frontend đều qua. Backend: 95 unit test/15 suite; frontend: 101 Vitest/21 file và 8 Node theme test; runner: 2 guard/statistics test. Integration: 516 kiểm tra API/database qua PGlite, kiểm tra archive chuyến và Vercel adapter đều qua. Các log 409/ECONNREFUSED trong ca kiểm tra lỗi là tình huống chủ đích, không được tính thành giao dịch thật thành công. Kết quả tải native PostgreSQL/Redis được tách ở trên.
+
+13 kịch bản Playwright E2E qua giao diện demo cục bộ đều qua, gồm responsive/keyboard/reduced motion, đặt vé, QR, phân quyền, xuất báo cáo và các màn hình hành khách/nhân viên/admin. Đã xem ảnh chụp mobile 360 px; đây không phải bằng chứng backend/provider Staging. Compose config và Nginx `nginx -t` trong container dùng một lần đều hợp lệ. Frontend dependency audit sau cập nhật không có lỗ hổng được công cụ báo tại thời điểm kiểm tra.

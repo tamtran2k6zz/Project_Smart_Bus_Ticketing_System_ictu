@@ -39,6 +39,11 @@
   background: transparent;
   color: inherit;
 }
+@media (prefers-reduced-motion: no-preference) {
+  .button:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+}
 .button:disabled {
   opacity: 0.5;
   cursor: not-allowed;

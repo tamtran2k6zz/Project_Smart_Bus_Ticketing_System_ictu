@@ -1,0 +1,46 @@
+name: Sprint 4 isolated performance
+on:
+  workflow_dispatch:
+jobs:
+  native-postgres-redis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: smartbus_sprint4_test
+          POSTGRES_USER: sprint4
+          POSTGRES_PASSWORD: sprint4-local-only
+        ports: ['6544:5432']
+        options: >-
+          --health-cmd "pg_isready -U sprint4 -d smartbus_sprint4_test"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+      redis:
+        image: redis:7-alpine
+        ports: ['6381:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+        working-directory: backend
+      - run: npm run build && npm run test:sprint4 && npm run test:load
+        working-directory: backend
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sprint4-native-load-evidence
+          path: |
+            backend/test-results/sprint4/**/summary.json
+            backend/test-results/sprint4/**/server-metrics.json
+            backend/test-results/sprint4/**/*-requests.json
+            backend/test-results/sprint4/**/schema.json
+            backend/test-results/sprint4/**/schema-erd.md
+          retention-days: 14

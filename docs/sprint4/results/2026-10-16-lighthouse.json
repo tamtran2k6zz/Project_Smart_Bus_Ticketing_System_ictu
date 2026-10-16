@@ -1,0 +1,88 @@
+{
+  "at": "2026-10-16T01:22:15.075Z",
+  "commit": "ae023ec56ba8752281972793b1570ac09bc34e8b",
+  "mode": "local production build, static server, public pages only",
+  "formFactor": "mobile",
+  "runs": 3,
+  "results": [
+    {
+      "page": "/",
+      "samples": [
+        {
+          "performance": 73,
+          "lcpMs": 4831.070199999998,
+          "observedLoadMs": 145,
+          "fcpMs": 2779.80265,
+          "totalBlockingMs": 245,
+          "lighthouseVersion": "13.5.0",
+          "report": "home-1.report.html"
+        },
+        {
+          "performance": 78,
+          "lcpMs": 4669.6248000000005,
+          "observedLoadMs": 118,
+          "fcpMs": 2570.7185999999997,
+          "totalBlockingMs": 159.5,
+          "lighthouseVersion": "13.5.0",
+          "report": "home-2.report.html"
+        },
+        {
+          "performance": 79,
+          "lcpMs": 4673.347399999999,
+          "observedLoadMs": 93,
+          "fcpMs": 2550.010550000001,
+          "totalBlockingMs": 76.58157499999925,
+          "lighthouseVersion": "13.5.0",
+          "report": "home-3.report.html"
+        }
+      ],
+      "medianPerformance": 78,
+      "medianLcpMs": 4673.347399999999,
+      "medianObservedLoadMs": 118,
+      "passed": false
+    },
+    {
+      "page": "/login",
+      "samples": [
+        {
+          "performance": 90,
+          "lcpMs": 3287.0402000000004,
+          "observedLoadMs": 120,
+          "fcpMs": 2313.4001249999997,
+          "totalBlockingMs": 85,
+          "lighthouseVersion": "13.5.0",
+          "report": "login-1.report.html"
+        },
+        {
+          "performance": 90,
+          "lcpMs": 3292.2216,
+          "observedLoadMs": 88,
+          "fcpMs": 2290.5135,
+          "totalBlockingMs": 86,
+          "lighthouseVersion": "13.5.0",
+          "report": "login-2.report.html"
+        },
+        {
+          "performance": 90,
+          "lcpMs": 3156.8138,
+          "observedLoadMs": 83,
+          "fcpMs": 2308.133625,
+          "totalBlockingMs": 130.5,
+          "lighthouseVersion": "13.5.0",
+          "report": "login-3.report.html"
+        }
+      ],
+      "medianPerformance": 90,
+      "medianLcpMs": 3287.0402000000004,
+      "medianObservedLoadMs": 88,
+      "passed": true
+    }
+  ],
+  "limitations": [
+    "Not proof of all authenticated screens or deployment network performance.",
+    "Observed load is reported separately from LCP; performance varies with machine/network."
+  ],
+  "passed": false,
+  "workingTree": "modified",
+  "serverPolicy": "gzip level 6, hashed assets immutable; same compression policy as Docker Nginx"
+}
