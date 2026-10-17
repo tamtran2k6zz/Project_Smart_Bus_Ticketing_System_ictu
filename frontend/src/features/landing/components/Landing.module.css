@@ -237,22 +237,8 @@
   font-size: 11px;
   color: #406744;
 }
-.mapBusWrapper {
-  position: absolute;
-  left: 6px;
-  top: 6px;
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2;
-}
 .mapBusRadar {
-  position: absolute;
-  inset: -6px;
-  border-radius: 50%;
-  background: rgba(34, 197, 94, 0.45);
+  transform-origin: 0 0;
   animation: landingRadarPulse 2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
   pointer-events: none;
 }
@@ -271,22 +257,13 @@
   }
 }
 .mapBus {
-  position: relative;
-  z-index: 2;
-  width: 38px;
-  height: 38px;
-  border-radius: 11px;
-  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2.5px solid white;
-  box-shadow: 0 4px 14px rgba(22, 101, 52, 0.45);
-  transition: transform 0.2s ease;
+  filter: drop-shadow(0 4px 5px rgba(22, 101, 52, 0.45));
 }
-.mapBus:hover {
-  transform: scale(1.12);
+@media (prefers-reduced-motion: reduce) {
+  .mapBusRadar {
+    animation: none;
+    opacity: 0;
+  }
 }
 .mapInfo {
   position: absolute;
