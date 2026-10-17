@@ -115,28 +115,34 @@ export function Landing() {
       })
     );
     onScroll({ target: '[data-benefits]', repeat: false, onEnter: () => self.methods.benefits() });
-    const route = root.current?.querySelector<SVGPathElement>('[data-demo-route]');
-    const marker = root.current?.querySelector<SVGGElement>('[data-marker]');
-    const position = { distance: 0 };
-    animate(position, {
-      distance: [0, route?.getTotalLength() || 0],
-      onUpdate: () => {
-        if (!route || !marker) return;
-        const point = route.getPointAtLength(position.distance);
-        marker.setAttribute('transform', `translate(${point.x} ${point.y})`);
-      },
-      ease: 'linear',
-      autoplay: onScroll({
-        target: '[data-track]',
-        sync: true,
-        enter: 'bottom top',
-        leave: 'top bottom',
-      }),
-    });
     self.add('accordion', (element: HTMLElement) =>
       animate(element, { opacity: [0.65, 1], y: [-4, 0], duration: 180, ease: 'out(2)' })
     );
   });
+  useAnimeScope(
+    root,
+    () => {
+      const route = root.current?.querySelector<SVGPathElement>('[data-demo-route]');
+      const marker = root.current?.querySelector<SVGGElement>('[data-marker]');
+      const position = { distance: 0 };
+      animate(position, {
+        distance: [0, route?.getTotalLength() || 0],
+        onUpdate: () => {
+          if (!route || !marker) return;
+          const point = route.getPointAtLength(position.distance);
+          marker.setAttribute('transform', `translate(${point.x} ${point.y})`);
+        },
+        ease: 'linear',
+        autoplay: onScroll({
+          target: '[data-demo-map]',
+          sync: true,
+          enter: 'bottom top',
+          leave: 'top bottom',
+        }),
+      });
+    },
+    { mobile: true }
+  );
   return (
     <div ref={root}>
       <HeroSection trackingUrl={trackingUrl} />
@@ -193,7 +199,7 @@ export function Landing() {
         </div>
       </section>
       <section className={'container ' + s.section + ' ' + s.tracking} data-reveal data-track>
-        <div className={s.map}>
+        <div className={s.map} data-demo-map>
           <div className={s.mapLabel}>
             <MapPin size={16} />
             THÁI NGUYÊN <Badge>Demo</Badge>
@@ -214,65 +220,69 @@ export function Landing() {
             <circle cx="80" cy="260" r="9" fill="white" stroke="#15803d" strokeWidth="5" />
             <circle cx="420" cy="85" r="9" fill="white" stroke="#15803d" strokeWidth="5" />
             <g data-marker transform="translate(80 260)">
-              <foreignObject x="-28" y="-28" width="56" height="56">
-                <div className={s.mapBusWrapper}>
-                  <div className={s.mapBusRadar} />
-                  <div className={s.mapBus} title="Xe buýt SmartBus đang di chuyển">
-                    <svg
-                      viewBox="0 0 28 28"
-                      width="22"
-                      height="22"
-                      fill="none"
-                      aria-label="Xe buýt SmartBus"
-                    >
-                      <rect
-                        x="3.5"
-                        y="4"
-                        width="21"
-                        height="17"
-                        rx="3.5"
-                        fill="#16a34a"
-                        stroke="#ffffff"
-                        strokeWidth="2"
-                      />
-                      <path
-                        d="M5.5 7h17v5.5h-17z"
-                        fill="#dcfce7"
-                        stroke="#ffffff"
-                        strokeWidth="1.2"
-                      />
-                      <line x1="14" y1="7" x2="14" y2="12.5" stroke="#16a34a" strokeWidth="1.2" />
-                      <circle
-                        cx="7.5"
-                        cy="16.5"
-                        r="1.5"
-                        fill="#fef08a"
-                        stroke="#ffffff"
-                        strokeWidth="0.8"
-                      />
-                      <circle
-                        cx="20.5"
-                        cy="16.5"
-                        r="1.5"
-                        fill="#fef08a"
-                        stroke="#ffffff"
-                        strokeWidth="0.8"
-                      />
-                      <line
-                        x1="11"
-                        y1="16.5"
-                        x2="17"
-                        y2="16.5"
-                        stroke="#ffffff"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                      />
-                      <rect x="5.5" y="21" width="3" height="3" rx="1" fill="#1f2937" />
-                      <rect x="19.5" y="21" width="3" height="3" rx="1" fill="#1f2937" />
-                    </svg>
-                  </div>
-                </div>
-              </foreignObject>
+              <circle className={s.mapBusRadar} r="24" fill="rgba(34, 197, 94, 0.45)" />
+              <g className={s.mapBus}>
+                <rect
+                  data-demo-bus
+                  x="-19"
+                  y="-19"
+                  width="38"
+                  height="38"
+                  rx="11"
+                  fill="#15803d"
+                  stroke="white"
+                  strokeWidth="2.5"
+                />
+                <svg
+                  viewBox="0 0 28 28"
+                  x="-11"
+                  y="-11"
+                  width="22"
+                  height="22"
+                  fill="none"
+                  aria-label="Xe buýt SmartBus"
+                >
+                  <rect
+                    x="3.5"
+                    y="4"
+                    width="21"
+                    height="17"
+                    rx="3.5"
+                    fill="#16a34a"
+                    stroke="#ffffff"
+                    strokeWidth="2"
+                  />
+                  <path d="M5.5 7h17v5.5h-17z" fill="#dcfce7" stroke="#ffffff" strokeWidth="1.2" />
+                  <line x1="14" y1="7" x2="14" y2="12.5" stroke="#16a34a" strokeWidth="1.2" />
+                  <circle
+                    cx="7.5"
+                    cy="16.5"
+                    r="1.5"
+                    fill="#fef08a"
+                    stroke="#ffffff"
+                    strokeWidth="0.8"
+                  />
+                  <circle
+                    cx="20.5"
+                    cy="16.5"
+                    r="1.5"
+                    fill="#fef08a"
+                    stroke="#ffffff"
+                    strokeWidth="0.8"
+                  />
+                  <line
+                    x1="11"
+                    y1="16.5"
+                    x2="17"
+                    y2="16.5"
+                    stroke="#ffffff"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                  <rect x="5.5" y="21" width="3" height="3" rx="1" fill="#1f2937" />
+                  <rect x="19.5" y="21" width="3" height="3" rx="1" fill="#1f2937" />
+                </svg>
+              </g>
             </g>
           </svg>
           <span className={s.mapStopOne}>Bến xe trung tâm</span>
