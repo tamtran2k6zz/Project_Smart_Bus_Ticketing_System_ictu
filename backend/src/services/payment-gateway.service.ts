@@ -7,6 +7,24 @@ const logger = appLogger.child('gateway');
 
 export type OnlinePaymentMethod = 'VNPAY' | 'MOMO' | 'ZALOPAY';
 
+// Pause new payment intents; callbacks/refunds for existing orders remain valid.
+export function assertPaymentMethodEnabled(method: string): void {
+  if (typeof method !== 'string') {
+    throw Object.assign(new Error('Phương thức thanh toán không hợp lệ.'), { status: 400 });
+  }
+  const paused = (process.env.PAYMENT_PAUSED_METHODS ?? 'MOMO,ZALOPAY')
+    .split(',')
+    .map(value => value.trim().toUpperCase());
+  if (paused.includes(method.toUpperCase())) {
+    throw Object.assign(
+      new Error(
+        `${method === 'MOMO' ? 'MoMo' : 'ZaloPay'} đang tạm khóa. Vui lòng chọn phương thức khác.`
+      ),
+      { status: 409 }
+    );
+  }
+}
+
 export class PaymentGatewayService {
   async createPaymentUrl(
     method: OnlinePaymentMethod,
@@ -15,6 +33,7 @@ export class PaymentGatewayService {
     clientIp: string,
     resultPath?: string
   ): Promise<string> {
+    assertPaymentMethodEnabled(method);
     if (!Number.isSafeInteger(amount) || amount <= 0) {
       throw new Error('Số tiền thanh toán không hợp lệ.');
     }

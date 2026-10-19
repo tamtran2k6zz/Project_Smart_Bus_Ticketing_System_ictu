@@ -1,6 +1,10 @@
 import { query, transaction } from '../config/database';
 import { PoolClient } from 'pg';
-import { PaymentGatewayService, OnlinePaymentMethod } from './payment-gateway.service';
+import {
+  PaymentGatewayService,
+  OnlinePaymentMethod,
+  assertPaymentMethodEnabled,
+} from './payment-gateway.service';
 import { assertEmailVerified } from './email-verification.service';
 
 export class WalletError extends Error {
@@ -141,6 +145,7 @@ export async function topupWallet(
   key: unknown,
   ip: string
 ) {
+  assertPaymentMethodEnabled(method);
   validateAmount(amount);
   const idempotency = requestKey(key);
   if (!['MOMO', 'VNPAY', 'ZALOPAY'].includes(method)) walletFail('Chọn cổng thanh toán hợp lệ.');

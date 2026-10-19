@@ -342,13 +342,30 @@ Sử dụng thư mục gốc repository làm **Root Directory**. [vercel.json](v
 
 ### Docker Compose
 
-[docker-compose.yml](docker-compose.yml) cung cấp frontend Nginx, backend và Redis. Database PostgreSQL được kết nối từ bên ngoài.
+[docker-compose.yml](docker-compose.yml) là file Compose duy nhất: frontend Nginx, backend và Redis ứng dụng chạy mặc định. Database ứng dụng tiếp tục kết nối PostgreSQL/Supabase bên ngoài; hai service kiểm thử PostgreSQL/Redis dùng profile `sprint4` và network riêng.
 
 ```powershell
 # Tại thư mục gốc; điền các biến cần thiết vào .env trước khi chạy
 Copy-Item .env.example .env
 docker compose up --build -d
 ```
+
+Chạy riêng hạ tầng kiểm thử tải, không cần `DATABASE_URL`/`JWT_SECRET` của ứng dụng:
+
+```powershell
+docker compose --profile sprint4 up -d --wait sprint4-postgres sprint4-redis
+npm --prefix backend run test:load
+# Dọn đúng hai service test; không dừng/xóa Redis ứng dụng
+docker compose --profile sprint4 stop sprint4-postgres sprint4-redis
+docker compose --profile sprint4 rm -f sprint4-postgres sprint4-redis
+```
+
+| Mục đích | Service | Dữ liệu / cổng |
+|---|---|---|
+| Ứng dụng | `frontend`, `backend`, `redis` | UI 3000, API 5000; Redis dùng volume `redis_data` |
+| Kiểm thử | `sprint4-postgres`, `sprint4-redis` | Loopback PostgreSQL 6544, Redis 6381; dữ liệu tạm |
+
+Luôn ghi hai tên service khi chỉ chạy kiểm thử: `--profile sprint4 up` không kèm tên sẽ khởi động cả ứng dụng. Không dùng `down -v` để dọn test. Xem [kế hoạch Sprint 4](docs/SPRINT4_TEST_PLAN.md) về fixture và runner. Khi chạy backend, Compose kiểm tra `DATABASE_URL` và `JWT_SECRET` tại lúc service khởi động; thiếu cấu hình sẽ không chạy API. `PAYMENT_PAUSED_METHODS` cũng được truyền vào container (mặc định khóa MoMo/ZaloPay).
 
 Đối chiếu các biến được truyền trong Compose khi bật SMTP hoặc tích hợp bổ sung; một số biến cần khai báo thêm bằng override hoặc cấu hình môi trường triển khai.
 
@@ -455,3 +472,9 @@ Repository hiện chưa công bố tệp `LICENSE`.
 **Đồ án Thực tập Cơ sở 2026 · Nhóm 5 — N5 Innovators**
 
 Trường Đại học Công nghệ Thông tin & Truyền thông — Đại học Thái Nguyên (ICTU).
+
+
+## Kiểm tra đóng gói Sprint 4 — 20/10/2026
+
+[Đối chiếu 20 nhiệm vụ, đề cương báo cáo và gate phát hành](docs/SPRINT4_RELEASE_READINESS_2026-10-20.md).
+Hiện chỉ chuẩn bị source snapshot ứng viên kiểm thử; chưa nghiệm thu Staging 24/24 US hoặc tag v1.0.0 chính thức. MoMo/ZaloPay tạm khóa cho giao dịch mới; callback/hoàn tiền giao dịch cũ vẫn được xử lý. Cấu hình server `PAYMENT_PAUSED_METHODS=MOMO,ZALOPAY`; VNPay, QR Techcombank thủ công và ví dùng theo cấu hình/điều kiện thực tế.

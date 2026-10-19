@@ -3,7 +3,11 @@ import { PoolClient } from 'pg';
 import { query, transaction } from '../config/database';
 import { getJwtSecret } from '../config/auth';
 import { assertEmailVerified } from './email-verification.service';
-import { PaymentGatewayService, OnlinePaymentMethod } from './payment-gateway.service';
+import {
+  PaymentGatewayService,
+  OnlinePaymentMethod,
+  assertPaymentMethodEnabled,
+} from './payment-gateway.service';
 import { assertTripAccess } from './trip-access.service';
 import { userFarePolicy } from './fare-policy.service';
 import { prepareSeats } from './booking';
@@ -146,6 +150,7 @@ export async function buyPass(
   method: OnlinePaymentMethod,
   ip: string
 ) {
+  assertPaymentMethodEnabled(method);
   await assertEmailVerified(userId);
   if (!['MOMO', 'VNPAY', 'ZALOPAY'].includes(method)) fail('Phương thức thanh toán không hợp lệ.');
   const policy = await userFarePolicy(userId);
@@ -180,6 +185,7 @@ export async function buyPass(
     );
     return created;
   });
+  assertPaymentMethodEnabled(order.payment_method);
   if (!order.payment_url) {
     const url = await new PaymentGatewayService().createPaymentUrl(
       method,

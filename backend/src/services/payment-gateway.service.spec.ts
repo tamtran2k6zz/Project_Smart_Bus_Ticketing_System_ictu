@@ -6,6 +6,7 @@ describe('PaymentGatewayService', () => {
   let service: PaymentGatewayService;
 
   beforeEach(() => {
+    process.env.PAYMENT_PAUSED_METHODS = '';
     service = new PaymentGatewayService();
     jest.restoreAllMocks();
     // Start every case from a clean gateway configuration so ordering between
@@ -35,6 +36,13 @@ describe('PaymentGatewayService', () => {
 
   afterAll(() => {
     process.env = originalEnv;
+  });
+
+  it.each(['MOMO', 'ZALOPAY'] as const)('pauses new %s intents by default', async method => {
+    delete process.env.PAYMENT_PAUSED_METHODS;
+    await expect(
+      service.createPaymentUrl(method, 'paused-order', 10000, '127.0.0.1')
+    ).rejects.toMatchObject({ status: 409 });
   });
 
   it('creates a signed VNPay checkout URL', async () => {

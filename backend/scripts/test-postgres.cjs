@@ -5,6 +5,8 @@ const { createHmac } = require('node:crypto');
 const { createServer } = require('node:http');
 const { PGlite } = require('@electric-sql/pglite');
 const request = require('supertest');
+// Existing provider callback fixtures remain enabled only inside this isolated suite.
+process.env.PAYMENT_PAUSED_METHODS = '';
 process.env.JWT_SECRET = 'test-only-secret-at-least-32-characters-long';
 process.env.DATABASE_URL = 'postgresql://test:test@127.0.0.1:1/test';
 process.env.MOMO_PARTNER_CODE = 'test-partner';

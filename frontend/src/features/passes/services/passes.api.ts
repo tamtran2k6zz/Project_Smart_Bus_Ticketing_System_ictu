@@ -16,7 +16,7 @@ export const passesApi = {
         eligibility: db.eligibility.filter(e => e.userId === userId),
       };
     }),
-  buy: (userId: string, routeId: string, id?: string, gateway = 'MoMo') =>
+  buy: (userId: string, routeId: string, id?: string, gateway = 'VNPay') =>
     service<Pass>(
       '/passes',
       db => {
