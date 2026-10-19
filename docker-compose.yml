@@ -15,13 +15,18 @@ services:
     restart: unless-stopped
     ports:
       - "5000:5000"
+    # Validate at service startup so the sprint4-only services need no app secrets.
+    command:
+      - sh
+      - -ec
+      - ': "$${DATABASE_URL:?Set DATABASE_URL in .env to the Supabase transaction pooler URL}"; : "$${JWT_SECRET:?Set JWT_SECRET in .env}"; exec node dist/server.js'
     environment:
       PORT: 5000
       NODE_ENV: ${NODE_ENV:-production}
       LOG_LEVEL: ${LOG_LEVEL:-info}
-      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env to the Supabase transaction pooler URL}
+      DATABASE_URL: ${DATABASE_URL:-}
       DB_POOL_MAX: ${DB_POOL_MAX:-2}
-      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      JWT_SECRET: ${JWT_SECRET:-}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000,http://localhost:5173}
       # Redis is optional. Empty REDIS_URL => PostgreSQL row locks only.
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
@@ -46,6 +51,7 @@ services:
       PAYMENT_REFUND_OPERATOR: ${PAYMENT_REFUND_OPERATOR:-smartbus-system}
       PAYMENT_REFUND_IP: ${PAYMENT_REFUND_IP:-127.0.0.1}
       PAYMENT_CRON_SECRET: ${PAYMENT_CRON_SECRET:-}
+      PAYMENT_PAUSED_METHODS: ${PAYMENT_PAUSED_METHODS-MOMO,ZALOPAY}
     depends_on:
       redis:
         condition: service_healthy
@@ -56,5 +62,37 @@ services:
       - "${FRONTEND_PORT:-3000}:3000"
     depends_on:
       - backend
+  # Isolated test fixtures: never used as the application database/cache.
+  sprint4-postgres:
+    profiles: ["sprint4"]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: smartbus_sprint4_test
+      POSTGRES_USER: sprint4
+      POSTGRES_PASSWORD: sprint4-local-only
+    ports:
+      - "127.0.0.1:6544:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    networks: [sprint4]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sprint4 -d smartbus_sprint4_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  sprint4-redis:
+    profiles: ["sprint4"]
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6381:6379"
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    networks: [sprint4]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+networks:
+  sprint4:
 volumes:
   redis_data:

@@ -17,12 +17,23 @@ Sprint bắt đầu từ baseline `ae023ec` trên `Develop`. Môi trường ki�
 Tại thư mục gốc:
 
 ```powershell
-docker compose -f docker-compose.sprint4.yml up -d --wait
+docker compose --profile sprint4 up -d --wait sprint4-postgres sprint4-redis
 npm --prefix backend ci
 npm --prefix backend run build
 npm --prefix backend run test:sprint4
 npm --prefix backend run test:load
 ```
+
+Chỉ dùng `docker-compose.yml`. Hai service test nằm trong profile `sprint4`, network riêng, không phụ thuộc cấu hình Supabase/JWT. Luôn chỉ định hai tên service khi khởi động kiểm thử, để không khởi động ứng dụng thật. `docker compose up -d` mặc định chỉ chạy frontend/backend/Redis ứng dụng.
+
+Dừng và bỏ riêng fixture test (không dừng ứng dụng/Redis bền vững):
+
+```powershell
+docker compose --profile sprint4 stop sprint4-postgres sprint4-redis
+docker compose --profile sprint4 rm -f sprint4-postgres sprint4-redis
+```
+
+Không dùng `down -v` để dọn test vì có thể xóa volume Redis ứng dụng. Mỗi lần tạo lại service PostgreSQL test sẽ khởi tạo database mới trong tmpfs.
 
 PostgreSQL: `127.0.0.1:6544`, database điều khiển `smartbus_sprint4_test`, tài khoản `sprint4`, mật khẩu fixture công khai `sprint4-local-only`. Redis: `127.0.0.1:6381`. Chỉ bind loopback; không dùng các thông tin fixture này cho deployment khác. PostgreSQL dùng tmpfs; dừng container sẽ bỏ dữ liệu thử. Runner từ chối URL ngoài localhost và database điều khiển có tên khác, không đọc `DATABASE_URL` của ứng dụng thật.
 

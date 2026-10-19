@@ -72,7 +72,7 @@ flowchart LR
   API -. Khi cấu hình .-> Redis[(Redis)]
 ~~~
 
-Docker Compose ứng dụng hiện dùng database ngoài qua DATABASE_URL, không chứa service PostgreSQL. File docker-compose.sprint4.yml mới cung cấp PostgreSQL/Redis **riêng cho kiểm thử**. Website Vercel đã kiểm tra trước đợt này đang dùng PostgreSQL-only; không suy ra Redis production đã được bật từ việc Redis cục bộ READY.
+Docker Compose ứng dụng dùng database ngoài qua DATABASE_URL. Tất cả service đã hợp nhất trong `docker-compose.yml`: frontend/backend/Redis ứng dụng chạy mặc định; `sprint4-postgres` và `sprint4-redis` thuộc profile `sprint4`, network riêng, **chỉ dành cho kiểm thử**. Xem lệnh khởi động/dọn đúng service ở kế hoạch kiểm thử. Website Vercel đã kiểm tra trước đợt này đang dùng PostgreSQL-only; không suy ra Redis production đã được bật từ việc Redis cục bộ READY.
 
 Express server.ts có WebSocket gateway; Vercel api/index.js chỉ nạp Express app. Giao diện tracking hiện polling. Nghiệm thu WebSocket cần host phù hợp hoặc quyết định phạm vi được duyệt, không lấy health UP làm bằng chứng socket hoạt động.
 
