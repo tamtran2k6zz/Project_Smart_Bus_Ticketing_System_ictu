@@ -97,6 +97,10 @@ export function Passes() {
                 `Giá theo hồ sơ hiện tại: ${money(query.data?.policy?.monthlyPrice ?? 0)} / 30 ngày. Giá được xác nhận khi khởi tạo thanh toán.`
               )}
             </p>
+            <p className="muted">
+              Vé chỉ áp dụng cho tuyến đã chọn trong 30 ngày, không dùng cho tất cả tuyến. Khi lên
+              xe, trình QR vé tháng để soát vé; chuyến cần còn chỗ, vé không giữ sẵn ghế.
+            </p>
             <Field label="Tuyến đăng ký">
               <select value={route} onChange={e => setRoute(e.target.value)}>
                 <option value="">Chọn tuyến</option>

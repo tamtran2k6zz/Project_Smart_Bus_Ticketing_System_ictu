@@ -35,12 +35,20 @@
   color: var(--primary);
   border-radius: 13px;
   width: 54px;
-  height: 54px;
+  min-height: 54px;
+  padding: 8px 4px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  text-align: center;
   display: grid;
   place-items: center;
   font-weight: 700;
 }
+.trip > div {
+  min-width: 0;
+}
 .trip h3 {
+  overflow-wrap: anywhere;
   margin: 0 0 12px;
   font-size: 17px;
 }
@@ -73,17 +81,48 @@
   margin-right: 18px;
 }
 .seatGrid button:disabled {
-  background: #e2e8f0;
-  border-color: #e2e8f0;
-  color: #64748b;
   cursor: not-allowed;
+  opacity: 1;
 }
-.seatGrid .selected {
+.seatGrid [data-seat-state='occupied'],
+.seatLegend [data-seat-state='occupied'] {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+.seatGrid [data-seat-state='selected'],
+.seatLegend [data-seat-state='selected'] {
   background: var(--primary);
   color: white;
 }
-.seatGrid .mine {
-  border: 2px solid #d97706;
+.seatGrid [data-seat-state='mine'],
+.seatLegend [data-seat-state='mine'] {
+  background: #fef3c7;
+  border: 2px solid #b45309;
+  color: #78350f;
+}
+.seatLegend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 16px;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+.seatLegend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.seatLegend span {
+  width: 18px;
+  height: 18px;
+  border: 1px solid #b9d9c2;
+  background: #f0fdf4;
+  border-radius: 4px;
+  flex-shrink: 0;
 }
 .seatBus {
   border: 2px solid var(--border);
@@ -135,7 +174,7 @@
   }
   .routeNum {
     width: 44px;
-    height: 44px;
+    min-height: 44px;
   }
   .tripAside {
     grid-column: 1/-1;
