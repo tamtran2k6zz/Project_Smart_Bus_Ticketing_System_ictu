@@ -174,11 +174,13 @@ function PassengerBookingFlow({ user }: { user: User }) {
     setDraft({ tripId: h.tripId, holdId: h.id, seatIds: h.seatIds, quantity: h.quantity });
     setExpired(false);
     setBookingNotice('');
+    await seats.refetch();
   }, 'Đã giữ chỗ. Hoàn tất thông tin để tiếp tục.');
   const release = useAction(async () => {
     await bookingApi.release(holdId, user.id);
     setDraft({ holdId: '' });
     setExpired(false);
+    await seats.refetch();
   });
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
@@ -256,10 +258,27 @@ function PassengerBookingFlow({ user }: { user: User }) {
                             seat.status === 'booked' ||
                             (seat.status === 'held' && !seat.mine)
                           }
-                          className={
-                            (draft.seatIds.includes(seat.id) ? s.selected : '') +
-                            ' ' +
-                            (seat.mine ? s.mine : '')
+                          data-seat-state={
+                            active && hold.data?.seatIds.includes(seat.id)
+                              ? 'mine'
+                              : seat.status === 'available'
+                                ? draft.seatIds.includes(seat.id)
+                                  ? 'selected'
+                                  : 'available'
+                                : seat.status === 'held' && seat.mine
+                                  ? 'mine'
+                                  : 'occupied'
+                          }
+                          title={
+                            active && hold.data?.seatIds.includes(seat.id)
+                              ? 'Đang giữ cho bạn'
+                              : seat.status !== 'available'
+                                ? seat.status === 'held' && seat.mine
+                                  ? 'Đang giữ cho bạn'
+                                  : 'Khách khác đã giữ / đã đặt'
+                                : draft.seatIds.includes(seat.id)
+                                  ? 'Đang chọn, chưa giữ chỗ'
+                                  : 'Còn trống'
                           }
                           onClick={() => {
                             setDraft({
@@ -273,11 +292,29 @@ function PassengerBookingFlow({ user }: { user: User }) {
                         </button>
                       ))}
                     </div>
-                    <p className="muted" style={{ textAlign: 'center' }}>
-                      Xanh nhạt: trống · xám: đã giữ/đặt
-                      <br />
-                      Viền vàng: giữ chỗ của bạn
-                    </p>
+                    <ul className={s.seatLegend} aria-label="Chú giải trạng thái ghế">
+                      <li>
+                        <span data-seat-state="available" />
+                        Trống
+                      </li>
+                      <li>
+                        <span data-seat-state="selected" />
+                        Đang chọn (chưa giữ)
+                      </li>
+                      <li>
+                        <span data-seat-state="mine" />
+                        Đang giữ cho bạn
+                      </li>
+                      <li>
+                        <span data-seat-state="occupied" />
+                        Khách khác đã giữ / đã đặt
+                      </li>
+                    </ul>
+                    {active && (
+                      <p className="muted">
+                        Muốn đổi ghế, chọn “Thay đổi lựa chọn” để hủy giữ chỗ hiện tại.
+                      </p>
+                    )}
                   </div>
                 </AsyncState>
               ) : (
