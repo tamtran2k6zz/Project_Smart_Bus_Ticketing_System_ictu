@@ -13,7 +13,10 @@ import { getMe } from '../controllers/auth.controller';
 import authRoutes from './auth.routes';
 import { cancelTicket } from '../services/cancellation.service';
 import { prepareSeats, reserveSeatForPayment } from '../services/booking';
-import { PaymentGatewayService } from '../services/payment-gateway.service';
+import {
+  PaymentGatewayService,
+  assertPaymentMethodEnabled,
+} from '../services/payment-gateway.service';
 import { createBankTransfer, transferForBooking } from '../services/bank-transfer.service';
 import {
   lockWallet,
@@ -593,6 +596,7 @@ router.post(
               : ['VNPay', 'Card'].includes(req.body.gateway)
                 ? 'VNPAY'
                 : fail('Cổng thanh toán chưa được hỗ trợ.');
+    assertPaymentMethodEnabled(method);
     const b = await ownBooking(req.body.bookingId, req.user!.id);
     if (bookingDto(b).status === 'paid') return paymentWithBankTransfer(b, req.user!.id);
     const ticketId = await transaction(async client => {

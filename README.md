@@ -455,3 +455,9 @@ Repository hiện chưa công bố tệp `LICENSE`.
 **Đồ án Thực tập Cơ sở 2026 · Nhóm 5 — N5 Innovators**
 
 Trường Đại học Công nghệ Thông tin & Truyền thông — Đại học Thái Nguyên (ICTU).
+
+
+## Kiểm tra đóng gói Sprint 4 — 20/10/2026
+
+[Đối chiếu 20 nhiệm vụ, đề cương báo cáo và gate phát hành](docs/SPRINT4_RELEASE_READINESS_2026-10-20.md).
+Hiện chỉ chuẩn bị source snapshot ứng viên kiểm thử; chưa nghiệm thu Staging 24/24 US hoặc tag v1.0.0 chính thức. MoMo/ZaloPay tạm khóa cho giao dịch mới; callback/hoàn tiền giao dịch cũ vẫn được xử lý. Cấu hình server `PAYMENT_PAUSED_METHODS=MOMO,ZALOPAY`; VNPay, QR Techcombank thủ công và ví dùng theo cấu hình/điều kiện thực tế.

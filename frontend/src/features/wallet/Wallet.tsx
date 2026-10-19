@@ -41,7 +41,7 @@ export default function Wallet() {
   });
   const [modal, setModal] = useState<'topup' | 'withdraw' | ''>('');
   const [amount, setAmount] = useState(100000),
-    [method, setMethod] = useState('MOMO');
+    [method, setMethod] = useState('VNPAY');
   const [bankName, setBank] = useState(''),
     [bankAccountNumber, setAccount] = useState(''),
     [accountHolderName, setHolder] = useState(user.name);
@@ -367,7 +367,11 @@ export default function Wallet() {
                           </Badge>
                         </div>
                         {t.status === 'PENDING' && t.payment_url && (
-                          <Button variant="secondary" onClick={() => openPayment(t.payment_url!)}>
+                          <Button
+                            variant="secondary"
+                            disabled={['MOMO', 'ZALOPAY'].includes(t.method)}
+                            onClick={() => openPayment(t.payment_url!)}
+                          >
                             Thanh toán
                           </Button>
                         )}
@@ -413,9 +417,13 @@ export default function Wallet() {
             <>
               <Field label="Cổng thanh toán">
                 <select value={method} onChange={e => setMethod(e.target.value)}>
-                  <option value="MOMO">MoMo</option>
+                  <option value="MOMO" disabled>
+                    MoMo · Tạm khóa
+                  </option>
                   <option value="VNPAY">VNPay</option>
-                  <option value="ZALOPAY">ZaloPay</option>
+                  <option value="ZALOPAY" disabled>
+                    ZaloPay · Tạm khóa
+                  </option>
                 </select>
               </Field>
               <p className="muted">

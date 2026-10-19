@@ -29,7 +29,7 @@ export function Checkout() {
   const { bookingId = '' } = useParams(),
     navigate = useNavigate(),
     user = useSession(s => s.user)!;
-  const [gateway, setGateway] = useState<Gateway>('MoMo'),
+  const [gateway, setGateway] = useState<Gateway>('VNPay'),
     [expired, setExpired] = useState(false);
   const query = useQuery({
     queryKey: ['booking', bookingId, user.id],
@@ -49,7 +49,8 @@ export function Checkout() {
     refetchInterval: gateway === 'Wallet' ? 10000 : false,
   });
   useEffect(() => {
-    if (savedGateway) setGateway(savedGateway);
+    if (savedGateway)
+      setGateway(['MoMo', 'ZaloPay'].includes(savedGateway) ? 'VNPay' : savedGateway);
   }, [payment.data?.id, savedGateway]);
   const hold = useQuery({
     queryKey: ['hold', query.data?.holdId, user.id],
@@ -135,6 +136,9 @@ export function Checkout() {
               )}
               <Card>
                 <h3>Chọn phương thức</h3>
+                <p className="muted">
+                  MoMo và ZaloPay tạm khóa. Vui lòng chọn VNPay, chuyển khoản hoặc ví cá nhân.
+                </p>
                 <div className={s.methods}>
                   {(
                     [
@@ -160,7 +164,7 @@ export function Checkout() {
                         name="gateway"
                         checked={gateway === value}
                         onChange={() => setGateway(value)}
-                        disabled={!canPay || busy}
+                        disabled={!canPay || busy || ['MoMo', 'ZaloPay'].includes(value)}
                       />
                       {value === 'Wallet' ? (
                         <WalletIcon size={19} />

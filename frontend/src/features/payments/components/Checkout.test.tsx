@@ -64,7 +64,7 @@ beforeEach(() => {
     serverTime: new Date().toISOString(),
     expiresAt: new Date(Date.now() + 8 * 60000).toISOString(),
   });
-  api.latest.mockResolvedValue({ id: 'p1', gateway: 'MoMo', status: 'pending', amount: 20000 });
+  api.latest.mockResolvedValue({ id: 'p1', gateway: 'VNPay', status: 'pending', amount: 20000 });
   api.start.mockRejectedValue(new Error('Cổng thanh toán đang bận.'));
   api.overview.mockResolvedValue({ wallet: { balance: 0, status: 'ACTIVE' } });
 });
@@ -162,7 +162,7 @@ it('recovers the saved payment after a network timeout without treating it as pa
   api.start.mockImplementation(async () => {
     api.latest.mockResolvedValue({
       id: 'saved-before-timeout',
-      gateway: 'MoMo',
+      gateway: 'VNPay',
       status: 'pending',
       amount: 20000,
     });
@@ -313,4 +313,13 @@ it('blocks duplicate submissions and changes while the request is in flight', as
   rejectStart(new Error('Thử lại'));
   await screen.findByText('Thử lại');
   await waitFor(() => expect(button.disabled).toBe(false));
+});
+
+it('keeps paused providers disabled and restores an old MoMo checkout to VNPay', async () => {
+  api.latest.mockResolvedValue({ id: 'old', gateway: 'MoMo', status: 'pending', amount: 20000 });
+  open();
+  await screen.findByText('Chỗ đang được giữ cho bạn');
+  expect(screen.getByRole('radio', { name: 'MoMo' })).toBeDisabled();
+  expect(screen.getByRole('radio', { name: 'ZaloPay' })).toBeDisabled();
+  expect(screen.getByRole('radio', { name: 'VNPay' })).toBeChecked();
 });

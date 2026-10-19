@@ -31,7 +31,7 @@ export function Passes() {
   const user = useSession(s => s.user)!;
   const query = useQuery({ queryKey: ['passes', user.id], queryFn: () => passesApi.list(user.id) });
   const catalog = useQuery({ queryKey: ['catalog'], queryFn: operationsApi.catalog });
-  const [gateway, setGateway] = useState('MoMo');
+  const [gateway, setGateway] = useState('VNPay');
   const intent = useRef({ routeId: '', key: '' });
   const [route, setRoute] = useState(''),
     [confirm, setConfirm] = useState<{ routeId: string; id?: string } | null>(null);
@@ -226,7 +226,10 @@ export function Passes() {
           <select value={gateway} onChange={e => setGateway(e.target.value)}>
             {['MoMo', 'VNPay', 'ZaloPay', 'Card', ...(!appConfig.demo ? ['Ví SmartBus'] : [])].map(
               g => (
-                <option key={g}>{g}</option>
+                <option key={g} disabled={['MoMo', 'ZaloPay'].includes(g)}>
+                  {g}
+                  {['MoMo', 'ZaloPay'].includes(g) ? ' · Tạm khóa' : ''}
+                </option>
               )
             )}
           </select>

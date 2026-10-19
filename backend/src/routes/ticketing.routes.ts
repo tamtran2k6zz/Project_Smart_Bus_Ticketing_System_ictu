@@ -18,7 +18,11 @@ import { acquireSeatLock, releaseSeatLock, redisSeatLockEnabled } from '../confi
 import { validateTicketQr } from '../services/ticket.service';
 import { appLogger } from '../config/logger';
 import { getGatewayCallbacks, isProduction, readEnv } from '../config/env';
-import { PaymentGatewayService, OnlinePaymentMethod } from '../services/payment-gateway.service';
+import {
+  PaymentGatewayService,
+  OnlinePaymentMethod,
+  assertPaymentMethodEnabled,
+} from '../services/payment-gateway.service';
 import { BookingError, reserveSeatForPayment, cleanupOldTrips } from '../services/booking';
 import { PaymentRefundError, PaymentRefundService } from '../services/payment-refund.service';
 import { deliverTicketEmail, processPendingTicketEmails } from '../services/ticket-email.service';
@@ -512,6 +516,12 @@ router.post(
       return;
     }
 
+    try {
+      assertPaymentMethodEnabled(paymentMethod);
+    } catch (error: any) {
+      res.status(error.status || 409).json({ success: false, message: error.message });
+      return;
+    }
     let lockId: string | null;
     try {
       lockId = await acquireSeatLock(String(tripId), seatNumber, userId);

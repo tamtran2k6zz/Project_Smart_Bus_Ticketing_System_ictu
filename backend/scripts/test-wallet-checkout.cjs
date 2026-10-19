@@ -31,6 +31,30 @@ module.exports = async ({ db, call, route, admin, momoCallback }) => {
   await db.query('UPDATE users SET email_verified_at=NOW() WHERE id=ANY($1::text[])', [
     [uid, other.data.user.id],
   ]);
+  process.env.PAYMENT_PAUSED_METHODS = 'MOMO,ZALOPAY';
+  for (const [method, gateway] of [
+    ['MOMO', 'MoMo'],
+    ['ZALOPAY', 'ZaloPay'],
+  ]) {
+    await call('post', base + '/payments', { bookingId: randomUUID(), gateway }, token, 409);
+    await call(
+      'post',
+      base + '/wallet/topup',
+      { amount: 100000, method, requestKey: randomUUID() },
+      token,
+      409
+    );
+    await call('post', base + '/passes', { routeId: route.id, gateway }, token, 409);
+  }
+  await call(
+    'post',
+    '/api/v1/ticketing/bookings',
+    { tripId: randomUUID(), seatNumber: 'A01', paymentMethod: 'MOMO' },
+    token,
+    409
+  );
+  // Restore sandbox providers for existing signature/settlement fixtures below.
+  process.env.PAYMENT_PAUSED_METHODS = '';
   const overview = () => call('get', base + '/wallet', null, token);
   const balance = async () => Number((await overview()).wallet.balance);
   assert.equal(await balance(), 0);
@@ -41,7 +65,9 @@ module.exports = async ({ db, call, route, admin, momoCallback }) => {
     token
   );
   assert.equal(await balance(), 0);
+  process.env.PAYMENT_PAUSED_METHODS = 'MOMO,ZALOPAY';
   await call('post', '/api/v1/ticketing/payments/momo/ipn', momoCallback(topup.id, 100000, 889941));
+  process.env.PAYMENT_PAUSED_METHODS = '';
   assert.equal(await balance(), 100000);
   const trip = (
     await call(
