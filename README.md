@@ -6,7 +6,7 @@
 
 [![CI](https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu/actions/workflows/ci.yml/badge.svg)](https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu/actions/workflows/ci.yml)
 
-[Ứng dụng](https://smart-bus-ticketing-system.vercel.app/) · [Báo lỗi](https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu/issues) · [Tài liệu](#tài-liệu)
+[Ứng dụng](https://smart-bus-ticketing-system.vercel.app/) · [Hotline: 0932397894](tel:0932397894) · [Báo lỗi](https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu/issues) · [Tài liệu](#tài-liệu)
 
 SmartBus là đồ án xây dựng ứng dụng web số hóa quy trình tra cứu, đặt vé, thanh toán và soát vé xe buýt; đồng thời hỗ trợ quản lý tuyến, lịch chạy, đội xe, nhân sự và doanh thu. Đồ án vận dụng kiến thức phân tích yêu cầu, thiết kế cơ sở dữ liệu, phát triển phần mềm và kiểm thử vào một bài toán vận tải công cộng. Giao diện sử dụng tiếng Việt, đơn vị tiền tệ VND và múi giờ `Asia/Ho_Chi_Minh`.
 
@@ -15,6 +15,7 @@ SmartBus là đồ án xây dựng ứng dụng web số hóa quy trình tra c�
 ## Mục lục
 
 - [Thông tin đồ án](#thông-tin-đồ-án)
+- [Trạng thái đóng gói Sprint 4](#kiểm-tra-đóng-gói-sprint-4--20102026)
 - [Tầm nhìn, mục tiêu và phạm vi đồ án](#tầm-nhìn-mục-tiêu-và-phạm-vi-đồ-án)
 - [Vai trò và phân quyền](#vai-trò-và-phân-quyền)
 - [Kiến trúc và công nghệ](#kiến-trúc-và-công-nghệ)
@@ -39,6 +40,11 @@ SmartBus là đồ án xây dựng ứng dụng web số hóa quy trình tra c�
 | Năm thực hiện  | 2026                                                                           |
 | Nhóm thực hiện | Nhóm 5 — N5 Innovators                                                         |
 | Đơn vị đào tạo | Trường Đại học Công nghệ Thông tin & Truyền thông — Đại học Thái Nguyên (ICTU) |
+
+## Kiểm tra đóng gói Sprint 4 — 20/10/2026
+
+[Đối chiếu 20 nhiệm vụ, đề cương báo cáo và gate phát hành](docs/SPRINT4_RELEASE_READINESS_2026-10-20.md).
+Hiện chỉ chuẩn bị source snapshot ứng viên kiểm thử; chưa nghiệm thu Staging 24/24 US hoặc tag v1.0.0 chính thức. MoMo/ZaloPay tạm khóa và ẩn lựa chọn UI cho giao dịch mới; callback/hoàn tiền giao dịch cũ vẫn được xử lý. Cấu hình server `PAYMENT_PAUSED_METHODS=MOMO,ZALOPAY`; VNPay, QR Techcombank thủ công và ví dùng theo cấu hình/điều kiện thực tế.
 
 ## Tầm nhìn, mục tiêu và phạm vi đồ án
 
@@ -75,10 +81,10 @@ Việc bán vé, kiểm soát chỗ, phân công chuyến và tổng hợp doanh
 | Phân hệ                | Chức năng chính                                                                                                                          |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | Đặt vé và vé điện tử   | Tìm chuyến theo hành trình/thời gian, chọn ghế, giữ chỗ 10 phút, phát hành QR, gửi yêu cầu hủy/đổi vé                                    |
-| Thanh toán và chứng từ | Adapter MoMo, VNPay, ZaloPay; ví điện tử người dùng, hoàn tiền tức thì, hóa đơn và email vé                                              |
+| Thanh toán và chứng từ | VNPay, QR chuyển khoản Techcombank duyệt thủ công, thanh toán bằng ví; hoàn về ví khi hủy được duyệt; adapter chứng từ/email             |
 | Điều hành              | Quản lý tuyến/trạm/giá, đội xe, lịch theo tần suất, phân công tài xế/phụ xe, đổi giờ và hoàn tất chuyến quá giờ đến                      |
 | Hành trình và soát vé  | Nhận GPS, hiển thị độ mới của dữ liệu/ETA, đăng ký thông báo trạm, báo sự cố/trễ chuyến, quét QR và danh sách hành khách                 |
-| Vé tháng và ưu đãi     | Mua/gia hạn vé tháng, duyệt đối tượng ưu tiên, chính sách giá và quản lý voucher                                                         |
+| Vé tháng và ưu đãi     | Mua/gia hạn vé tháng theo một tuyến, tự gia hạn bằng ví khi đăng ký; duyệt ưu tiên, chính sách giá và voucher                            |
 | Báo cáo và phân tích   | Doanh thu theo thời gian/tuyến/xe, tỷ lệ lấp đầy từng chuyến, xuất Excel/PDF, mật độ khách và dự báo nhu cầu tham khảo                   |
 | Quản trị và hỗ trợ     | Phân quyền tài khoản, quản lý yêu cầu hủy/đổi vé, duyệt rút tiền về ngân hàng, nhật ký truy cập/thao tác, phản ánh và khôi phục mật khẩu |
 
@@ -86,14 +92,14 @@ Các phân hệ tương ứng với **24 user story và 5 product goal**. Việc
 
 ## Vai trò và phân quyền
 
-| Vai trò         | Mã          | Phạm vi chính                                      |
-| --------------- | ----------- | -------------------------------------------------- |
-| Hành khách      | `PASSENGER` | Đặt vé, vé tháng, hành trình và dữ liệu cá nhân    |
-| Tài xế / phụ xe | `DRIVER`    | Chuyến được phân công, soát vé, vị trí và sự cố    |
-| Điều hành       | `MANAGER`   | Vận hành, hỗ trợ, soát vé, duyệt ưu đãi và báo cáo |
-| Tài chính       | `FINANCE`   | Báo cáo và khuyến mãi                              |
-| Marketing       | `MARKETING` | Quản lý khuyến mãi                                 |
-| Quản trị viên   | `ADMIN`     | Quản trị toàn hệ thống                             |
+| Vai trò         | Mã          | Phạm vi chính                                              |
+| --------------- | ----------- | ---------------------------------------------------------- |
+| Hành khách      | `PASSENGER` | Đặt vé, vé tháng, hành trình và dữ liệu cá nhân            |
+| Tài xế / phụ xe | `DRIVER`    | Chuyến được phân công, soát vé, vị trí và sự cố            |
+| Điều hành       | `MANAGER`   | Vận hành, hỗ trợ, soát vé, duyệt ưu đãi và báo cáo         |
+| Tài chính       | `FINANCE`   | Báo cáo, khuyến mãi, đối soát chuyển khoản và duyệt rút ví |
+| Marketing       | `MARKETING` | Quản lý khuyến mãi                                         |
+| Quản trị viên   | `ADMIN`     | Quản trị toàn hệ thống                                     |
 
 Backend xác thực JWT, kiểm tra vai trò hiện tại, quyền sở hữu dữ liệu và phân công chuyến. Quyền truy cập được kiểm tra tại API bên cạnh các guard trên giao diện.
 
@@ -120,7 +126,7 @@ flowchart LR
 | Kiểm thử                       | Jest, Vitest, Testing Library, Playwright, PGlite                                         |
 | Triển khai                     | Vercel, Docker Compose, Nginx, GitHub Actions                                             |
 
-Các thao tác đặt vé sử dụng transaction và khóa hàng PostgreSQL. Redis bổ sung khóa/cache cho các luồng có cấu hình sử dụng. Schema được quản lý bằng migration SQL; backend sử dụng trực tiếp `pg` với hệ thống interface TypeScript tường minh (strict domain interfaces), bảo mật HMAC/timingSafeEqual và chuẩn hóa xử lý lỗi đồng bộ.
+Các thao tác đặt vé sử dụng transaction và khóa hàng PostgreSQL. Redis bổ sung khóa/cache cho các luồng có cấu hình sử dụng. Schema được quản lý bằng migration SQL; backend truy cập trực tiếp qua `pg`. QR vé tháng được ký HMAC SHA-256 và so sánh bằng `timingSafeEqual`; JWT xác thực được kiểm tra cùng trạng thái tài khoản và quyền hiện tại trong database.
 
 ## Luồng nghiệp vụ chính
 
@@ -129,6 +135,7 @@ Các thao tác đặt vé sử dụng transaction và khóa hàng PostgreSQL. Re
 ```mermaid
 sequenceDiagram
     actor P as Hành khách
+    actor F as Tài chính/admin
     participant UI as Frontend
     participant API as Express API
     participant DB as PostgreSQL
@@ -140,10 +147,19 @@ sequenceDiagram
     UI->>API: POST /bookings
     API-->>UI: bookingId
     UI->>API: POST /payments
-    API->>G: Khởi tạo giao dịch
-    API-->>UI: redirectUrl
-    G->>API: Callback / IPN
-    API->>DB: Kiểm tra giao dịch, cập nhật vé
+    alt Thanh toán bằng ví
+        API->>DB: Khóa ví, kiểm tra số dư, trừ tiền và phát hành vé trong transaction
+    else QR chuyển khoản Techcombank
+        API-->>UI: QR, số tiền và nội dung chuyển khoản
+        P->>UI: Báo đã chuyển khoản
+        F->>API: Xác nhận báo có
+        API->>DB: Xác nhận thanh toán và phát hành vé
+    else VNPay
+        API->>G: Khởi tạo giao dịch
+        API-->>UI: redirectUrl
+        G->>API: Callback / IPN
+        API->>DB: Kiểm tra chữ ký, số tiền và giao dịch, cập nhật vé
+    end
     UI->>API: Đọc trạng thái vé
     API-->>UI: QR khi đủ điều kiện
 ```
@@ -152,10 +168,21 @@ Giá và thời hạn giữ chỗ do backend xác định; tải lại trang kh�
 
 Với **Mã QR / Chuyển khoản Techcombank**, khách nhận QR chứa số tiền và nội dung riêng cho đơn, sau đó báo đã chuyển khoản. Tài chính/admin đối chiếu báo có rồi mới phát hành vé; khoản đến muộn hoặc lệch số tiền được ghi nhận vào ví. Xem [quy trình đối soát và migration triển khai](docs/TECHCOMBANK_TRANSFER.md).
 
+Với **Ví cá nhân**, số dư khả dụng phải đủ toàn bộ đơn. Backend lấy giá từ đặt vé, khóa ví và xử lý khoản trừ, ledger, vé và ghế trong cùng transaction; yêu cầu lặp không trừ lại. Thiếu tiền hoặc ví bị khóa sẽ không phát hành vé. Xem [thanh toán vé bằng ví](docs/WALLET_TICKET_CHECKOUT_2026-10-16.md).
+
+**MoMo và ZaloPay đang tạm khóa** cho giao dịch mới và đã ẩn khỏi lựa chọn trên UI, gồm đặt vé, vé tháng và nạp ví. Code tích hợp/callback/hoàn tiền của giao dịch cũ vẫn được giữ. Nạp ví hiện cho chọn VNPay; việc hiển thị phương thức không chứng nhận merchant đã nghiệm thu. Server mặc định `PAYMENT_PAUSED_METHODS=MOMO,ZALOPAY`; để mở lại cần cập nhật cả cấu hình server và UI.
+
+### Vé tháng và số dư ví
+
+- Vé tháng gắn với **một tuyến đã chọn**, có hiệu lực 30 ngày; gia hạn vé còn hiệu lực cộng thêm 30 ngày từ ngày hết hạn.
+- Trình QR vé tháng khi lên chuyến đúng tuyến, trong thời gian cho phép và còn chỗ. Vé tháng không giữ sẵn ghế; quét lại trên cùng chuyến không chiếm thêm chỗ.
+- Mua/gia hạn bằng VNPay hoặc số dư ví theo cấu hình khả dụng. Tự động gia hạn chỉ chạy khi khách đã đăng ký, đồng ý hạn mức và ví đủ tiền; scheduler phải được cấu hình.
+- Nạp ví không tự cộng tiền ngay khi tạo đơn hoặc quay lại URL kết quả; chỉ cộng khi backend xác nhận hợp lệ. Rút tiền là yêu cầu tài chính/admin **chuyển khoản thủ công**, không có API chi hộ ngân hàng.
+
 ### Xác minh, hủy/đổi và soát vé
 
 - Hành khách đăng ký bằng email, nhận liên kết xác minh và hoàn tất xác minh trước các thao tác yêu cầu quyền này. Khôi phục mật khẩu dùng liên kết có hạn, dùng một lần; đổi mật khẩu làm mất hiệu lực phiên cũ.
-- Yêu cầu hủy/đổi được xét theo điều kiện vé và thời gian trước khởi hành. Backend quản lý việc đổi chỗ, trạng thái vé và hoàn tiền; thông tin ngân hàng nhận hoàn có thể được cung cấp trong yêu cầu hủy.
+- Yêu cầu hủy/đổi được xét theo điều kiện vé và thời gian trước khởi hành. Khi yêu cầu hủy được duyệt, luồng hành khách hoàn khoản đã thanh toán về ví và trả ghế; khách gửi yêu cầu rút riêng nếu muốn nhận qua ngân hàng. Thông tin ngân hàng lưu trong yêu cầu không tự thực hiện chuyển khoản.
 - Người soát cần đúng quyền và phân công chuyến. Vé chưa thanh toán, bị hủy hoặc QR không còn hợp lệ bị từ chối; quét lặp không tạo thêm lần lên xe.
 - Chuyến chờ chạy hoặc đang chạy được hoàn tất khi đã qua giờ đến dự kiến. Những chuyến chưa tới giờ kết thúc được giữ nguyên.
 
@@ -169,13 +196,14 @@ Chức năng **Giải phóng chuyến hoàn thành** đưa tất cả chuyến �
 
 Nguồn schema áp dụng là **[supabase/migrations/](supabase/migrations/)**:
 
-| Nhóm               | Bảng tiêu biểu                                                                                                   |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| Tài khoản          | `roles`, `users`, `staff_profiles`                                                                               |
-| Vận hành           | `routes`, `bus_stops`, `route_stops`, `buses`, `seats`, `fares`, `trips`, `trip_seats`                           |
-| Vé / thanh toán    | `ui_holds`, `ui_bookings`, `tickets`, `payment_transactions`, `ticket_requests`, `vouchers`, `user_wallets`      |
-| Vị trí / tương tác | `trip_locations`, `trip_subscriptions`, `incidents`, `feedbacks`, `support_requests`, `eligibility_applications` |
-| Audit / gửi vé     | `audit_events`, `ticket_email_deliveries` và các bảng validation/notification trong migration Sprint 3           |
+| Nhóm               | Bảng tiêu biểu                                                                                                        |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| Tài khoản          | `roles`, `users`, `staff_profiles`                                                                                    |
+| Vận hành           | `routes`, `bus_stops`, `route_stops`, `buses`, `seats`, `fares`, `trips`, `trip_seats`                                |
+| Vé / thanh toán    | `ui_holds`, `ui_bookings`, `tickets`, `payment_transactions`, `ticket_requests`, `vouchers`, `bank_transfer_payments` |
+| Ví cá nhân         | `user_wallets`, `wallet_transactions`, `wallet_topups`, `wallet_withdrawals`, `wallet_pass_subscriptions`             |
+| Vị trí / tương tác | `trip_locations`, `trip_subscriptions`, `incidents`, `feedbacks`, `support_requests`, `eligibility_applications`      |
+| Audit / gửi vé     | `audit_events`, `ticket_email_deliveries` và các bảng validation/notification trong migration Sprint 3                |
 
 Các migration bổ sung quản lý `monthly_passes`, `pass_orders`, `pass_checkins`, `fare_policies`, `refund_jobs`, `electronic_invoices`, đơn ZaloPay, `user_wallets` (ví điện tử) và các trường khôi phục mật khẩu/thông tin ngân hàng.
 
@@ -189,7 +217,7 @@ Migration runner:
 
 Đổi schema bằng **migration mới**, kiểm thử trước khi áp dụng database dùng chung. Nguồn áp dụng chuẩn là thư mục `supabase/migrations`; không dùng bản SQL tham chiếu để thay runner. Truy cập ứng dụng đi qua Express/`pg`; custom JWT không phải Supabase Auth JWT. Migration bật RLS/hạn chế truy cập trực tiếp cho `anon`/`authenticated` của Data API.
 
-[Sơ đồ ERD](https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu/blob/745108a0217267ee29cb65e88d94437d853f5f45/docs/ERD_SMART_BUS_TICKETING_SYSTEM.md) mô tả mô hình nền; migration bổ sung là nguồn đối chiếu cho bảng mới.
+[Sơ đồ ERD](docs/ERD_SMART_BUS_TICKETING_SYSTEM.md) mô tả mô hình nền; migration bổ sung là nguồn đối chiếu cho bảng mới.
 
 ## Hướng dẫn cài đặt và chạy
 
@@ -202,7 +230,7 @@ Migration runner:
 ### Cài đặt dependency
 
 ```powershell
-git clone https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu.git
+git clone --branch Develop https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu.git
 cd Project_Smart_Bus_Ticketing_System_ictu
 npm ci
 npm --prefix backend ci
@@ -270,7 +298,7 @@ Frontend cũng hỗ trợ `VITE_APP_MODE=demo` để chạy dữ liệu mô ph�
 
 ## Cấu hình
 
-Phân hệ **Ví SmartBus** hỗ trợ nhận hoàn tiền, nạp qua cổng thanh toán, rút ngân hàng do tài chính duyệt thủ công và tự động gia hạn vé tháng bằng số dư ví. Xem [hướng dẫn sử dụng, migration và lịch gia hạn](docs/WALLET.md).
+Phân hệ **Ví SmartBus** hỗ trợ nhận hoàn tiền, nạp qua VNPay, thanh toán vé chuyến, mua/gia hạn vé tháng theo tuyến, rút ngân hàng do tài chính duyệt thủ công và tự gia hạn khi khách đăng ký. Xem [hướng dẫn sử dụng, migration và lịch gia hạn](docs/WALLET.md).
 
 Danh sách đầy đủ nằm trong [cấu hình backend mẫu](.env.example) và [cấu hình frontend mẫu](frontend/.env.example).
 
@@ -280,12 +308,14 @@ Danh sách đầy đủ nằm trong [cấu hình backend mẫu](.env.example) v�
 | Ứng dụng          | `NODE_ENV`, `PORT`, `JWT_SECRET`, `CORS_ORIGIN`                                    | Môi trường, xác thực và origin frontend                 |
 | Email             | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Xác minh tài khoản, khôi phục mật khẩu, gửi vé/chứng từ |
 | Liên kết frontend | `FRONTEND_PUBLIC_URL`                                                              | Origin nhận liên kết email; dùng HTTPS trên production  |
-| Thanh toán        | `MOMO_*`, `VNPAY_*`, `ZALOPAY_*`                                                   | Merchant, chữ ký, callback và kết quả thanh toán        |
-| Hóa đơn           | `INVOICE_API_URL`, `INVOICE_API_TOKEN`, `INVOICE_SELLER_NAME`                      | Adapter nhà cung cấp hóa đơn                            |
+| Thanh toán        | `PAYMENT_PAUSED_METHODS`, `MOMO_*`, `VNPAY_*`, `ZALOPAY_*`                         | Merchant, chữ ký, callback và kết quả thanh toán        |
+| Hóa đơn           | `INVOICE_MODE`, `INVOICE_API_URL`, `INVOICE_API_TOKEN`, `INVOICE_SELLER_NAME`      | Adapter nhà cung cấp hóa đơn                            |
 | Job và Redis      | `PAYMENT_CRON_SECRET` hoặc `CRON_SECRET`, `REDIS_URL`                              | Bảo vệ job định kỳ; khóa/cache tùy chọn                 |
 | Frontend          | `VITE_APP_MODE`, `VITE_API_BASE_URL`, `VITE_LEGACY_APP`                            | Chế độ dữ liệu, API và giao diện                        |
 
 Dùng session/direct connection cho migration; transaction pooler cổng `6543` dành cho runtime. Cấu hình chứng chỉ TLS theo môi trường triển khai và yêu cầu của nhà cung cấp.
+
+Hóa đơn cần nhà cung cấp và thông tin cấu hình hợp lệ. `INVOICE_MODE=demo` chỉ cho phép chứng từ mô phỏng ngoài production; PDF tự xuất không thay thế hóa đơn thuế đã nghiệm thu.
 
 Các biến `VITE_*` được đưa vào mã frontend và có thể đọc từ trình duyệt. Credential database, SMTP, merchant, JWT secret và file môi trường thật phải được quản lý riêng, không đưa vào Git.
 
@@ -301,6 +331,7 @@ npm run build
 npm --prefix backend run test:postgres
 npm --prefix backend run test:trip-cleanup
 npm --prefix backend run test:serverless
+npm --prefix backend run test:sprint4
 npm --prefix frontend run test:e2e
 ```
 
@@ -314,15 +345,19 @@ Pop-Location
 
 Playwright cần trình duyệt đã cài đặt; có thể chỉ định Chrome bằng biến `PLAYWRIGHT_EXECUTABLE_PATH`. Trên máy hạn chế tài nguyên, chạy frontend test với `npm --prefix frontend test -- --maxWorkers=1`.
 
-Mốc kiểm chứng cục bộ ngày **14/10/2026**:
+Mốc kiểm chứng cục bộ đầy đủ gần nhất ngày **20/10/2026**, trên bản sửa thanh toán `d44edc8`:
 
-| Nhóm                   | Kết quả                      |
-| ---------------------- | ---------------------------- |
-| Backend unit           | 83 test / 12 suite đạt       |
-| Frontend unit và theme | 85 Vitest và 8 test Node đạt |
-| API / PostgreSQL       | 394 kiểm tra đạt             |
-| E2E frontend           | 13 kịch bản đạt              |
-| E2E qua API cô lập     | 3 kịch bản đạt               |
+| Nhóm                   | Kết quả / phạm vi                                         |
+| ---------------------- | --------------------------------------------------------- |
+| Backend unit           | 97 test / 15 suite đạt                                    |
+| Frontend unit          | 116 Vitest / 23 file đạt                                  |
+| API / PostgreSQL nhúng | 561 kiểm tra đạt; gateway giả lập, không chuyển tiền thật |
+| E2E frontend           | 21 kịch bản Chromium đạt; dùng demo localStorage          |
+| Typecheck, lint, build | Backend/frontend đạt                                      |
+
+Các thay đổi UI ẩn cổng (`3e7f683`) đã kiểm tra lại 16 test Checkout, 6 test ví, lint và TypeScript. Bản hợp nhất Compose (`6856aaa`) đã kiểm tra cấu hình mặc định/profile, PostgreSQL/Redis healthy, kết nối DB/PONG, chốt thiếu secrets và 2 guard/statistics test của runner. Đây là bằng chứng theo từng snapshot, không phải kết quả chạy mới trên mọi commit đọc README.
+
+Ba kịch bản `playwright.demo.config.ts` dùng API fixture cục bộ, khác với E2E localStorage; chưa được chạy lại trong mốc đầy đủ 20/10 nêu trên. Không cộng chúng thành nghiệm thu Staging 24/24 US.
 
 PGlite và provider giả lập giúp kiểm tra nghiệp vụ, migration, phân quyền và các tình huống lỗi. Kết quả này chưa thay thế kiểm thử tải trên PostgreSQL nhiều kết nối, giao dịch provider thật hoặc thiết bị GPS/camera thực.
 
@@ -337,7 +372,7 @@ Sử dụng thư mục gốc repository làm **Root Directory**. [vercel.json](v
 - Đặt các biến backend ở môi trường triển khai; frontend/API cùng origin sử dụng `/api/smartbus/v1`.
 - Dùng database riêng cho Preview và production; áp dụng migration trước khi triển khai mã phụ thuộc schema mới.
 - Xác nhận `/api/health` trả HTTP `200` và database kết nối thành công sau triển khai.
-- Cấu hình scheduler gọi `/api/v1/ticketing/release-expired` với Bearer job secret. Interval trong `server.ts` chỉ chạy trên server thường trực.
+- Cấu hình scheduler gọi `/api/v1/ticketing/release-expired` với Bearer job secret. Endpoint này xử lý giữ chỗ hết hạn, hoàn tất chuyến quá giờ và gia hạn ví. `vercel.json` hiện lên lịch `0 0 * * *` (00:00 UTC, 07:00 Việt Nam); cần scheduler ngoài nếu yêu cầu tần suất cao hơn. Interval trong `server.ts` chạy mỗi 60 giây trên server thường trực.
 - Tracking/thông báo sử dụng polling HTTP trên frontend. WebSocket cần hạ tầng hỗ trợ kết nối thường trực.
 
 ### Docker Compose
@@ -360,9 +395,9 @@ docker compose --profile sprint4 stop sprint4-postgres sprint4-redis
 docker compose --profile sprint4 rm -f sprint4-postgres sprint4-redis
 ```
 
-| Mục đích | Service | Dữ liệu / cổng |
-|---|---|---|
-| Ứng dụng | `frontend`, `backend`, `redis` | UI 3000, API 5000; Redis dùng volume `redis_data` |
+| Mục đích | Service                             | Dữ liệu / cổng                                    |
+| -------- | ----------------------------------- | ------------------------------------------------- |
+| Ứng dụng | `frontend`, `backend`, `redis`      | UI 3000, API 5000; Redis dùng volume `redis_data` |
 | Kiểm thử | `sprint4-postgres`, `sprint4-redis` | Loopback PostgreSQL 6544, Redis 6381; dữ liệu tạm |
 
 Luôn ghi hai tên service khi chỉ chạy kiểm thử: `--profile sprint4 up` không kèm tên sẽ khởi động cả ứng dụng. Không dùng `down -v` để dọn test. Xem [kế hoạch Sprint 4](docs/SPRINT4_TEST_PLAN.md) về fixture và runner. Khi chạy backend, Compose kiểm tra `DATABASE_URL` và `JWT_SECRET` tại lúc service khởi động; thiếu cấu hình sẽ không chạy API. `PAYMENT_PAUSED_METHODS` cũng được truyền vào container (mặc định khóa MoMo/ZaloPay).
@@ -395,8 +430,9 @@ Cần hoàn tất nghiệm thu merchant/callback/hoàn tiền, hợp đồng API
 4. Đánh giá mô hình dự báo trên dữ liệu thực, xác định chỉ số sai số và hiệu quả điều chỉnh chuyến.
 5. Tiếp tục tách nghiệp vụ backend thành module và chuẩn hóa tài liệu, quy trình phát triển của nhóm.
 
-### Cải tiến kỹ thuật gần đây (Tháng 10/2026)
-- **Type Safety & Strict Interfaces**: Chuẩn hóa toàn bộ các dịch vụ cốt lõi (như `monthly-pass.service.ts`, `schedule.service.ts`) bằng các interface TypeScript tường minh (`MonthlyPassRecord`, `PassOrderRecord`, `ScheduleConfig`), loại bỏ các kiểu `any` lỏng lẻo.
+### Cải tiến kỹ thuật gần đây (tháng 10/2026)
+
+- **Kiểu dữ liệu:** bổ sung interface như `MonthlyPassRecord`, `PassOrderRecord`, `ScheduleConfig` cho các luồng tương ứng. Vẫn còn vị trí dùng `any`; chưa xem đây là hoàn tất chuẩn hóa kiểu toàn backend.
 - **Bảo mật & Đồng thời**: Tăng cường bảo mật xác thực QR vé tháng với HMAC SHA-256 và `timingSafeEqual`, kết hợp giao dịch PostgreSQL với row-level locking (`FOR UPDATE`) chống tranh chấp ghế hiệu quả.
 
 ## Cấu trúc mã nguồn
@@ -424,22 +460,29 @@ Các lệnh npm của từng thành phần được định nghĩa trong [packag
 
 ## Tài liệu
 
-Các liên kết dưới đây trỏ tới phiên bản tài liệu đã lưu cùng mã nguồn, để giữ ổn định khi vị trí file được tổ chức lại:
+Tài liệu theo phiên bản mã nguồn đang đọc; các tài liệu có ngày/Sprint cũ là bằng chứng lịch sử, không tự đại diện trạng thái production:
 
-| Tài liệu                                                                                                                                                                                           | Nội dung                                                                |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| [Hướng dẫn demo](https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu/blob/745108a0217267ee29cb65e88d94437d853f5f45/docs/DEMO_2026-10-13.md)                                    | Kịch bản 15 phút, tài khoản và dữ liệu mẫu                              |
-| [Sơ đồ dữ liệu](https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu/blob/745108a0217267ee29cb65e88d94437d853f5f45/docs/ERD_SMART_BUS_TICKETING_SYSTEM.md)                      | ERD nền và quan hệ nghiệp vụ                                            |
-| [Khôi phục mật khẩu](https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu/blob/745108a0217267ee29cb65e88d94437d853f5f45/docs/PASSWORD_RECOVERY_2026-10-13.md)                   | Email khôi phục, thời hạn liên kết và hủy phiên cũ                      |
-| [Hoàn tất chuyến](https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu/blob/745108a0217267ee29cb65e88d94437d853f5f45/docs/TRIP_CLEANUP_2026-10-13.md)                           | Điều kiện giờ đến, quyền truy cập và tính an toàn khi chạy lặp          |
-| [Đánh giá chức năng ngày 12/10](https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu/blob/745108a0217267ee29cb65e88d94437d853f5f45/docs/IMPLEMENTATION_READINESS_2026-10-12.md) | Đối chiếu user story/goal và giới hạn nghiệm thu tại thời điểm đánh giá |
+| Tài liệu                                                                     | Nội dung                                                                |
+| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| [Hướng dẫn demo](docs/DEMO_2026-10-13.md)                                    | Kịch bản 15 phút, tài khoản và dữ liệu mẫu                              |
+| [Sơ đồ dữ liệu](docs/ERD_SMART_BUS_TICKETING_SYSTEM.md)                      | ERD nền và quan hệ nghiệp vụ                                            |
+| [Khôi phục mật khẩu](docs/PASSWORD_RECOVERY_2026-10-13.md)                   | Email khôi phục, thời hạn liên kết và hủy phiên cũ                      |
+| [Hoàn tất chuyến](docs/TRIP_CLEANUP_2026-10-13.md)                           | Điều kiện giờ đến, quyền truy cập và tính an toàn khi chạy lặp          |
+| [Đánh giá chức năng ngày 12/10](docs/IMPLEMENTATION_READINESS_2026-10-12.md) | Đối chiếu user story/goal và giới hạn nghiệm thu tại thời điểm đánh giá |
+
+Các hướng dẫn và bằng chứng bổ sung:
+
+- [Ví SmartBus và gia hạn tự động](docs/WALLET.md) · [Thanh toán vé bằng ví](docs/WALLET_TICKET_CHECKOUT_2026-10-16.md). Cấu hình tạm khóa cổng hiện tại được mô tả trong README này.
+- [QR Techcombank và đối soát thủ công](docs/TECHCOMBANK_TRANSFER.md).
+- [Lưu trữ chuyến hoàn thành](docs/TRIP_ARCHIVE.md) · [Tách giữ chỗ theo tài khoản](docs/BOOKING_DRAFT_ISOLATION_2026-10-16.md).
+- [Kế hoạch Sprint 4](docs/SPRINT4_TEST_PLAN.md) · [Báo cáo kỹ thuật](docs/SPRINT_4_TECHNICAL_REPORT.md) · [Ma trận 24 US](docs/SPRINT4_ACCEPTANCE_MATRIX.md) · [Đối chiếu 20 nhiệm vụ và gate phát hành](docs/SPRINT4_RELEASE_READINESS_2026-10-20.md).
 
 Điểm vào API được định nghĩa tại [backend/src/app.ts](backend/src/app.ts); điều hướng giao diện chính tại [frontend/src/routes/AppRouter.tsx](frontend/src/routes/AppRouter.tsx).
 
-Tài liệu phục vụ học phần tại commit tham chiếu:
+Tài liệu học phần Sprint 1 (không phải báo cáo/slide cuối cùng):
 
-- [Báo cáo Sprint 1 — Word](https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu/blob/745108a0217267ee29cb65e88d94437d853f5f45/docs/Bao_Cao_Sprint_1_Smart_Bus_Ticketing_System.docx).
-- [Slide thuyết trình Sprint 1 — PowerPoint](https://github.com/tamtran2k6zz/Project_Smart_Bus_Ticketing_System_ictu/blob/745108a0217267ee29cb65e88d94437d853f5f45/docs/Slide_Thuyet_Trinh_Sprint_1_Smart_Bus.pptx).
+- [Báo cáo Sprint 1 — Word](docs/Bao_Cao_Sprint_1_Smart_Bus_Ticketing_System.docx).
+- [Slide thuyết trình Sprint 1 — PowerPoint](docs/Slide_Thuyet_Trinh_Sprint_1_Smart_Bus.pptx).
 
 Kịch bản demo được giữ như tài liệu lịch sử. Hai script khởi động/dừng buổi demo đã được gỡ sau khi báo cáo kết thúc.
 
@@ -460,10 +503,10 @@ Kịch bản demo được giữ như tài liệu lịch sử. Hai script khởi
 
 ## Quy trình làm việc nhóm và bảo mật
 
-1. Tạo nhánh từ phiên bản `main` mới nhất, mô tả rõ phạm vi thay đổi.
+1. Tạo nhánh làm việc từ `Develop` mới nhất, mô tả rõ phạm vi thay đổi.
 2. Bổ sung migration mới cho thay đổi dữ liệu; không chỉnh migration đã áp dụng.
 3. Chạy các kiểm tra liên quan và cập nhật tài liệu/config mẫu khi thay đổi hành vi.
-4. Gửi pull request kèm mục đích, cách kiểm tra và tác động triển khai.
+4. Gửi pull request kèm mục đích, cách kiểm tra và tác động triển khai. Tích hợp vào `Develop`; đưa sang `main` qua PR riêng sau khi kiểm tra.
 
 Dùng Issues cho lỗi chức năng và đề xuất cải tiến. Với vấn đề bảo mật, liên hệ riêng người quản lý repository; không đăng credential, token, connection string hoặc dữ liệu cá nhân vào issue công khai.
 
@@ -472,9 +515,3 @@ Repository hiện chưa công bố tệp `LICENSE`.
 **Đồ án Thực tập Cơ sở 2026 · Nhóm 5 — N5 Innovators**
 
 Trường Đại học Công nghệ Thông tin & Truyền thông — Đại học Thái Nguyên (ICTU).
-
-
-## Kiểm tra đóng gói Sprint 4 — 20/10/2026
-
-[Đối chiếu 20 nhiệm vụ, đề cương báo cáo và gate phát hành](docs/SPRINT4_RELEASE_READINESS_2026-10-20.md).
-Hiện chỉ chuẩn bị source snapshot ứng viên kiểm thử; chưa nghiệm thu Staging 24/24 US hoặc tag v1.0.0 chính thức. MoMo/ZaloPay tạm khóa cho giao dịch mới; callback/hoàn tiền giao dịch cũ vẫn được xử lý. Cấu hình server `PAYMENT_PAUSED_METHODS=MOMO,ZALOPAY`; VNPay, QR Techcombank thủ công và ví dùng theo cấu hình/điều kiện thực tế.
