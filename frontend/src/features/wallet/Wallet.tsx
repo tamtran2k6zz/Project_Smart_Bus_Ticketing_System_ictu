@@ -417,13 +417,7 @@ export default function Wallet() {
             <>
               <Field label="Cổng thanh toán">
                 <select value={method} onChange={e => setMethod(e.target.value)}>
-                  <option value="MOMO" disabled>
-                    MoMo · Tạm khóa
-                  </option>
                   <option value="VNPAY">VNPay</option>
-                  <option value="ZALOPAY" disabled>
-                    ZaloPay · Tạm khóa
-                  </option>
                 </select>
               </Field>
               <p className="muted">

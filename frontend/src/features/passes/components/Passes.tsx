@@ -224,14 +224,9 @@ export function Passes() {
         </p>
         <Field label="Phương thức thanh toán">
           <select value={gateway} onChange={e => setGateway(e.target.value)}>
-            {['MoMo', 'VNPay', 'ZaloPay', 'Card', ...(!appConfig.demo ? ['Ví SmartBus'] : [])].map(
-              g => (
-                <option key={g} disabled={['MoMo', 'ZaloPay'].includes(g)}>
-                  {g}
-                  {['MoMo', 'ZaloPay'].includes(g) ? ' · Tạm khóa' : ''}
-                </option>
-              )
-            )}
+            {['VNPay', 'Card', ...(!appConfig.demo ? ['Ví SmartBus'] : [])].map(g => (
+              <option key={g}>{g}</option>
+            ))}
           </select>
         </Field>
         <ActionMessage action={buy} />

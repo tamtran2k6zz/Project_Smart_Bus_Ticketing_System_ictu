@@ -784,7 +784,7 @@ export const PassengerPortalPage: React.FC = () => {
                   </div>
                 </div>
                 <div style={{ alignSelf: 'end', padding: '12px 16px', borderRadius: '12px', background: 'rgba(56, 189, 248, 0.08)', color: '#bae6fd', fontSize: '13px' }}>
-                  Chọn ghế rồi tiếp tục để chọn VNPay, MoMo hoặc QR demo.
+                  Chọn ghế rồi tiếp tục để chọn VNPay hoặc QR demo.
                 </div>
               </div>
 

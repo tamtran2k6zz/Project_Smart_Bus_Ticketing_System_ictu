@@ -136,18 +136,9 @@ export function Checkout() {
               )}
               <Card>
                 <h3>Chọn phương thức</h3>
-                <p className="muted">
-                  MoMo và ZaloPay tạm khóa. Vui lòng chọn VNPay, chuyển khoản hoặc ví cá nhân.
-                </p>
                 <div className={s.methods}>
                   {(
-                    [
-                      'MoMo',
-                      'VNPay',
-                      'ZaloPay',
-                      'BankTransfer',
-                      ...(!appConfig.demo ? ['Wallet'] : []),
-                    ] as Gateway[]
+                    ['VNPay', 'BankTransfer', ...(!appConfig.demo ? ['Wallet'] : [])] as Gateway[]
                   ).map(value => (
                     <label
                       key={value}
@@ -164,7 +155,7 @@ export function Checkout() {
                         name="gateway"
                         checked={gateway === value}
                         onChange={() => setGateway(value)}
-                        disabled={!canPay || busy || ['MoMo', 'ZaloPay'].includes(value)}
+                        disabled={!canPay || busy}
                       />
                       {value === 'Wallet' ? (
                         <WalletIcon size={19} />
