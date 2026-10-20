@@ -36,6 +36,9 @@ export function Footer() {
             <h3>HỖ TRỢ & THÔNG TIN</h3>
             <ul>
               <li>
+                <a href="tel:0932397894">Hotline: 0932397894</a>
+              </li>
+              <li>
                 <Link to="/account/support">Liên hệ & phản ánh</Link>
               </li>
               <li>
