@@ -14,12 +14,6 @@ const paymentMethods: { id: PaymentMethod; name: string; description: string; ic
     icon: 'VNP',
   },
   {
-    id: 'MOMO',
-    name: 'Ví MoMo',
-    description: 'Thanh toán nhanh qua ví điện tử MoMo',
-    icon: 'M',
-  },
-  {
     id: 'QR',
     name: 'QR (demo)',
     description: 'Giữ ghế và tạo QR thông tin giao dịch; không chuyển tiền thật',

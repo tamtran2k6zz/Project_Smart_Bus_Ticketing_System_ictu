@@ -315,11 +315,11 @@ it('blocks duplicate submissions and changes while the request is in flight', as
   await waitFor(() => expect(button.disabled).toBe(false));
 });
 
-it('keeps paused providers disabled and restores an old MoMo checkout to VNPay', async () => {
+it('hides paused providers and restores an old MoMo checkout to VNPay', async () => {
   api.latest.mockResolvedValue({ id: 'old', gateway: 'MoMo', status: 'pending', amount: 20000 });
   open();
   await screen.findByText('Chỗ đang được giữ cho bạn');
-  expect(screen.getByRole('radio', { name: 'MoMo' })).toBeDisabled();
-  expect(screen.getByRole('radio', { name: 'ZaloPay' })).toBeDisabled();
+  expect(screen.queryByRole('radio', { name: 'MoMo' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('radio', { name: 'ZaloPay' })).not.toBeInTheDocument();
   expect(screen.getByRole('radio', { name: 'VNPay' })).toBeChecked();
 });

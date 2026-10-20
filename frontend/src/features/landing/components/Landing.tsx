@@ -52,7 +52,7 @@ const faqs = [
     'Tôi có thể thanh toán bằng cách nào?',
     appConfig.demo
       ? 'Bản demo mô phỏng thanh toán, không thu tiền thật.'
-      : 'Bạn có thể thanh toán bằng MoMo, VNPay hoặc thẻ qua VNPay khi nhà xe mở cổng thanh toán. Vé chỉ phát hành sau khi giao dịch được xác nhận.',
+      : 'Bạn có thể thanh toán bằng VNPay, chuyển khoản Techcombank hoặc ví SmartBus khi phương thức tương ứng khả dụng. Vé chỉ phát hành sau khi giao dịch được xác nhận.',
   ],
   [
     'Tôi cần làm gì khi lên xe?',
