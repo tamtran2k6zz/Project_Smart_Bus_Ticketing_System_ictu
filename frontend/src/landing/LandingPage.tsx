@@ -710,6 +710,9 @@ export default function LandingPage() {
             SmartBus
           </a>
           <p>Hệ thống vé xe buýt thông minh · Nhóm 5, ICTU · 2026</p>
+          <a href="tel:0932397894" className="footer-link">
+            Hotline: 0932397894
+          </a>
           <a href="/register" className="footer-link">
             Đăng ký tài khoản
           </a>
